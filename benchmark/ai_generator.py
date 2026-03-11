@@ -15,10 +15,10 @@ def generate_bricks_yaml(
     """Generate Bricks YAML via SequenceComposer.
 
     Returns:
-        (yaml_string, input_tokens_used)
+        (yaml_string, total_tokens_used)
 
-    Note: Token count is estimated from the request since SequenceComposer
-    does not expose token usage from the underlying Anthropic API call.
+    Token count is the real input+output token usage reported by the
+    Anthropic API via SequenceComposer.compose_with_usage().
     """
     try:
         from bricks.ai import SequenceComposer
@@ -35,18 +35,9 @@ def generate_bricks_yaml(
         )
 
     composer = SequenceComposer(registry=registry, api_key=api_key)
-    sequence = composer.compose(intent)
+    sequence, input_tokens, output_tokens = composer.compose_with_usage(intent)
     yaml_str = _sequence_to_yaml(sequence)
-
-    # Estimate tokens from YAML output and brick schemas
-    # Rough estimate: ~4 characters = 1 token
-    yaml_tokens = len(yaml_str) // 4
-    # Add ~960 tokens for Bricks system prompt in SequenceComposer
-    # and ~200 tokens per brick in registry for context
-    system_and_context_tokens = 960 + (len(registry.get_all_brick_names()) * 200)
-    estimated_total = system_and_context_tokens + yaml_tokens
-
-    return yaml_str, estimated_total
+    return yaml_str, input_tokens + output_tokens
 
 
 def generate_python_code(

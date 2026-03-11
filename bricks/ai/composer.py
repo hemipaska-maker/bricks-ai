@@ -131,6 +131,28 @@ class SequenceComposer:
             ComposerError: If the AI returns invalid YAML or the sequence
                 fails Pydantic validation.
         """
+        sequence, _, _ = self.compose_with_usage(intent)
+        return sequence
+
+    def compose_with_usage(self, intent: str) -> tuple[SequenceDefinition, int, int]:
+        """Compose a sequence and return real token usage from the API.
+
+        Same as ``compose()`` but also returns the exact token counts reported
+        by the Anthropic API response, enabling accurate benchmarking of token
+        efficiency compared to raw Python code generation.
+
+        Args:
+            intent: Natural language description of the desired sequence.
+
+        Returns:
+            A 3-tuple of ``(sequence, input_tokens, output_tokens)`` where
+            ``input_tokens`` and ``output_tokens`` are the actual values from
+            ``response.usage`` as reported by the Anthropic API.
+
+        Raises:
+            ComposerError: If the AI returns invalid YAML or the sequence
+                fails Pydantic validation.
+        """
         bricks_info = self._build_bricks_context()
         prompt = _USER_PROMPT_TEMPLATE.format(
             bricks_json=json.dumps(bricks_info, indent=2),
@@ -147,16 +169,21 @@ class SequenceComposer:
         except Exception as exc:
             raise ComposerError(f"API call failed: {exc}", cause=exc) from exc
 
+        input_tokens: int = response.usage.input_tokens
+        output_tokens: int = response.usage.output_tokens
+
         raw_text = self._extract_text(response)
         yaml_content = self._extract_yaml(raw_text)
 
         try:
-            return self._loader.load_string(yaml_content)
+            sequence = self._loader.load_string(yaml_content)
         except Exception as exc:
             raise ComposerError(
                 f"AI-generated YAML is invalid: {exc}\n\nYAML:\n{yaml_content}",
                 cause=exc,
             ) from exc
+
+        return sequence, input_tokens, output_tokens
 
     def _build_bricks_context(self) -> list[dict[str, Any]]:
         """Build a JSON-serialisable list of brick descriptions.
