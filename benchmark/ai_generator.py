@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from bricks.core import BrickRegistry
@@ -11,14 +12,22 @@ from bricks.core import BrickRegistry
 def generate_bricks_yaml(
     intent: str,
     registry: BrickRegistry,
+    inputs: dict[str, Any] | None = None,
+    expected_outputs: list[str] | None = None,
 ) -> tuple[str, int]:
     """Generate Bricks YAML via SequenceComposer.
 
+    Args:
+        intent: Natural language description of what to compute.
+        registry: The brick registry to use.
+        inputs: Scenario inputs dict -- constrains the AI to use the same
+            parameter names so the generated YAML is runnable with the
+            scenario's test data.
+        expected_outputs: Expected output key names -- constrains the AI to
+            use the same keys in outputs_map for correct comparison.
+
     Returns:
         (yaml_string, total_tokens_used)
-
-    Token count is the real input+output token usage reported by the
-    Anthropic API via SequenceComposer.compose_with_usage().
     """
     try:
         from bricks.ai import SequenceComposer
@@ -34,8 +43,22 @@ def generate_bricks_yaml(
             "Set it or use demo mode (no --live flag)."
         )
 
+    # Enrich the intent with exact input/output constraints so the AI
+    # generates YAML that is compatible with the scenario's test data.
+    enriched_intent = intent
+    if inputs:
+        input_names = ", ".join(inputs.keys())
+        enriched_intent += (
+            f"\n\nYou MUST use exactly these input parameter names: {input_names}"
+        )
+    if expected_outputs:
+        output_names = ", ".join(expected_outputs)
+        enriched_intent += (
+            f"\nYou MUST use exactly these keys in outputs_map: {output_names}"
+        )
+
     composer = SequenceComposer(registry=registry, api_key=api_key)
-    sequence, input_tokens, output_tokens = composer.compose_with_usage(intent)
+    sequence, input_tokens, output_tokens = composer.compose_with_usage(enriched_intent)
     yaml_str = _sequence_to_yaml(sequence)
     return yaml_str, input_tokens + output_tokens
 
@@ -43,12 +66,15 @@ def generate_bricks_yaml(
 def generate_python_code(
     intent: str,
     available_functions: list[tuple[str, str]],
+    inputs: dict[str, Any] | None = None,
 ) -> tuple[str, int]:
     """Generate Python code via Anthropic API.
 
     Args:
-        intent: Natural language description of what to compute
-        available_functions: List of (function_name, docstring) tuples
+        intent: Natural language description of what to compute.
+        available_functions: List of (function_name, docstring) tuples.
+        inputs: Scenario inputs dict -- tells the AI what variables are
+            available so it uses inputs['key'] correctly.
 
     Returns:
         (python_code, total_tokens_used)
@@ -71,10 +97,15 @@ def generate_python_code(
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Build function descriptions
     func_descriptions = "\n".join(
         f"- {name}: {doc}" for name, doc in available_functions
     )
+
+    inputs_hint = ""
+    if inputs:
+        inputs_hint = "\n\nAvailable inputs (access via inputs['key']):\n" + "\n".join(
+            f"- inputs['{k}'] = {v!r}" for k, v in inputs.items()
+        )
 
     system_prompt = (
         "You are an expert Python programmer. "
@@ -86,13 +117,13 @@ def generate_python_code(
         "- Do NOT import any modules or define new functions\n"
         "- Store the final result in a variable named 'result' as a dict\n"
         "- The code must be runnable with exec()\n"
-        "- Assume 'inputs' is a dict of input parameters already defined\n\n"
-        "Output ONLY the Python code, no explanations."
+        "- Access input values via inputs['key'] (a dict is pre-defined)\n"
+        "- Output ONLY raw Python code -- no markdown, no code fences"
     )
 
-    user_prompt = f"""Task: {intent}
-
-Generate Python code that solves this task using the available functions."""
+    user_prompt = (
+        f"Task: {intent}{inputs_hint}\n\nGenerate Python code that solves this task."
+    )
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
@@ -102,13 +133,23 @@ Generate Python code that solves this task using the available functions."""
     )
 
     code = response.content[0].text
-    # Return total tokens: input + output
+    code = _strip_markdown_fences(code)
     total_tokens = response.usage.input_tokens + response.usage.output_tokens
     return code, total_tokens
 
 
+def _strip_markdown_fences(code: str) -> str:
+    """Remove ```python ... ``` or ``` ... ``` wrappers if present."""
+    match = re.search(r"```(?:python)?\s*\n(.*?)```", code, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return code.strip()
+
+
 def _sequence_to_yaml(sequence: Any) -> str:
     """Convert a SequenceDefinition to YAML string."""
+    import io
+
     from ruamel.yaml import YAML
 
     yaml = YAML()
@@ -130,8 +171,6 @@ def _sequence_to_yaml(sequence: Any) -> str:
         ],
         "outputs_map": sequence.outputs_map,
     }
-
-    import io
 
     stream = io.StringIO()
     yaml.dump(data, stream)

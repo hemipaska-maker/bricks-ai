@@ -44,8 +44,14 @@ def _generate_live_code(scenarios: list[Scenario], registry) -> None:  # type: i
         print(f"Generating for scenario {scenario.name}...")
 
         try:
-            # Generate Bricks YAML
-            yaml_code, bricks_tokens = generate_bricks_yaml(scenario.intent, registry)
+            # Pass input names + expected output keys so the AI generates
+            # YAML that is compatible with the scenario's test data.
+            yaml_code, bricks_tokens = generate_bricks_yaml(
+                scenario.intent,
+                registry,
+                inputs=scenario.inputs,
+                expected_outputs=list(scenario.expected_output.keys()),
+            )
             scenario.bricks_yaml = yaml_code
             print(f"  YAML: {len(yaml_code)} chars, {bricks_tokens} tokens")
         except Exception as e:
@@ -53,9 +59,9 @@ def _generate_live_code(scenarios: list[Scenario], registry) -> None:  # type: i
             sys.exit(1)
 
         try:
-            # Generate Python code
+            # Pass inputs so AI uses inputs['key'] instead of hardcoding.
             python_code, python_tokens = generate_python_code(
-                scenario.intent, available_functions
+                scenario.intent, available_functions, inputs=scenario.inputs
             )
             scenario.python_code = python_code
             print(f"  Python: {len(python_code)} chars, {python_tokens} tokens")
