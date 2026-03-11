@@ -17,7 +17,7 @@ class TestDefaultConfig:
         assert config.registry.auto_discover is False
         assert config.registry.paths == []
         assert config.sequences.base_dir == "sequences/"
-        assert config.ai.model == "claude-3-5-haiku-20241022"
+        assert config.ai.model == "claude-3-5-haiku-latest"
         assert config.ai.max_tokens == 4096
 
     def test_load_returns_default_when_no_file(self, tmp_path: Path) -> None:
@@ -40,7 +40,7 @@ registry:
 sequences:
   base_dir: "my_sequences/"
 ai:
-  model: "claude-3-5-haiku-20241022"
+  model: "claude-3-5-haiku-latest"
   max_tokens: 2048
 """
         config = loader.load_string(yaml_content)
@@ -48,7 +48,7 @@ ai:
         assert config.registry.auto_discover is True
         assert config.registry.paths == ["bricks_lib/", "custom_bricks.py"]
         assert config.sequences.base_dir == "my_sequences/"
-        assert config.ai.model == "claude-3-5-haiku-20241022"
+        assert config.ai.model == "claude-3-5-haiku-latest"
         assert config.ai.max_tokens == 2048
 
     def test_load_partial_config_uses_defaults(self) -> None:

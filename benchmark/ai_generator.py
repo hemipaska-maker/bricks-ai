@@ -95,7 +95,7 @@ def generate_python_code(
 Generate Python code that solves this task using the available functions."""
 
     response = client.messages.create(
-        model="claude-3-5-haiku-20241022",
+        model="claude-3-5-haiku-latest",
         max_tokens=2048,
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],

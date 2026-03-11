@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(pip install -e \".[dev]\")",
-      "Bash(pytest -v)"
+      "Bash(pytest -v)",
+      "Bash(python -m pytest benchmark/tests/ -v)",
+      "Bash(python -m benchmark.run_benchmark)",
+      "Bash(ruff check benchmark/ --fix)",
+      "Bash(ruff format benchmark/)"
     ]
   }
 }

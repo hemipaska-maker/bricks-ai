@@ -71,7 +71,7 @@ registry:
 sequences:
   base_dir: "sequences/"
 ai:
-  model: "claude-3-5-haiku-20241022"
+  model: "claude-3-5-haiku-latest"
   max_tokens: 4096
 """
     config_file.write_text(config_content)
