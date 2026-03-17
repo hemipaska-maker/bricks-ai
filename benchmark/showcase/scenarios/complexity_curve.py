@@ -331,7 +331,7 @@ def _execute_blueprint(blueprint_file: str, inputs: dict[str, Any], registry: ob
     engine = BlueprintEngine(registry=registry)  # type: ignore[arg-type]
     yaml_str = (_BLUEPRINTS / blueprint_file).read_text()
     sequence = loader.load_string(yaml_str)
-    return engine.run(sequence, inputs=inputs)
+    return engine.run(sequence, inputs=inputs).outputs
 
 
 # ── A-3 public functions ──────────────────────────────────────────────────────

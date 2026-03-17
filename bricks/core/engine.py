@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
 from bricks.core.brick import BaseBrick, BrickModel
 from bricks.core.context import ExecutionContext
 from bricks.core.exceptions import BrickExecutionError
-from bricks.core.models import BlueprintDefinition, BrickMeta
+from bricks.core.models import (
+    BlueprintDefinition,
+    BrickMeta,
+    ExecutionResult,
+    StepResult,
+    Verbosity,
+)
 from bricks.core.registry import BrickRegistry
 from bricks.core.resolver import ReferenceResolver
 
@@ -47,6 +54,13 @@ class BlueprintEngine:
 
     On failure, teardown is called on the failing step, then in reverse
     order on all previously completed steps, before re-raising.
+
+    The ``verbosity`` parameter controls how much execution detail is included
+    in the returned :class:`~bricks.core.models.ExecutionResult`:
+
+    - ``MINIMAL`` (default): final ``outputs`` only.
+    - ``STANDARD``: ``outputs`` + per-step output dicts.
+    - ``FULL``: ``outputs`` + per-step inputs/outputs/timing + total duration.
     """
 
     _MAX_DEPTH: int = 10
@@ -64,36 +78,46 @@ class BlueprintEngine:
         self._loader: BlueprintLoader = loader if loader is not None else BlueprintLoader()
         self._resolver = ReferenceResolver()
 
-    def run(self, blueprint: BlueprintDefinition, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Execute a blueprint and return its output map.
+    def run(
+        self,
+        blueprint: BlueprintDefinition,
+        inputs: dict[str, Any] | None = None,
+        verbosity: Verbosity = Verbosity.MINIMAL,
+    ) -> ExecutionResult:
+        """Execute a blueprint and return a structured result.
 
         Args:
             blueprint: A validated BlueprintDefinition.
             inputs: Runtime input values matching the blueprint's input schema.
+            verbosity: Controls execution trace detail in the returned result.
 
         Returns:
-            A dictionary of output values as defined by ``outputs_map``.
+            An :class:`~bricks.core.models.ExecutionResult` with ``outputs``
+            always populated. ``steps`` and timing fields populated according
+            to ``verbosity``.
 
         Raises:
             BrickExecutionError: If any step fails during execution.
         """
-        return self._execute(blueprint, inputs, depth=0)
+        return self._execute(blueprint, inputs, depth=0, verbosity=verbosity)
 
     def _execute(
         self,
         blueprint: BlueprintDefinition,
         inputs: dict[str, Any] | None,
         depth: int,
-    ) -> dict[str, Any]:
+        verbosity: Verbosity = Verbosity.MINIMAL,
+    ) -> ExecutionResult:
         """Internal recursive execution helper.
 
         Args:
             blueprint: The blueprint to execute.
             inputs: Runtime inputs.
             depth: Current recursion depth (0 = top level).
+            verbosity: Execution trace detail level.
 
         Returns:
-            A dictionary of output values.
+            An ExecutionResult.
 
         Raises:
             BrickExecutionError: On step failure or recursion depth exceeded.
@@ -107,6 +131,8 @@ class BlueprintEngine:
 
         context = ExecutionContext(inputs=inputs)
         completed: list[tuple[Any, dict[str, Any], BrickMeta]] = []
+        step_results: list[StepResult] = []
+        total_start = time.perf_counter()
 
         for step in blueprint.steps:
             resolved_params = self._resolver.resolve(step.params, context)
@@ -115,6 +141,7 @@ class BlueprintEngine:
                 # ── Function/class-based brick ─────────────────────────────
                 callable_, meta = self._registry.get(step.brick)
 
+                t0 = time.perf_counter()
                 try:
                     result = callable_(**resolved_params)
                 except Exception as exc:
@@ -127,7 +154,20 @@ class BlueprintEngine:
                         cause=exc,
                     ) from exc
 
+                duration_ms = (time.perf_counter() - t0) * 1000
                 completed.append((callable_, resolved_params, meta))
+
+                if verbosity in (Verbosity.STANDARD, Verbosity.FULL):
+                    step_results.append(
+                        StepResult(
+                            step_name=step.name,
+                            brick_name=step.brick,
+                            inputs=resolved_params if verbosity == Verbosity.FULL else {},
+                            outputs=result if isinstance(result, dict) else {},
+                            duration_ms=duration_ms if verbosity == Verbosity.FULL else 0.0,
+                            save_as=step.save_as,
+                        )
+                    )
 
             else:
                 # ── Sub-blueprint ──────────────────────────────────────────
@@ -135,7 +175,8 @@ class BlueprintEngine:
                 child_path = Path(step.blueprint or "")
                 try:
                     child_bp = self._loader.load_file(child_path)
-                    result = self._execute(child_bp, resolved_params, depth + 1)
+                    child_result = self._execute(child_bp, resolved_params, depth + 1, verbosity)
+                    result = child_result.outputs
                 except BrickExecutionError:
                     raise
                 except Exception as exc:
@@ -145,9 +186,28 @@ class BlueprintEngine:
                         cause=exc,
                     ) from exc
 
+                if verbosity in (Verbosity.STANDARD, Verbosity.FULL):
+                    step_results.append(
+                        StepResult(
+                            step_name=step.name,
+                            brick_name=step.blueprint or "<sub-blueprint>",
+                            inputs=resolved_params if verbosity == Verbosity.FULL else {},
+                            outputs=result if isinstance(result, dict) else {},
+                            save_as=step.save_as,
+                        )
+                    )
+
             if step.save_as is not None:
                 context.save_result(step.save_as, result)
             context.advance_step()
 
         outputs: dict[str, Any] = self._resolver.resolve(blueprint.outputs_map, context)
-        return outputs
+        total_ms = (time.perf_counter() - total_start) * 1000
+
+        return ExecutionResult(
+            outputs=outputs,
+            steps=step_results,
+            total_duration_ms=total_ms if verbosity == Verbosity.FULL else 0.0,
+            blueprint_name=blueprint.name,
+            verbosity=verbosity,
+        )

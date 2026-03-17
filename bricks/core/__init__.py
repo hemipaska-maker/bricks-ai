@@ -24,7 +24,14 @@ from bricks.core.exceptions import (
     YamlLoadError,
 )
 from bricks.core.loader import BlueprintLoader
-from bricks.core.models import BlueprintDefinition, BrickMeta, StepDefinition
+from bricks.core.models import (
+    BlueprintDefinition,
+    BrickMeta,
+    ExecutionResult,
+    StepDefinition,
+    StepResult,
+    Verbosity,
+)
 from bricks.core.registry import BrickRegistry
 from bricks.core.resolver import ReferenceResolver
 from bricks.core.schema import blueprint_schema, brick_schema, catalog_schema, registry_schema
@@ -63,6 +70,7 @@ __all__ = [
     "ConfigLoader",
     "DuplicateBrickError",
     "ExecutionContext",
+    "ExecutionResult",
     "ReferenceResolver",
     "RegistryConfig",
     # Deprecated aliases — will be removed in v1.0.0
@@ -73,8 +81,10 @@ __all__ = [
     "SequenceValidator",
     "SequencesConfig",
     "StepDefinition",
+    "StepResult",
     "TieredCatalog",
     "VariableResolutionError",
+    "Verbosity",
     "YamlLoadError",
     "blueprint_schema",
     "blueprint_to_yaml",

@@ -181,7 +181,7 @@ def run_demo(registry: BrickRegistry) -> None:
     inputs = {"quantity": 5.0, "unit_price": 12.0, "discount_fraction": 0.10}
     print(f"\nRunning with inputs: {inputs}")
     engine = BlueprintEngine(registry=registry)
-    outputs = engine.run(blueprint, inputs=inputs)
+    outputs = engine.run(blueprint, inputs=inputs).outputs
 
     print("\nOutputs:")
     for k, v in outputs.items():
@@ -257,7 +257,7 @@ def run_live(registry: BrickRegistry, api_key: str) -> None:
 
     engine = BlueprintEngine(registry=registry)
     try:
-        outputs = engine.run(blueprint, inputs=inputs)
+        outputs = engine.run(blueprint, inputs=inputs).outputs
     except Exception as exc:
         print(f"\nExecution error: {exc}", file=sys.stderr)
         sys.exit(1)

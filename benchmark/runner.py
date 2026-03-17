@@ -81,7 +81,7 @@ class BricksRunner:
 
         # 3. Execute
         try:
-            outputs = self._engine.run(sequence, inputs=scenario.inputs)
+            outputs = self._engine.run(sequence, inputs=scenario.inputs).outputs
         except BrickExecutionError as exc:
             return RunResult(
                 status="runtime_error",

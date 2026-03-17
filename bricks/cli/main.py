@@ -17,6 +17,7 @@ from bricks.core.exceptions import (
     YamlLoadError,
 )
 from bricks.core.loader import BlueprintLoader
+from bricks.core.models import Verbosity
 from bricks.core.registry import BrickRegistry
 from bricks.core.validation import BlueprintValidator
 
@@ -207,6 +208,9 @@ def run(
     input_: list[str] = typer.Option(  # noqa: B008
         [], "--input", "-i", help="Input values as key=value."
     ),
+    verbosity: Verbosity = typer.Option(  # noqa: B008
+        Verbosity.MINIMAL, "--verbosity", "-v", help="Output detail level (minimal/standard/full)."
+    ),
 ) -> None:
     """Execute a blueprint."""
     path = Path(sequence)
@@ -236,16 +240,31 @@ def run(
     engine = BlueprintEngine(registry=registry)
 
     try:
-        outputs = engine.run(bp_def, inputs=inputs or None)
+        exec_result = engine.run(bp_def, inputs=inputs or None, verbosity=verbosity)
     except BrickExecutionError as exc:
         typer.echo(f"Execution error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     typer.echo(f"Blueprint {bp_def.name!r} completed.")
-    if outputs:
+    if exec_result.outputs:
         typer.echo("Outputs:")
-        for k, v in outputs.items():
+        for k, v in exec_result.outputs.items():
             typer.echo(f"  {k}: {v!r}")
+
+    if verbosity in (Verbosity.STANDARD, Verbosity.FULL) and exec_result.steps:
+        typer.echo("Steps:")
+        for s in exec_result.steps:
+            line = f"  [{s.step_name}] {s.brick_name}"
+            if verbosity == Verbosity.FULL:
+                line += f" ({s.duration_ms:.1f}ms)"
+            typer.echo(line)
+            if s.outputs:
+                typer.echo(f"    outputs: {s.outputs!r}")
+            if verbosity == Verbosity.FULL and s.inputs:
+                typer.echo(f"    inputs:  {s.inputs!r}")
+
+    if verbosity == Verbosity.FULL:
+        typer.echo(f"Total: {exec_result.total_duration_ms:.1f}ms")
 
 
 @app.command(name="dry-run")

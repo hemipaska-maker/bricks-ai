@@ -60,6 +60,6 @@ blueprint = BlueprintDefinition(
 
 # --- Execute ---
 engine = BlueprintEngine(registry=registry)
-result = engine.run(blueprint, inputs={"x": 3.0, "y": 4.0, "factor": 2.0})
+result = engine.run(blueprint, inputs={"x": 3.0, "y": 4.0, "factor": 2.0}).outputs
 print(f"\nBlueprint result: {result}")
 # Expected: {'final_result': 14.0}  (3+4=7, 7*2=14)

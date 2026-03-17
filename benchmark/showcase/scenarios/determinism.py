@@ -362,7 +362,7 @@ def run_bricks(n: int = 5) -> dict[str, Any]:
             validation_passed.append(True)
         except BlueprintValidationError:
             validation_passed.append(False)
-        result = engine.run(sequence, inputs=inp)
+        result = engine.run(sequence, inputs=inp).outputs
         executions.append(result)
 
     return {

@@ -101,13 +101,11 @@ def main() -> None:
         child_path = Path(tmp.name)
 
     try:
-        parent_yaml = PARENT_BLUEPRINT_YAML_TEMPLATE.format(
-            child_path=child_path.as_posix()
-        )
+        parent_yaml = PARENT_BLUEPRINT_YAML_TEMPLATE.format(child_path=child_path.as_posix())
         parent_bp = loader.load_string(parent_yaml)
 
         inputs = {"width": 7.5, "height": 4.2}
-        outputs = engine.run(parent_bp, inputs=inputs)
+        outputs = engine.run(parent_bp, inputs=inputs).outputs
 
         print(f"Blueprint: {parent_bp.name!r}")
         print(f"Inputs:    width={inputs['width']}, height={inputs['height']}")

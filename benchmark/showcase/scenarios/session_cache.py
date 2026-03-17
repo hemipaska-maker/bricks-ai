@@ -157,7 +157,7 @@ def bricks_approach() -> dict[str, Any]:
     blueprint_sequence = _load_sequence(blueprint_yaml)
 
     for i, inp in enumerate(PROPERTY_INPUTS):
-        result = engine.run(blueprint_sequence, inputs=inp)
+        result = engine.run(blueprint_sequence, inputs=inp).outputs
         execution_results.append({"run": i + 1, "inputs": inp, "output": result})
         if i > 0:
             runs.append(

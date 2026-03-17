@@ -7,6 +7,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.2] — 2026-03-18
+
+### Summary
+Configurable Result Verbosity (Mission 007, Phase 2). `BlueprintEngine.run()` now returns a structured `ExecutionResult` with optional per-step trace detail, timing, and inputs — controlled by a `Verbosity` enum.
+
+### Added
+- `Verbosity` enum (`MINIMAL` / `STANDARD` / `FULL`) in `bricks/core/models.py`
+- `StepResult` model — per-step name, brick name, inputs, outputs, timing, save_as
+- `ExecutionResult` model — `outputs`, `steps`, `total_duration_ms`, `blueprint_name`, `verbosity`
+- `--verbosity` / `-v` flag on `bricks run` CLI command
+- 21 new tests in `tests/core/test_verbosity.py`
+
+### Changed
+- **Breaking**: `BlueprintEngine.run()` return type changed from `dict[str, Any]` to `ExecutionResult`; callers that need the raw dict use `.outputs`
+- All example and benchmark caller files updated to `.outputs`
+
+---
+
 ## [0.3.1] — 2026-03-18
 
 ### Summary

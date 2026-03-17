@@ -62,7 +62,7 @@ outputs_map:
   result: "${total}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"x": 3.0, "y": 4.0})
+        out = engine.run(seq, inputs={"x": 3.0, "y": 4.0}).outputs
         assert out["result"] == 7.0, f"Expected 7.0, got {out['result']!r}"
 
     def test_literal_params(self) -> None:
@@ -81,7 +81,7 @@ outputs_map:
   result: "${total}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["result"] == 15.0, f"Expected 15.0, got {out['result']!r}"
 
     def test_string_output(self) -> None:
@@ -99,7 +99,7 @@ outputs_map:
   label: "${text}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["label"] == "42.0", f"Expected '42.0', got {out['label']!r}"
 
     def test_no_outputs_map(self) -> None:
@@ -115,7 +115,7 @@ steps:
       b: 2.0
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out == {}, f"Expected {{}}, got {out!r}"
 
 
@@ -146,7 +146,7 @@ outputs_map:
   total: "${final_sum}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"a": 1.0, "b": 2.0, "c": 3.0})
+        out = engine.run(seq, inputs={"a": 1.0, "b": 2.0, "c": 3.0}).outputs
         assert out["total"] == 6.0, f"Expected 6.0, got {out['total']!r}"
 
     def test_multiply_then_round(self) -> None:
@@ -174,7 +174,7 @@ outputs_map:
   result: "${rounded}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"x": 7.5, "y": 4.2})
+        out = engine.run(seq, inputs={"x": 7.5, "y": 4.2}).outputs
         assert out["result"] == 31.5, f"Expected 31.5, got {out['result']!r}"
 
     def test_three_steps_chained(self) -> None:
@@ -205,7 +205,7 @@ outputs_map:
   result: "${r3}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["result"] == 20.0, f"Expected 20.0, got {out['result']!r}"  # (2+3)*4 = 20
 
     def test_add_then_stringify(self) -> None:
@@ -229,7 +229,7 @@ outputs_map:
   label: "${text_result}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["label"] == "10.0", f"Expected '10.0', got {out['label']!r}"
 
 
@@ -255,7 +255,7 @@ outputs_map:
         validator.validate(seq)  # raises on failure
 
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"n": 5.0})
+        out = engine.run(seq, inputs={"n": 5.0}).outputs
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"
 
     @pytest.mark.parametrize(
@@ -341,7 +341,7 @@ outputs_map:
   result: "${squared}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"n": 4.0})
+        out = engine.run(seq, inputs={"n": 4.0}).outputs
         assert out["result"] == 16.0, f"Expected 16.0, got {out['result']!r}"
 
     def test_discover_package_and_run(self, tmp_path: Path) -> None:
@@ -377,7 +377,7 @@ outputs_map:
   out: "${result}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["out"] == 10.0, f"Expected 10.0, got {out['out']!r}"
 
 
@@ -408,7 +408,7 @@ outputs_map:
   product: "${prod_val}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq, inputs={"x": 3.0, "y": 4.0})
+        out = engine.run(seq, inputs={"x": 3.0, "y": 4.0}).outputs
         assert out["sum"] == 7.0, f"Expected 7.0, got {out['sum']!r}"
         assert out["product"] == 12.0, f"Expected 12.0, got {out['product']!r}"
 
@@ -430,7 +430,7 @@ outputs_map:
   label: "computed"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"
         assert out["label"] == "computed", f"Expected 'computed', got {out['label']!r}"
 
@@ -452,7 +452,7 @@ outputs_map:
   pi_approx: "${rounded}"
 """)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["pi_approx"] == 3.14, f"Expected 3.14, got {out['pi_approx']!r}"
 
     def test_load_file_and_run(self, tmp_path: Path) -> None:
@@ -475,5 +475,5 @@ outputs_map:
         loader = BlueprintLoader()
         seq = loader.load_file(seq_file)
         engine = BlueprintEngine(registry=reg)
-        out = engine.run(seq)
+        out = engine.run(seq).outputs
         assert out["result"] == 150.0, f"Expected 150.0, got {out['result']!r}"

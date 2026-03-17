@@ -28,7 +28,7 @@ class TestEngineRun:
             steps=[StepDefinition(name="s1", brick="add", params={"a": 3.0, "b": 4.0}, save_as="total")],
             outputs_map={"result": "${total}"},
         )
-        out = engine.run(bp)
+        out = engine.run(bp).outputs
         assert out["result"] == 7.0, f"Expected 7.0, got {out['result']!r}"
 
     def test_empty_outputs_map_returns_empty(self, math_registry: BrickRegistry) -> None:
@@ -37,7 +37,7 @@ class TestEngineRun:
             name="test",
             steps=[StepDefinition(name="s1", brick="add", params={"a": 1.0, "b": 2.0})],
         )
-        out = engine.run(bp)
+        out = engine.run(bp).outputs
         assert out == {}, f"Expected {{}}, got {out!r}"
 
     def test_inputs_resolved_in_params(self, math_registry: BrickRegistry) -> None:
@@ -55,7 +55,7 @@ class TestEngineRun:
             ],
             outputs_map={"total": "${sum}"},
         )
-        out = engine.run(bp, inputs={"x": 10.0, "y": 5.0})
+        out = engine.run(bp, inputs={"x": 10.0, "y": 5.0}).outputs
         assert out["total"] == 15.0, f"Expected 15.0, got {out['total']!r}"
 
     def test_chained_steps(self, math_registry: BrickRegistry) -> None:
@@ -73,7 +73,7 @@ class TestEngineRun:
             ],
             outputs_map={"result": "${second}"},
         )
-        out = engine.run(bp)
+        out = engine.run(bp).outputs
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"  # (2+3)*2
 
     def test_brick_exception_wrapped(self) -> None:
@@ -100,7 +100,7 @@ class TestEngineRun:
             steps=[StepDefinition(name="s1", brick="add", params={"a": 1.0, "b": 2.0}, save_as="r")],
             outputs_map={"result": "${r}"},
         )
-        out = engine.run(bp, inputs=None)
+        out = engine.run(bp, inputs=None).outputs
         assert out["result"] == 3.0, f"Expected 3.0, got {out['result']!r}"
 
     def test_step_without_save_as_result_not_accessible(self, math_registry: BrickRegistry) -> None:
@@ -115,7 +115,7 @@ class TestEngineRun:
             ],
             outputs_map={"result": "${r}"},
         )
-        out = engine.run(bp)
+        out = engine.run(bp).outputs
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"
 
     def test_multiple_outputs(self, math_registry: BrickRegistry) -> None:
@@ -133,7 +133,7 @@ class TestEngineRun:
             ],
             outputs_map={"sum": "${sum}", "product": "${product}"},
         )
-        out = engine.run(bp)
+        out = engine.run(bp).outputs
         assert out["sum"] == 7.0, f"Expected 7.0, got {out['sum']!r}"
         assert out["product"] == 12.0, f"Expected 12.0, got {out['product']!r}"
 

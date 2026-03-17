@@ -93,7 +93,7 @@ def main() -> None:
     print(f"Blueprint '{blueprint.name}' validated ({len(blueprint.steps)} steps)")
 
     engine = BlueprintEngine(registry=registry)
-    outputs = engine.run(blueprint, inputs={"width": 7.5, "height": 4.2})
+    outputs = engine.run(blueprint, inputs={"width": 7.5, "height": 4.2}).outputs
 
     print("Execution complete")
     print(f"  area    = {outputs['area']}")

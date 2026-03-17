@@ -218,7 +218,7 @@ def main() -> None:
         print(f"  Brick: {name} -- {meta.description}")
 
     engine = BlueprintEngine(registry=registry)
-    outputs = engine.run(blueprint, inputs={"channel": 1})
+    outputs = engine.run(blueprint, inputs={"channel": 1}).outputs
 
     print("\nResults for channel 1:")
     print(f"  Celsius:    {outputs['celsius']}C")

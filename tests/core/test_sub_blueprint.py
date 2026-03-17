@@ -107,7 +107,7 @@ outputs_map:
             outputs_map={"answer": "${child_result.total}"},
         )
 
-        result = engine.run(parent)
+        result = engine.run(parent).outputs
         assert result["answer"] == 3.0, f"Expected 3.0, got {result['answer']!r}"
 
     def test_sub_blueprint_result_accessible_by_parent(self, tmp_path: Path) -> None:
@@ -143,7 +143,7 @@ outputs_map:
             outputs_map={"result": "${total.result}"},
         )
 
-        result = engine.run(parent)
+        result = engine.run(parent).outputs
         assert result["result"] == 11.0, f"Expected 11.0, got {result['result']!r}"
 
     def test_parent_params_passed_as_child_inputs(self, tmp_path: Path) -> None:
@@ -183,7 +183,7 @@ outputs_map:
             outputs_map={"result": "${r.total}"},
         )
 
-        result = engine.run(parent, inputs={"a": 3.0, "b": 4.0})
+        result = engine.run(parent, inputs={"a": 3.0, "b": 4.0}).outputs
         assert result["result"] == 7.0, f"Expected 7.0, got {result['result']!r}"
 
     def test_chained_after_sub_blueprint(self, tmp_path: Path) -> None:
@@ -220,7 +220,7 @@ outputs_map:
             outputs_map={"result": "${final.result}"},
         )
 
-        result = engine.run(parent)
+        result = engine.run(parent).outputs
         assert result["result"] == 30.0, f"Expected 30.0, got {result['result']!r}"
 
     def test_file_not_found_raises_brick_execution_error(self) -> None:
@@ -325,5 +325,5 @@ steps:
         steps=[StepDefinition(name="sub", blueprint=str(child), save_as="r")],
         outputs_map={"done": "${r}"},
     )
-    result = engine.run(parent)
+    result = engine.run(parent).outputs
     assert result["done"] == {}, f"Expected empty dict, got {result['done']!r}"
