@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from bricks.core.constants import _REF_PATTERN
@@ -35,7 +36,8 @@ class BlueprintValidator:
     """Validates a BlueprintDefinition against the registry without executing.
 
     Checks:
-    - All referenced bricks exist in the registry.
+    - All referenced bricks exist in the registry (brick steps only).
+    - Sub-blueprint file paths exist on disk (blueprint steps only).
     - save_as names are unique across steps.
     - Duplicate step names are not allowed.
     - outputs_map references exist (as save_as names or input names).
@@ -74,10 +76,15 @@ class BlueprintValidator:
                 errors=errors,
             )
 
-        # Check 1: All referenced bricks exist
+        # Check 1: All referenced bricks exist (brick steps) / sub-blueprint files exist (blueprint steps)
         for step in blueprint.steps:
-            if not self._registry.has(step.brick):
-                errors.append(f"Step {step.name!r}: brick {step.brick!r} not found in registry")
+            if step.brick is not None:
+                if not self._registry.has(step.brick):
+                    errors.append(f"Step {step.name!r}: brick {step.brick!r} not found in registry")
+            else:
+                # step.blueprint is not None here (guaranteed by model validator)
+                if not Path(step.blueprint or "").exists():
+                    errors.append(f"Step {step.name!r}: blueprint file {step.blueprint!r} not found")
 
         # Check 2: save_as uniqueness
         save_names: list[str] = []

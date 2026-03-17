@@ -51,6 +51,7 @@ def blueprint_schema(blueprint: BlueprintDefinition) -> dict[str, Any]:
             {
                 "name": step.name,
                 "brick": step.brick,
+                "blueprint": step.blueprint,
                 "params": step.params,
                 "save_as": step.save_as,
             }

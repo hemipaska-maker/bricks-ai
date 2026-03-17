@@ -7,6 +7,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] — 2026-03-18
+
+### Summary
+Sub-blueprint execution (Mission 005, Phase 2). Blueprints can now call other blueprints as child steps, enabling hierarchical composition.
+
+### Added
+- `StepDefinition.blueprint` field — path to a child blueprint YAML file
+- `StepDefinition.brick` is now optional (exactly one of `brick`/`blueprint` must be set; enforced by Pydantic `model_validator`)
+- `BlueprintEngine` dispatches sub-blueprint steps: loads and executes the child blueprint, passes `params` as child inputs, stores child outputs under `save_as`
+- Recursion depth guard (`_MAX_DEPTH = 10`); exceeding it raises `BrickExecutionError`
+- `BlueprintValidator` checks sub-blueprint file existence (skips brick-registry check for blueprint steps)
+- `blueprint_schema()` now includes `"blueprint"` field in step entries
+- `examples/sub_blueprint.py` — runnable demo of parent/child blueprint composition
+- 14 new tests in `tests/core/test_sub_blueprint.py`
+
+### Changed
+- `BlueprintEngine.__init__` accepts optional `loader: BlueprintLoader` parameter
+
+---
+
 ## [0.2.1] — 2026-03-18
 
 ### Summary
