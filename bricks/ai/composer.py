@@ -1,4 +1,4 @@
-"""AI sequence composer: generates YAML sequences from natural language."""
+"""AI blueprint composer: generates YAML blueprints from natural language."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import json
 from typing import Any
 
 from bricks.core.exceptions import BrickError
-from bricks.core.loader import SequenceLoader
-from bricks.core.models import SequenceDefinition
+from bricks.core.loader import BlueprintLoader
+from bricks.core.models import BlueprintDefinition
 from bricks.core.registry import BrickRegistry
 from bricks.core.schema import registry_schema
 from bricks.core.utils import strip_code_fence
@@ -29,14 +29,14 @@ class ComposerError(BrickError):
 
 # System prompt template for the AI model
 _SYSTEM_PROMPT = """\
-You are an expert at composing YAML sequences for the Bricks framework.
+You are an expert at composing YAML blueprints for the Bricks framework.
 
 Given a natural language intent and a list of available bricks, you generate
-a valid YAML sequence.
+a valid YAML blueprint.
 
-YAML sequence format:
+YAML blueprint format:
 ```yaml
-name: sequence_name        # snake_case name
+name: blueprint_name       # snake_case name
 description: "What it does"
 inputs:
   param_name: "type"       # e.g. "int", "float", "str", "bool"
@@ -65,14 +65,14 @@ _USER_PROMPT_TEMPLATE = """Available bricks:
 
 Intent: {intent}
 
-Generate the YAML sequence:"""
+Generate the YAML blueprint:"""
 
 
-class SequenceComposer:
-    """Generates SequenceDefinitions from natural language intent using Claude.
+class BlueprintComposer:
+    """Generates BlueprintDefinitions from natural language intent using Claude.
 
     Uses the Anthropic Messages API to translate natural language descriptions
-    into valid YAML sequences, then parses and validates them.
+    into valid YAML blueprints, then parses and validates them.
 
     Requires the ``anthropic`` package: ``pip install bricks[ai]``
     """
@@ -112,44 +112,44 @@ class SequenceComposer:
         self._registry = registry
         self._model = model
         self._max_tokens = max_tokens
-        self._loader = SequenceLoader()
+        self._loader = BlueprintLoader()
 
-    def compose(self, intent: str) -> SequenceDefinition:
-        """Compose a sequence from a natural language description.
+    def compose(self, intent: str) -> BlueprintDefinition:
+        """Compose a blueprint from a natural language description.
 
         Sends the intent and registry schema to the AI model, parses the
-        returned YAML, and returns a validated SequenceDefinition.
+        returned YAML, and returns a validated BlueprintDefinition.
 
         Args:
-            intent: Natural language description of the desired sequence.
+            intent: Natural language description of the desired blueprint.
 
         Returns:
-            A validated SequenceDefinition.
+            A validated BlueprintDefinition.
 
         Raises:
-            ComposerError: If the AI returns invalid YAML or the sequence
+            ComposerError: If the AI returns invalid YAML or the blueprint
                 fails Pydantic validation.
         """
-        sequence, _, _ = self.compose_with_usage(intent)
-        return sequence
+        blueprint, _, _ = self.compose_with_usage(intent)
+        return blueprint
 
-    def compose_with_usage(self, intent: str) -> tuple[SequenceDefinition, int, int]:
-        """Compose a sequence and return real token usage from the API.
+    def compose_with_usage(self, intent: str) -> tuple[BlueprintDefinition, int, int]:
+        """Compose a blueprint and return real token usage from the API.
 
         Same as ``compose()`` but also returns the exact token counts reported
         by the Anthropic API response, enabling accurate benchmarking of token
         efficiency compared to raw Python code generation.
 
         Args:
-            intent: Natural language description of the desired sequence.
+            intent: Natural language description of the desired blueprint.
 
         Returns:
-            A 3-tuple of ``(sequence, input_tokens, output_tokens)`` where
+            A 3-tuple of ``(blueprint, input_tokens, output_tokens)`` where
             ``input_tokens`` and ``output_tokens`` are the actual values from
             ``response.usage`` as reported by the Anthropic API.
 
         Raises:
-            ComposerError: If the AI returns invalid YAML or the sequence
+            ComposerError: If the AI returns invalid YAML or the blueprint
                 fails Pydantic validation.
         """
         bricks_info = self._build_bricks_context()
@@ -175,14 +175,14 @@ class SequenceComposer:
         yaml_content = self._extract_yaml(raw_text)
 
         try:
-            sequence = self._loader.load_string(yaml_content)
+            blueprint = self._loader.load_string(yaml_content)
         except Exception as exc:
             raise ComposerError(
                 f"AI-generated YAML is invalid: {exc}\n\nYAML:\n{yaml_content}",
                 cause=exc,
             ) from exc
 
-        return sequence, input_tokens, output_tokens
+        return blueprint, input_tokens, output_tokens
 
     def _build_bricks_context(self) -> list[dict[str, Any]]:
         """Build a JSON-serialisable list of brick descriptions.

@@ -1,4 +1,4 @@
-"""Pydantic models for Brick metadata and YAML sequence definitions."""
+"""Pydantic models for Brick metadata and YAML blueprint definitions."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class BrickMeta(BaseModel):
 
 
 class StepDefinition(BaseModel):
-    """A single step within a sequence definition (parsed from YAML)."""
+    """A single step within a blueprint definition (parsed from YAML)."""
 
     name: str
     brick: str
@@ -26,10 +26,10 @@ class StepDefinition(BaseModel):
     save_as: str | None = None
 
 
-class SequenceDefinition(BaseModel):
-    """A complete sequence definition (parsed from YAML).
+class BlueprintDefinition(BaseModel):
+    """A complete blueprint definition (parsed from YAML).
 
-    Represents the top-level structure of a sequence YAML file.
+    Represents the top-level structure of a blueprint YAML file.
     """
 
     name: str

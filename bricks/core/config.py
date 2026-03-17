@@ -20,10 +20,10 @@ class RegistryConfig(BaseModel):
     paths: list[str] = Field(default_factory=list)
 
 
-class SequencesConfig(BaseModel):
-    """Sequences directory configuration."""
+class BlueprintsConfig(BaseModel):
+    """Blueprints directory configuration."""
 
-    base_dir: str = "sequences/"
+    base_dir: str = "blueprints/"
 
 
 class AiConfig(BaseModel):
@@ -41,7 +41,7 @@ class BricksConfig(BaseModel):
 
     version: str = "1"
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
-    sequences: SequencesConfig = Field(default_factory=SequencesConfig)
+    sequences: BlueprintsConfig = Field(default_factory=BlueprintsConfig)
     ai: AiConfig = Field(default_factory=AiConfig)
 
 

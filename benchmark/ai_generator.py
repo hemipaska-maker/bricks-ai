@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from bricks.core import BrickRegistry
-from bricks.core.utils import sequence_to_yaml, strip_code_fence
+from bricks.core.utils import blueprint_to_yaml, strip_code_fence
 
 
 def generate_bricks_yaml(
@@ -15,7 +15,7 @@ def generate_bricks_yaml(
     inputs: dict[str, Any] | None = None,
     expected_outputs: list[str] | None = None,
 ) -> tuple[str, int]:
-    """Generate Bricks YAML via SequenceComposer.
+    """Generate Bricks YAML via BlueprintComposer.
 
     Args:
         intent: Natural language description of what to compute.
@@ -30,7 +30,7 @@ def generate_bricks_yaml(
         (yaml_string, total_tokens_used)
     """
     try:
-        from bricks.ai import SequenceComposer
+        from bricks.ai import BlueprintComposer
     except ImportError as exc:
         raise RuntimeError("anthropic package not installed. Run: pip install -e '.[ai]'") from exc
 
@@ -48,9 +48,9 @@ def generate_bricks_yaml(
         output_names = ", ".join(expected_outputs)
         enriched_intent += f"\nYou MUST use exactly these keys in outputs_map: {output_names}"
 
-    composer = SequenceComposer(registry=registry, api_key=api_key)
+    composer = BlueprintComposer(registry=registry, api_key=api_key)
     sequence, input_tokens, output_tokens = composer.compose_with_usage(enriched_intent)
-    yaml_str = sequence_to_yaml(sequence)
+    yaml_str = blueprint_to_yaml(sequence)
     return yaml_str, input_tokens + output_tokens
 
 

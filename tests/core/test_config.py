@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from bricks.core.config import BricksConfig, ConfigLoader
+from bricks.core.config import BlueprintsConfig, BricksConfig, ConfigLoader
 from bricks.core.exceptions import ConfigError
 
 
@@ -16,7 +16,7 @@ class TestDefaultConfig:
         assert config.version == "1", f"Expected '1', got {config.version!r}"
         assert config.registry.auto_discover is False, f"Expected False, got {config.registry.auto_discover!r}"
         assert config.registry.paths == [], f"Expected [], got {config.registry.paths!r}"
-        assert config.sequences.base_dir == "sequences/", f"Expected 'sequences/', got {config.sequences.base_dir!r}"
+        assert config.sequences.base_dir == "blueprints/", f"Expected 'blueprints/', got {config.sequences.base_dir!r}"
         assert config.ai.model == "claude-haiku-4-5-20251001", f"Expected claude model, got {config.ai.model!r}"
         assert config.ai.max_tokens == 4096, f"Expected 4096, got {config.ai.max_tokens!r}"
 
@@ -25,6 +25,10 @@ class TestDefaultConfig:
         config = loader.load(directory=tmp_path)
         assert isinstance(config, BricksConfig), f"Expected BricksConfig, got {type(config).__name__}"
         assert config.registry.auto_discover is False, f"Expected False, got {config.registry.auto_discover!r}"
+
+    def test_blueprints_config_default(self) -> None:
+        bp_config = BlueprintsConfig()
+        assert bp_config.base_dir == "blueprints/", f"Expected 'blueprints/', got {bp_config.base_dir!r}"
 
 
 class TestLoadString:
@@ -38,7 +42,7 @@ registry:
     - "bricks_lib/"
     - "custom_bricks.py"
 sequences:
-  base_dir: "my_sequences/"
+  base_dir: "my_blueprints/"
 ai:
   model: "claude-haiku-4-5-20251001"
   max_tokens: 2048
@@ -47,8 +51,8 @@ ai:
         assert config.version == "1", f"Expected '1', got {config.version!r}"
         assert config.registry.auto_discover is True, f"Expected True, got {config.registry.auto_discover!r}"
         assert config.registry.paths == ["bricks_lib/", "custom_bricks.py"], "Expected paths mismatch"
-        assert config.sequences.base_dir == "my_sequences/", (
-            f"Expected 'my_sequences/', got {config.sequences.base_dir!r}"
+        assert config.sequences.base_dir == "my_blueprints/", (
+            f"Expected 'my_blueprints/', got {config.sequences.base_dir!r}"
         )
         assert config.ai.model == "claude-haiku-4-5-20251001", f"Expected claude model, got {config.ai.model!r}"
         assert config.ai.max_tokens == 2048, f"Expected 2048, got {config.ai.max_tokens!r}"

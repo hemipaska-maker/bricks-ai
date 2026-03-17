@@ -23,8 +23,8 @@ class BrickNotFoundError(BrickError):
         super().__init__(f"Brick not found: {name!r}")
 
 
-class SequenceValidationError(BrickError):
-    """Raised when a sequence definition fails validation."""
+class BlueprintValidationError(BrickError):
+    """Raised when a blueprint definition fails validation."""
 
     def __init__(self, message: str, errors: list[str] | None = None) -> None:
         self.errors = errors or []

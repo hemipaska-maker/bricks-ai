@@ -25,14 +25,14 @@ def strip_code_fence(text: str) -> str:
     return match.group(1).strip() if match else text.strip()
 
 
-def sequence_to_yaml(sequence: Any) -> str:
-    """Serialise a SequenceDefinition to a YAML string.
+def blueprint_to_yaml(sequence: Any) -> str:
+    """Serialise a BlueprintDefinition to a YAML string.
 
     Args:
-        sequence: A SequenceDefinition instance.
+        sequence: A BlueprintDefinition instance.
 
     Returns:
-        YAML representation of the sequence as a string.
+        YAML representation of the blueprint as a string.
     """
     yaml = YAML()
     yaml.preserve_quotes = True
@@ -57,3 +57,7 @@ def sequence_to_yaml(sequence: Any) -> str:
     stream = io.StringIO()
     yaml.dump(data, stream)
     return stream.getvalue()
+
+
+# Deprecated alias — will be removed in v1.0.0
+sequence_to_yaml = blueprint_to_yaml

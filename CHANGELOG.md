@@ -7,6 +7,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] — 2026-03-18
+
+### Summary
+Rename Sequence → Blueprint everywhere (Mission 003). Pure mechanical rename — no logic changes.
+
+### Changed
+- `SequenceDefinition` → `BlueprintDefinition` (`bricks/core/models.py`)
+- `SequenceEngine` → `BlueprintEngine` (`bricks/core/engine.py`)
+- `SequenceLoader` → `BlueprintLoader` (`bricks/core/loader.py`)
+- `SequenceValidator` → `BlueprintValidator` (`bricks/core/validation.py`)
+- `SequenceValidationError` → `BlueprintValidationError` (`bricks/core/exceptions.py`)
+- `SequenceComposer` → `BlueprintComposer` (`bricks/ai/composer.py`)
+- `sequence_schema` → `blueprint_schema` (`bricks/core/schema.py`)
+- `SequencesConfig` → `BlueprintsConfig` (`bricks/core/config.py`)
+- `sequence_to_yaml` → `blueprint_to_yaml` (`bricks/core/utils.py`)
+- CLI, tests, examples, benchmark, and docs updated throughout
+- `examples/yaml_sequence.py` renamed to `examples/yaml_blueprint.py`
+- `examples/sequences/` renamed to `examples/blueprints/`
+
+### Backward Compatibility
+- Deprecated aliases added in `bricks/core/__init__.py` and `bricks/ai/__init__.py`
+- Old names (`SequenceDefinition`, `SequenceEngine`, etc.) still work until v1.0.0
+
+---
+
 ## [0.1.1] — 2026-03-17
 
 ### Summary

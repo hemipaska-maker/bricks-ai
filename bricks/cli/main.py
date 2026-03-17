@@ -10,15 +10,15 @@ import typer
 
 from bricks.core.config import BricksConfig, ConfigLoader
 from bricks.core.discovery import BrickDiscovery
-from bricks.core.engine import SequenceEngine
+from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import (
+    BlueprintValidationError,
     BrickExecutionError,
-    SequenceValidationError,
     YamlLoadError,
 )
-from bricks.core.loader import SequenceLoader
+from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
-from bricks.core.validation import SequenceValidator
+from bricks.core.validation import BlueprintValidator
 
 app = typer.Typer(
     name="bricks",
@@ -70,19 +70,19 @@ registry:
   auto_discover: false
   paths: []
 sequences:
-  base_dir: "sequences/"
+  base_dir: "blueprints/"
 ai:
   model: "claude-haiku-4-5-20251001"
   max_tokens: 4096
 """
     config_file.write_text(config_content)
-    sequences_dir = Path.cwd() / "sequences"
-    sequences_dir.mkdir(exist_ok=True)
+    blueprints_dir = Path.cwd() / "blueprints"
+    blueprints_dir.mkdir(exist_ok=True)
     bricks_lib = Path.cwd() / "bricks_lib"
     bricks_lib.mkdir(exist_ok=True)
     (bricks_lib / "__init__.py").write_text("")
     typer.echo("Created bricks.config.yaml")
-    typer.echo("Created sequences/")
+    typer.echo("Created blueprints/")
     typer.echo("Created bricks_lib/")
     typer.echo("Bricks project initialised.")
 
@@ -139,17 +139,17 @@ class {class_name}(BaseBrick):
     typer.echo(f"Created {output_path}")
 
 
-@new_app.command("sequence")
-def new_sequence(name: str = typer.Argument(..., help="Name of the sequence.")) -> None:
-    """Scaffold a new YAML sequence file."""
+@new_app.command("blueprint")
+def new_blueprint(name: str = typer.Argument(..., help="Name of the blueprint.")) -> None:
+    """Scaffold a new YAML blueprint file."""
     snake_name = name.lower().replace("-", "_").replace(" ", "_")
 
     loader = ConfigLoader()
     config = loader.load()
-    seq_dir = Path.cwd() / config.sequences.base_dir
-    seq_dir.mkdir(parents=True, exist_ok=True)
+    bp_dir = Path.cwd() / config.sequences.base_dir
+    bp_dir.mkdir(parents=True, exist_ok=True)
 
-    output_path = seq_dir / f"{snake_name}.yaml"
+    output_path = bp_dir / f"{snake_name}.yaml"
     content = f"""name: {snake_name}
 description: ""
 inputs:
@@ -166,28 +166,34 @@ outputs_map:
     typer.echo(f"Created {output_path}")
 
 
+@new_app.command("sequence")
+def new_sequence(name: str = typer.Argument(..., help="Name of the sequence.")) -> None:
+    """Scaffold a new YAML sequence file (alias for 'new blueprint')."""
+    new_blueprint(name)
+
+
 @app.command()
-def check(file: str = typer.Argument(..., help="Path to sequence YAML file.")) -> None:
-    """Validate a sequence YAML file (lint without executing)."""
+def check(file: str = typer.Argument(..., help="Path to blueprint YAML file.")) -> None:
+    """Validate a blueprint YAML file (lint without executing)."""
     path = Path(file)
     if not path.exists():
         typer.echo(f"Error: File not found: {path}", err=True)
         raise typer.Exit(code=1)
 
-    seq_loader = SequenceLoader()
+    bp_loader = BlueprintLoader()
     try:
-        sequence = seq_loader.load_file(path)
+        blueprint = bp_loader.load_file(path)
     except YamlLoadError as exc:
         typer.echo(f"Error loading YAML: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     registry, _ = _setup_registry()
-    validator = SequenceValidator(registry=registry)
+    validator = BlueprintValidator(registry=registry)
 
     try:
-        validator.validate(sequence)
+        validator.validate(blueprint)
         typer.echo(f"valid: {path}")
-    except SequenceValidationError as exc:
+    except BlueprintValidationError as exc:
         typer.echo(f"Validation errors in {path}:", err=True)
         if exc.errors:
             for error in exc.errors:
@@ -197,20 +203,20 @@ def check(file: str = typer.Argument(..., help="Path to sequence YAML file.")) -
 
 @app.command()
 def run(
-    sequence: str = typer.Argument(..., help="Path to sequence YAML file."),
+    sequence: str = typer.Argument(..., help="Path to blueprint YAML file."),
     input_: list[str] = typer.Option(  # noqa: B008
         [], "--input", "-i", help="Input values as key=value."
     ),
 ) -> None:
-    """Execute a sequence."""
+    """Execute a blueprint."""
     path = Path(sequence)
     if not path.exists():
-        typer.echo(f"Error: Sequence file not found: {path}", err=True)
+        typer.echo(f"Error: Blueprint file not found: {path}", err=True)
         raise typer.Exit(code=1)
 
-    seq_loader = SequenceLoader()
+    bp_loader = BlueprintLoader()
     try:
-        seq_def = seq_loader.load_file(path)
+        bp_def = bp_loader.load_file(path)
     except YamlLoadError as exc:
         typer.echo(f"Error loading YAML: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -227,15 +233,15 @@ def run(
             inputs[k] = v
 
     registry, _ = _setup_registry()
-    engine = SequenceEngine(registry=registry)
+    engine = BlueprintEngine(registry=registry)
 
     try:
-        outputs = engine.run(seq_def, inputs=inputs or None)
+        outputs = engine.run(bp_def, inputs=inputs or None)
     except BrickExecutionError as exc:
         typer.echo(f"Execution error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"Sequence {seq_def.name!r} completed.")
+    typer.echo(f"Blueprint {bp_def.name!r} completed.")
     if outputs:
         typer.echo("Outputs:")
         for k, v in outputs.items():
@@ -244,28 +250,28 @@ def run(
 
 @app.command(name="dry-run")
 def dry_run(
-    sequence: str = typer.Argument(..., help="Path to sequence YAML file."),
+    sequence: str = typer.Argument(..., help="Path to blueprint YAML file."),
 ) -> None:
-    """Validate a sequence without executing (dry run)."""
+    """Validate a blueprint without executing (dry run)."""
     path = Path(sequence)
     if not path.exists():
-        typer.echo(f"Error: Sequence file not found: {path}", err=True)
+        typer.echo(f"Error: Blueprint file not found: {path}", err=True)
         raise typer.Exit(code=1)
 
-    seq_loader = SequenceLoader()
+    bp_loader = BlueprintLoader()
     try:
-        seq_def = seq_loader.load_file(path)
+        bp_def = bp_loader.load_file(path)
     except YamlLoadError as exc:
         typer.echo(f"Error loading YAML: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     registry, _ = _setup_registry()
-    validator = SequenceValidator(registry=registry)
+    validator = BlueprintValidator(registry=registry)
 
     try:
-        validator.validate(seq_def)
-        typer.echo(f"Sequence {seq_def.name!r} is valid (dry-run passed).")
-    except SequenceValidationError as exc:
+        validator.validate(bp_def)
+        typer.echo(f"Blueprint {bp_def.name!r} is valid (dry-run passed).")
+    except BlueprintValidationError as exc:
         typer.echo("Validation errors:", err=True)
         if exc.errors:
             for error in exc.errors:
@@ -295,9 +301,9 @@ def list_bricks() -> None:
 def compose(
     intent: str = typer.Argument(..., help="Natural language description."),
 ) -> None:
-    """AI-compose a sequence from a natural language description."""
+    """AI-compose a blueprint from a natural language description."""
     try:
-        from bricks.ai.composer import SequenceComposer  # noqa: PLC0415
+        from bricks.ai.composer import BlueprintComposer  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: AI features require the 'anthropic' package.", err=True)
         typer.echo("Install with: pip install bricks[ai]", err=True)
@@ -305,12 +311,12 @@ def compose(
 
     api_key = os.environ.get("ANTHROPIC_API_KEY") or typer.prompt("Anthropic API key", hide_input=True)
     registry, _ = _setup_registry()
-    composer = SequenceComposer(registry=registry, api_key=api_key)
+    composer = BlueprintComposer(registry=registry, api_key=api_key)
 
     try:
-        result_sequence = composer.compose(intent)
-        typer.echo(f"Composed sequence: {result_sequence.name!r}")
-        typer.echo(f"  Steps: {len(result_sequence.steps)}")
+        result_blueprint = composer.compose(intent)
+        typer.echo(f"Composed blueprint: {result_blueprint.name!r}")
+        typer.echo(f"  Steps: {len(result_blueprint.steps)}")
     except NotImplementedError as exc:
         typer.echo("AI composition is not yet fully implemented.", err=True)
         raise typer.Exit(code=1) from exc

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from bricks.core.models import BrickMeta, SequenceDefinition, StepDefinition
+from bricks.core.models import BlueprintDefinition, BrickMeta, StepDefinition
 
 
 class TestBrickMeta:
@@ -44,39 +44,39 @@ class TestStepDefinition:
         assert step.name == "my_step", f"Expected 'my_step', got {step.name!r}"
 
 
-class TestSequenceDefinition:
-    def test_minimal_sequence(self) -> None:
-        seq = SequenceDefinition(name="test_seq")
-        assert seq.steps == [], f"Expected [], got {seq.steps!r}"
-        assert seq.outputs_map == {}, f"Expected {{}}, got {seq.outputs_map!r}"
+class TestBlueprintDefinition:
+    def test_minimal_blueprint(self) -> None:
+        bp = BlueprintDefinition(name="test_bp")
+        assert bp.steps == [], f"Expected [], got {bp.steps!r}"
+        assert bp.outputs_map == {}, f"Expected {{}}, got {bp.outputs_map!r}"
 
     def test_inputs_default_empty(self) -> None:
-        seq = SequenceDefinition(name="test")
-        assert seq.inputs == {}, f"Expected {{}}, got {seq.inputs!r}"
+        bp = BlueprintDefinition(name="test")
+        assert bp.inputs == {}, f"Expected {{}}, got {bp.inputs!r}"
 
     def test_steps_can_be_added(self) -> None:
         step = StepDefinition(name="s1", brick="b")
-        seq = SequenceDefinition(name="test", steps=[step])
-        assert len(seq.steps) == 1, f"Expected length 1, got {len(seq.steps)}"
-        assert seq.steps[0].name == "s1", f"Expected 's1', got {seq.steps[0].name!r}"
+        bp = BlueprintDefinition(name="test", steps=[step])
+        assert len(bp.steps) == 1, f"Expected length 1, got {len(bp.steps)}"
+        assert bp.steps[0].name == "s1", f"Expected 's1', got {bp.steps[0].name!r}"
 
     def test_outputs_map_can_be_set(self) -> None:
-        seq = SequenceDefinition(name="test", outputs_map={"result": "${val}"})
-        assert seq.outputs_map == {"result": "${val}"}, "Expected outputs_map mismatch"
+        bp = BlueprintDefinition(name="test", outputs_map={"result": "${val}"})
+        assert bp.outputs_map == {"result": "${val}"}, "Expected outputs_map mismatch"
 
     def test_description_default_empty(self) -> None:
-        seq = SequenceDefinition(name="test")
-        assert seq.description == "", f"Expected '', got {seq.description!r}"
+        bp = BlueprintDefinition(name="test")
+        assert bp.description == "", f"Expected '', got {bp.description!r}"
 
     def test_description_can_be_set(self) -> None:
-        seq = SequenceDefinition(name="test", description="My sequence")
-        assert seq.description == "My sequence", f"Expected 'My sequence', got {seq.description!r}"
+        bp = BlueprintDefinition(name="test", description="My blueprint")
+        assert bp.description == "My blueprint", f"Expected 'My blueprint', got {bp.description!r}"
 
     def test_name_required(self) -> None:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            SequenceDefinition()  # type: ignore[call-arg]
+            BlueprintDefinition()  # type: ignore[call-arg]
 
 
 class TestBrickMetaDefaults:

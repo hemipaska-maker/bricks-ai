@@ -1,9 +1,9 @@
-"""Example: loading and running a YAML sequence file.
+"""Example: loading and running a YAML blueprint file.
 
 This example demonstrates:
 - Registering @brick-decorated functions
-- Loading a sequence from a YAML string
-- Executing it with the SequenceEngine
+- Loading a blueprint from a YAML string
+- Executing it with the BlueprintEngine
 - Reading the output map
 """
 
@@ -12,10 +12,10 @@ from __future__ import annotations
 from typing import cast
 
 from bricks.core.brick import BrickFunction, brick
-from bricks.core.engine import SequenceEngine
-from bricks.core.loader import SequenceLoader
+from bricks.core.engine import BlueprintEngine
+from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
-from bricks.core.validation import SequenceValidator
+from bricks.core.validation import BlueprintValidator
 
 # -- 1. Define bricks ----------------------------------------------------------
 
@@ -45,9 +45,9 @@ for _fn in (multiply, round_value, format_result):
     _bf = cast(BrickFunction, _fn)
     registry.register(_bf.__brick_meta__.name, _bf, _bf.__brick_meta__)
 
-# -- 3. Define sequence in YAML ------------------------------------------------
+# -- 3. Define blueprint in YAML -----------------------------------------------
 
-SEQUENCE_YAML = """
+BLUEPRINT_YAML = """
 name: calculate_area
 description: "Calculate the area of a rectangle, round it, and format it."
 inputs:
@@ -84,16 +84,16 @@ outputs_map:
 
 
 def main() -> None:
-    """Run the yaml_sequence example."""
-    loader = SequenceLoader()
-    sequence = loader.load_string(SEQUENCE_YAML)
+    """Run the yaml_blueprint example."""
+    loader = BlueprintLoader()
+    blueprint = loader.load_string(BLUEPRINT_YAML)
 
-    validator = SequenceValidator(registry=registry)
-    validator.validate(sequence)
-    print(f"Sequence '{sequence.name}' validated ({len(sequence.steps)} steps)")
+    validator = BlueprintValidator(registry=registry)
+    validator.validate(blueprint)
+    print(f"Blueprint '{blueprint.name}' validated ({len(blueprint.steps)} steps)")
 
-    engine = SequenceEngine(registry=registry)
-    outputs = engine.run(sequence, inputs={"width": 7.5, "height": 4.2})
+    engine = BlueprintEngine(registry=registry)
+    outputs = engine.run(blueprint, inputs={"width": 7.5, "height": 4.2})
 
     print("Execution complete")
     print(f"  area    = {outputs['area']}")

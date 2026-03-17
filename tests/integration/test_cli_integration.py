@@ -1,4 +1,4 @@
-"""Integration tests: CLI commands with real sequences."""
+"""Integration tests: CLI commands with real blueprints."""
 
 from __future__ import annotations
 
@@ -22,12 +22,12 @@ class TestCliEndToEnd:
         assert r2.exit_code == 0, f"Expected exit code 0, got {r2.exit_code}"
         assert (tmp_path / "bricks_lib" / "my_op.py").exists(), "Expected my_op.py to exist"
 
-    def test_init_then_scaffold_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_init_then_scaffold_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
         runner.invoke(app, ["init"])
-        r = runner.invoke(app, ["new", "sequence", "my_flow"])
+        r = runner.invoke(app, ["new", "blueprint", "my_flow"])
         assert r.exit_code == 0, f"Expected exit code 0, got {r.exit_code}"
-        assert (tmp_path / "sequences" / "my_flow.yaml").exists(), "Expected my_flow.yaml to exist"
+        assert (tmp_path / "blueprints" / "my_flow.yaml").exists(), "Expected my_flow.yaml to exist"
 
     def test_list_with_auto_discover(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -124,7 +124,7 @@ class TestCliEndToEnd:
 
 
 class TestCliRunEndToEnd:
-    """End-to-end run tests with real bricks and sequences."""
+    """End-to-end run tests with real bricks and blueprints."""
 
     def _setup_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -263,7 +263,7 @@ class TestCliInitWorkflow:
     """Tests for the full init + use workflow."""
 
     def test_full_init_workflow(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test the complete workflow: init -> new brick -> new sequence -> run."""
+        """Test the complete workflow: init -> new brick -> new blueprint -> run."""
         monkeypatch.chdir(tmp_path)
 
         # Step 1: init
@@ -271,7 +271,7 @@ class TestCliInitWorkflow:
         assert r_init.exit_code == 0, f"Expected exit code 0, got {r_init.exit_code}"
         assert (tmp_path / "bricks.config.yaml").exists(), "Expected bricks.config.yaml to exist"
         assert (tmp_path / "bricks_lib").is_dir(), "Expected bricks_lib/ to be a directory"
-        assert (tmp_path / "sequences").is_dir(), "Expected sequences/ to be a directory"
+        assert (tmp_path / "blueprints").is_dir(), "Expected blueprints/ to be a directory"
 
         # Step 2: scaffold a brick file (manually create working implementation)
         brick_file = tmp_path / "bricks_lib" / "adder.py"
@@ -294,12 +294,12 @@ class TestCliInitWorkflow:
                   paths:
                     - 'bricks_lib/'
                 sequences:
-                  base_dir: "sequences/"
+                  base_dir: "blueprints/"
             """).strip()
         )
 
-        # Step 4: create sequence file
-        seq_file = tmp_path / "sequences" / "add_seq.yaml"
+        # Step 4: create blueprint file
+        seq_file = tmp_path / "blueprints" / "add_seq.yaml"
         seq_file.write_text(
             textwrap.dedent("""
                 name: add_seq
@@ -315,11 +315,11 @@ class TestCliInitWorkflow:
             """).strip()
         )
 
-        # Step 5: check the sequence
+        # Step 5: check the blueprint
         r_check = runner.invoke(app, ["check", str(seq_file)])
         assert r_check.exit_code == 0, f"Expected exit code 0 for check, got {r_check.exit_code}"
 
-        # Step 6: run the sequence
+        # Step 6: run the blueprint
         r_run = runner.invoke(app, ["run", str(seq_file)])
         assert r_run.exit_code == 0, f"Expected exit code 0 for run, got {r_run.exit_code}"
         assert "8.0" in r_run.output, "Expected '8.0' in output"

@@ -9,11 +9,11 @@ from typing import cast
 import pytest
 
 from bricks.core.brick import BrickFunction, brick
-from bricks.core.engine import SequenceEngine
-from bricks.core.exceptions import BrickExecutionError, SequenceValidationError
-from bricks.core.loader import SequenceLoader
+from bricks.core.engine import BlueprintEngine
+from bricks.core.exceptions import BlueprintValidationError, BrickExecutionError
+from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
-from bricks.core.validation import SequenceValidator
+from bricks.core.validation import BlueprintValidator
 
 
 def _make_math_registry() -> BrickRegistry:
@@ -45,7 +45,7 @@ def _make_math_registry() -> BrickRegistry:
 class TestSingleStepPipeline:
     def test_single_step_add(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: simple_add
 inputs:
@@ -61,13 +61,13 @@ steps:
 outputs_map:
   result: "${total}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"x": 3.0, "y": 4.0})
         assert out["result"] == 7.0, f"Expected 7.0, got {out['result']!r}"
 
     def test_literal_params(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: literal_add
 steps:
@@ -80,13 +80,13 @@ steps:
 outputs_map:
   result: "${total}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["result"] == 15.0, f"Expected 15.0, got {out['result']!r}"
 
     def test_string_output(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: to_str
 steps:
@@ -98,13 +98,13 @@ steps:
 outputs_map:
   label: "${text}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["label"] == "42.0", f"Expected '42.0', got {out['label']!r}"
 
     def test_no_outputs_map(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: no_outputs
 steps:
@@ -114,7 +114,7 @@ steps:
       a: 1.0
       b: 2.0
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out == {}, f"Expected {{}}, got {out!r}"
 
@@ -122,7 +122,7 @@ steps:
 class TestMultiStepPipeline:
     def test_chained_steps(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: chain
 inputs:
@@ -145,13 +145,13 @@ steps:
 outputs_map:
   total: "${final_sum}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"a": 1.0, "b": 2.0, "c": 3.0})
         assert out["total"] == 6.0, f"Expected 6.0, got {out['total']!r}"
 
     def test_multiply_then_round(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: mul_round
 inputs:
@@ -173,13 +173,13 @@ steps:
 outputs_map:
   result: "${rounded}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"x": 7.5, "y": 4.2})
         assert out["result"] == 31.5, f"Expected 31.5, got {out['result']!r}"
 
     def test_three_steps_chained(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: triple_chain
 steps:
@@ -204,13 +204,13 @@ steps:
 outputs_map:
   result: "${r3}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["result"] == 20.0, f"Expected 20.0, got {out['result']!r}"  # (2+3)*4 = 20
 
     def test_add_then_stringify(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: add_then_str
 steps:
@@ -228,7 +228,7 @@ steps:
 outputs_map:
   label: "${text_result}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["label"] == "10.0", f"Expected '10.0', got {out['label']!r}"
 
@@ -236,7 +236,7 @@ outputs_map:
 class TestValidationIntegration:
     def test_validate_then_run(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: validated_seq
 inputs:
@@ -251,10 +251,10 @@ steps:
 outputs_map:
   result: "${doubled}"
 """)
-        validator = SequenceValidator(registry=reg)
+        validator = BlueprintValidator(registry=reg)
         validator.validate(seq)  # raises on failure
 
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"n": 5.0})
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"
 
@@ -265,15 +265,15 @@ outputs_map:
     def test_validation_catches_missing_brick(self, brick_name: str) -> None:
         """Validation raises for any unregistered brick name."""
         reg = BrickRegistry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string(f"""
 name: bad_seq
 steps:
   - name: s1
     brick: {brick_name}
 """)
-        validator = SequenceValidator(registry=reg)
-        with pytest.raises(SequenceValidationError) as exc_info:
+        validator = BlueprintValidator(registry=reg)
+        with pytest.raises(BlueprintValidationError) as exc_info:
             validator.validate(seq)
         assert any(brick_name in e for e in exc_info.value.errors), (
             f"Expected {brick_name!r} in errors: {exc_info.value.errors!r}"
@@ -291,7 +291,7 @@ steps:
             cast(BrickFunction, always_fails),
             cast(BrickFunction, always_fails).__brick_meta__,
         )
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: failing_seq
 steps:
@@ -300,7 +300,7 @@ steps:
     params:
       x: 1
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         with pytest.raises(BrickExecutionError) as exc_info:
             engine.run(seq)
         assert "always_fails" in str(exc_info.value), f"Expected 'always_fails' in {str(exc_info.value)!r}"
@@ -326,7 +326,7 @@ class TestDiscoveryIntegration:
         disc.discover_path(brick_file)
         assert reg.has("square"), "Expected 'square' to be registered"
 
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: square_seq
 inputs:
@@ -340,7 +340,7 @@ steps:
 outputs_map:
   result: "${squared}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"n": 4.0})
         assert out["result"] == 16.0, f"Expected 16.0, got {out['result']!r}"
 
@@ -364,7 +364,7 @@ outputs_map:
         disc.discover_package(pkg_dir)
         assert reg.has("add_one"), "Expected 'add_one' to be registered"
 
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: add_one_seq
 steps:
@@ -376,7 +376,7 @@ steps:
 outputs_map:
   out: "${result}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["out"] == 10.0, f"Expected 10.0, got {out['out']!r}"
 
@@ -384,7 +384,7 @@ outputs_map:
 class TestOutputsMap:
     def test_multiple_outputs(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: multi_out
 inputs:
@@ -407,7 +407,7 @@ outputs_map:
   sum: "${sum_val}"
   product: "${prod_val}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq, inputs={"x": 3.0, "y": 4.0})
         assert out["sum"] == 7.0, f"Expected 7.0, got {out['sum']!r}"
         assert out["product"] == 12.0, f"Expected 12.0, got {out['product']!r}"
@@ -415,7 +415,7 @@ outputs_map:
     def test_literal_output_value(self) -> None:
         """Outputs map with a literal value (no reference) passthrough."""
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: literal_out
 steps:
@@ -429,7 +429,7 @@ outputs_map:
   result: "${total}"
   label: "computed"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["result"] == 10.0, f"Expected 10.0, got {out['result']!r}"
         assert out["label"] == "computed", f"Expected 'computed', got {out['label']!r}"
@@ -438,7 +438,7 @@ outputs_map:
 class TestLoaderIntegration:
     def test_load_string_and_run(self) -> None:
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_string("""
 name: round_test
 steps:
@@ -451,7 +451,7 @@ steps:
 outputs_map:
   pi_approx: "${rounded}"
 """)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["pi_approx"] == 3.14, f"Expected 3.14, got {out['pi_approx']!r}"
 
@@ -472,8 +472,8 @@ outputs_map:
             """).strip()
         )
         reg = _make_math_registry()
-        loader = SequenceLoader()
+        loader = BlueprintLoader()
         seq = loader.load_file(seq_file)
-        engine = SequenceEngine(registry=reg)
+        engine = BlueprintEngine(registry=reg)
         out = engine.run(seq)
         assert out["result"] == 150.0, f"Expected 150.0, got {out['result']!r}"

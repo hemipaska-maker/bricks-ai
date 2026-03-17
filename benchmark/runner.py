@@ -20,14 +20,14 @@ from benchmark.domain_bricks import (
 from benchmark.scenarios import Scenario
 from benchmark.token_counter import TokenEstimate, TokenEstimator
 from bricks.core import (
+    BlueprintEngine,
+    BlueprintLoader,
+    BlueprintValidator,
     BrickRegistry,
-    SequenceEngine,
-    SequenceLoader,
-    SequenceValidator,
 )
 from bricks.core.exceptions import (
+    BlueprintValidationError,
     BrickExecutionError,
-    SequenceValidationError,
     YamlLoadError,
 )
 
@@ -49,9 +49,9 @@ class BricksRunner:
 
     def __init__(self, registry: BrickRegistry) -> None:
         self._registry = registry
-        self._loader = SequenceLoader()
-        self._validator = SequenceValidator(registry=registry)
-        self._engine = SequenceEngine(registry=registry)
+        self._loader = BlueprintLoader()
+        self._validator = BlueprintValidator(registry=registry)
+        self._engine = BlueprintEngine(registry=registry)
         self._estimator = TokenEstimator()
 
     def run(self, scenario: Scenario) -> RunResult:
@@ -70,7 +70,7 @@ class BricksRunner:
         # 2. Validate
         try:
             self._validator.validate(sequence)
-        except SequenceValidationError as exc:
+        except BlueprintValidationError as exc:
             return RunResult(
                 status="caught_pre_exec",
                 errors=list(exc.errors),

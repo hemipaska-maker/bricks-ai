@@ -1,11 +1,11 @@
-"""JSON Schema generation for BrickMeta and SequenceDefinition."""
+"""JSON Schema generation for BrickMeta and BlueprintDefinition."""
 
 from __future__ import annotations
 
 import inspect
 from typing import Any
 
-from bricks.core.models import SequenceDefinition
+from bricks.core.models import BlueprintDefinition
 from bricks.core.registry import BrickRegistry
 
 
@@ -34,19 +34,19 @@ def brick_schema(name: str, registry: BrickRegistry) -> dict[str, Any]:
     return schema
 
 
-def sequence_schema(sequence: SequenceDefinition) -> dict[str, Any]:
-    """Generate a JSON Schema dict describing a SequenceDefinition.
+def blueprint_schema(blueprint: BlueprintDefinition) -> dict[str, Any]:
+    """Generate a JSON Schema dict describing a BlueprintDefinition.
 
     Args:
-        sequence: The sequence definition to describe.
+        blueprint: The blueprint definition to describe.
 
     Returns:
-        A JSON Schema compatible dict describing the sequence inputs and outputs.
+        A JSON Schema compatible dict describing the blueprint inputs and outputs.
     """
     return {
-        "name": sequence.name,
-        "description": sequence.description,
-        "inputs": sequence.inputs,
+        "name": blueprint.name,
+        "description": blueprint.description,
+        "inputs": blueprint.inputs,
         "steps": [
             {
                 "name": step.name,
@@ -54,9 +54,9 @@ def sequence_schema(sequence: SequenceDefinition) -> dict[str, Any]:
                 "params": step.params,
                 "save_as": step.save_as,
             }
-            for step in sequence.steps
+            for step in blueprint.steps
         ],
-        "outputs_map": sequence.outputs_map,
+        "outputs_map": blueprint.outputs_map,
     }
 
 

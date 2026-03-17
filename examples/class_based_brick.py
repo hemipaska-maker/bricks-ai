@@ -4,7 +4,7 @@ This example demonstrates:
 - Defining Bricks using BaseBrick with typed Input/Output schemas
 - Using BrickModel for input/output validation
 - Registering class-based bricks in the registry via wrapper functions
-- Running them via SequenceDefinition built programmatically (no YAML file needed)
+- Running them via BlueprintDefinition built programmatically (no YAML file needed)
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from bricks.core.brick import BaseBrick, BrickModel
-from bricks.core.engine import SequenceEngine
-from bricks.core.models import BrickMeta, SequenceDefinition, StepDefinition
+from bricks.core.engine import BlueprintEngine
+from bricks.core.models import BlueprintDefinition, BrickMeta, StepDefinition
 from bricks.core.registry import BrickRegistry
 
 # -- 1. Define class-based bricks ---------------------------------------------
@@ -113,7 +113,7 @@ class ConvertTemperature(BaseBrick):
 
 # -- 2. Register bricks via wrapper functions ---------------------------------
 #
-# The SequenceEngine calls callable_(**resolved_params) with plain keyword
+# The BlueprintEngine calls callable_(**resolved_params) with plain keyword
 # arguments from the YAML params dict.  BaseBrick.execute() takes
 # (inputs: BrickModel, metadata: BrickMeta), so we register thin wrappers
 # that accept keyword args and delegate to execute().
@@ -169,12 +169,12 @@ def _build_registry() -> BrickRegistry:
     return registry
 
 
-# -- 3. Build sequence programmatically ---------------------------------------
+# -- 3. Build blueprint programmatically --------------------------------------
 
 
-def _build_sequence() -> SequenceDefinition:
-    """Build a sequence that reads and converts a temperature."""
-    return SequenceDefinition(
+def _build_blueprint() -> BlueprintDefinition:
+    """Build a blueprint that reads and converts a temperature."""
+    return BlueprintDefinition(
         name="temperature_pipeline",
         description="Read temperature from channel 1 and convert to Fahrenheit",
         inputs={"channel": "int"},
@@ -209,16 +209,16 @@ def _build_sequence() -> SequenceDefinition:
 def main() -> None:
     """Run the class_based_brick example."""
     registry = _build_registry()
-    sequence = _build_sequence()
+    blueprint = _build_blueprint()
 
-    print(f"Sequence: {sequence.name}")
-    print(f"Steps: {len(sequence.steps)}")
+    print(f"Blueprint: {blueprint.name}")
+    print(f"Steps: {len(blueprint.steps)}")
 
     for name, meta in registry.list_all():
         print(f"  Brick: {name} -- {meta.description}")
 
-    engine = SequenceEngine(registry=registry)
-    outputs = engine.run(sequence, inputs={"channel": 1})
+    engine = BlueprintEngine(registry=registry)
+    outputs = engine.run(blueprint, inputs={"channel": 1})
 
     print("\nResults for channel 1:")
     print(f"  Celsius:    {outputs['celsius']}C")

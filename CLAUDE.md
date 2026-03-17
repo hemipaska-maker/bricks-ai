@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Bricks is a deterministic sequencing engine where typed Python building blocks (Bricks) are composed into auditable YAML sequences -- by engineers directly or by AI through natural language conversation -- with full validation before execution.
+Bricks is a deterministic execution engine where typed Python building blocks (Bricks) are composed into auditable YAML blueprints -- by engineers directly or by AI through natural language conversation -- with full validation before execution.
 
 ## Technical Constraints
 
@@ -31,9 +31,31 @@ registry.register("read_temperature", read_temperature, read_temperature.__brick
 - `@brick(...)` -- decorator attaching metadata to a function brick
 - `BaseBrick` -- abstract base class for class-based bricks with Meta/Input/Output inner classes
 - `BrickRegistry` -- flat namespace; duplicate names raise `DuplicateBrickError`
-- `SequenceEngine.run()` -- executes a `SequenceDefinition` step-by-step
-- `SequenceValidator.validate()` -- dry-run validation without execution
+- `BlueprintEngine.run()` -- executes a `BlueprintDefinition` step-by-step
+- `BlueprintValidator.validate()` -- dry-run validation without execution
 - `ReferenceResolver` -- expands `${variable}` references in step parameters
+
+### Teardown Hooks
+
+Bricks support optional cleanup on failure:
+
+```python
+# Class-based: override teardown() in BaseBrick
+class MyBrick(BaseBrick):
+    def teardown(self, inputs: BrickModel, metadata: BrickMeta, error: Exception) -> None:
+        # cleanup (close connections, delete temp files, etc.)
+        ...
+
+# Function-based: pass teardown= to @brick
+def my_cleanup(inputs: dict, error: Exception) -> None:
+    ...
+
+@brick(tags=["io"], destructive=True, teardown=my_cleanup)
+def write_to_file(path: str, content: str) -> dict:
+    ...
+```
+
+The engine calls teardown on the failing step, then reverse-teardown all previously completed steps before re-raising. Teardown exceptions are suppressed so they never mask the original error.
 
 ## Monorepo Structure
 
@@ -42,8 +64,8 @@ bricks/                  # Python package root
   core/                  # Engine, context, validation, Brick base
     brick.py             # @brick decorator + BaseBrick + BrickModel
     registry.py          # BrickRegistry
-    models.py            # Pydantic models (BrickMeta, StepDefinition, SequenceDefinition)
-    engine.py            # SequenceEngine
+    models.py            # Pydantic models (BrickMeta, StepDefinition, BlueprintDefinition)
+    engine.py            # BlueprintEngine
     context.py           # ExecutionContext
     resolver.py          # ${variable} reference resolver
     validation.py        # Dry-run validation
@@ -51,7 +73,7 @@ bricks/                  # Python package root
   cli/                   # Typer CLI commands
     main.py              # Typer app with command stubs
   ai/                    # AI composition layer
-    composer.py          # SequenceComposer stub
+    composer.py          # BlueprintComposer
 tests/                   # Mirrors source structure
 examples/                # Runnable standalone scripts
 ```

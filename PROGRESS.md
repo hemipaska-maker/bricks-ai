@@ -4,12 +4,12 @@
 
 ### Completed Phases
 - [x] **Scaffolding** -- 14 source files, 22 tests, mypy/ruff clean, CLI stubs, example
-- [x] **Phase 1: YAML Loader** -- `SequenceLoader` with `load_file()` and `load_string()`
+- [x] **Phase 1: YAML Loader** -- `BlueprintLoader` with `load_file()` and `load_string()`
 - [x] **Phase 2: Sub-Sequence Support** -- models + engine
 - [x] **Phase 3: Enhanced Validation** -- 5 additional checks, 63 tests total (up from 42)
-- [x] **Phase 4: Brick Discovery + JSON Schema** -- `BrickDiscovery`, `brick_schema`, `registry_schema`, `sequence_schema`
+- [x] **Phase 4: Brick Discovery + JSON Schema** -- `BrickDiscovery`, `brick_schema`, `registry_schema`, `blueprint_schema`
 - [x] **Phase 5: Configuration** -- `BricksConfig`, `ConfigLoader`, `ConfigError`, 11 new tests
-- [x] **Phase 7: AI Composition Layer** -- `SequenceComposer`, `ComposerError`, 17 new tests (145 total)
+- [x] **Phase 7: AI Composition Layer** -- `BlueprintComposer`, `ComposerError`, 17 new tests (145 total)
 
 ### Phase 4 Details
 
@@ -30,11 +30,11 @@ Key behaviors:
 #### Phase 4B: JSON Schema Export (`bricks/core/schema.py`)
 Three public functions:
 - `brick_schema(name, registry)` -- returns a dict with `name`, `description`, `tags`, `destructive`, `idempotent`, and `parameters` for a registered brick; uses `inspect.signature` to extract parameter names, type annotations, and required/optional status
-- `sequence_schema(sequence)` -- serialises a `SequenceDefinition` to a JSON-compatible dict including all steps with their `name`, `brick`, `params`, and `save_as` fields
+- `blueprint_schema(sequence)` -- serialises a `BlueprintDefinition` to a JSON-compatible dict including all steps with their `name`, `brick`, `params`, and `save_as` fields
 - `registry_schema(registry)` -- returns a sorted list of `brick_schema` dicts for all registered bricks
 
 #### `bricks/core/__init__.py` updates
-Added exports: `BrickDiscovery`, `brick_schema`, `registry_schema`, `sequence_schema`
+Added exports: `BrickDiscovery`, `brick_schema`, `registry_schema`, `blueprint_schema`
 
 Also restored `YamlLoadError` and `ConfigError` to `bricks/core/exceptions.py` which were lost during a stash/restore operation (these belong to Phase 1 and Phase 5 respectively).
 
@@ -53,8 +53,8 @@ Test suite expanded from 1 to 22 tests in `tests/core/test_validation.py`, cover
 ### Phase 5 Details
 
 Created `bricks/core/config.py` with:
-- `RegistryConfig`, `SequencesConfig`, `AiConfig` -- Pydantic sub-models for config sections
-- `BricksConfig` -- top-level config model with defaults (version "1", auto_discover false, base_dir "sequences/", model "claude-3-5-sonnet-20241022", max_tokens 4096)
+- `RegistryConfig`, `BlueprintsConfig`, `AiConfig` -- Pydantic sub-models for config sections
+- `BricksConfig` -- top-level config model with defaults (version "1", auto_discover false, base_dir "blueprints/", model "claude-3-5-sonnet-20241022", max_tokens 4096)
 - `ConfigLoader` -- loads from directory (auto-discovers `bricks.config.yaml`), file path, or YAML string; returns default `BricksConfig` when no file found
 - `ConfigError` -- added to `bricks/core/exceptions.py` following project convention; raised on parse or validation failures
 
@@ -63,12 +63,12 @@ Also restored Phase 3 validation checks (checks 3-7) and `test_validation.py` (1
 ### Phase 6 Details
 
 Implemented all 8 CLI commands in `bricks/cli/main.py`:
-- `init` -- scaffolds `bricks.config.yaml`, `sequences/`, `bricks_lib/__init__.py` in cwd; errors if config already exists
+- `init` -- scaffolds `bricks.config.yaml`, `blueprints/`, `bricks_lib/__init__.py` in cwd; errors if config already exists
 - `new brick <name>` -- generates a `BaseBrick` subclass stub in `bricks_lib/<name>.py`; normalises name (hyphens/spaces to underscores)
-- `new sequence <name>` -- generates a YAML sequence template in the configured `sequences/` dir
+- `new sequence <name>` -- generates a YAML sequence template in the configured `blueprints/` dir
 - `check <file>` -- loads a sequence YAML, validates against registry; exits 0 if valid, 1 with error list if not
-- `run <sequence>` -- executes a sequence via `SequenceEngine`; parses `--input key=value` pairs with JSON type coercion
-- `dry-run <sequence>` -- validates a sequence via `SequenceValidator` without executing
+- `run <sequence>` -- executes a sequence via `BlueprintEngine`; parses `--input key=value` pairs with JSON type coercion
+- `dry-run <sequence>` -- validates a sequence via `BlueprintValidator` without executing
 - `list` -- lists all registered bricks with name, tags, destructive flag, and description
 - `compose <intent>` -- AI-compose stub; exits 1 with install instructions if `anthropic` is not installed
 
@@ -84,13 +84,13 @@ Added 52 tests in `tests/cli/test_main.py` covering all 8 commands plus the help
 
 Created four runnable examples in `examples/`:
 
-#### `examples/yaml_sequence.py`
+#### `examples/yaml_blueprint.py`
 Demonstrates end-to-end YAML-based sequence loading and execution:
 - Defines three `@brick`-decorated functions (`multiply`, `round_value`, `format_result`)
 - Registers them in a `BrickRegistry`
-- Loads a `SEQUENCE_YAML` string via `SequenceLoader.load_string()`
-- Validates with `SequenceValidator`
-- Runs via `SequenceEngine` with `inputs={"width": 7.5, "height": 4.2}`
+- Loads a `SEQUENCE_YAML` string via `BlueprintLoader.load_string()`
+- Validates with `BlueprintValidator`
+- Runs via `BlueprintEngine` with `inputs={"width": 7.5, "height": 4.2}`
 - Asserts `area == 31.5` and `display == "Area (m²): 31.5"`
 
 #### `examples/class_based_brick.py`
@@ -98,10 +98,10 @@ Demonstrates class-based brick definitions registered via wrapper functions:
 - Defines `ReadTemperature` and `ConvertTemperature` as `BaseBrick` subclasses
 - Registers thin wrapper functions (accepting keyword args) so the engine's
   `callable_(**resolved_params)` call pattern works correctly
-- Builds a `SequenceDefinition` programmatically (no YAML file)
+- Builds a `BlueprintDefinition` programmatically (no YAML file)
 - Runs with `inputs={"channel": 1}` and asserts `celsius == 37.0`, `fahrenheit == 98.6`
 
-#### `examples/sequences/power_cycle_test.yaml`
+#### `examples/blueprints/power_cycle_test.yaml`
 A reference YAML sequence describing a hardware power cycle test:
 - Declares `device_id` and `wait_seconds` as inputs
 - Five steps: `log_message`, `set_power_state` (off), `wait_seconds`, `set_power_state` (on), `check_device_online`
@@ -122,15 +122,15 @@ Implemented the full AI composition layer in `bricks/ai/composer.py`:
 - Inherits from `BrickError`
 - Stores optional `cause: Exception | None` for the underlying exception
 
-#### `SequenceComposer`
+#### `BlueprintComposer`
 - `__init__(registry, api_key, model, max_tokens)` -- lazily imports `anthropic` inside the constructor; raises `ImportError` with install instructions if the package is missing
-- `compose(intent)` -- builds a prompt from the registry schema, calls the Anthropic Messages API, extracts YAML from the response, and returns a validated `SequenceDefinition`; wraps all failures as `ComposerError`
+- `compose(intent)` -- builds a prompt from the registry schema, calls the Anthropic Messages API, extracts YAML from the response, and returns a validated `BlueprintDefinition`; wraps all failures as `ComposerError`
 - `_build_bricks_context()` -- uses `registry_schema()` to generate a simplified list of brick dicts (name, description, tags, parameters) for the prompt
 - `_extract_text(response)` -- extracts the text content from the first text block in an Anthropic response
 - `_extract_yaml(text)` -- regex-extracts content from ` ```yaml ... ``` ` or ` ``` ... ``` ` blocks; falls back to the raw text
 
 #### `bricks/ai/__init__.py`
-Updated to export `ComposerError` and `SequenceComposer`.
+Updated to export `ComposerError` and `BlueprintComposer`.
 
 #### `pyproject.toml`
 Added `ai` optional dependency group: `anthropic>=0.40`.
@@ -157,7 +157,7 @@ Expanded test coverage across all core modules and added a new `tests/integratio
 #### New/Expanded Test Files
 
 **`tests/core/test_exceptions.py`** (expanded from 2 to 35 tests):
-- Full coverage of all 8 exception classes: `BrickError`, `DuplicateBrickError`, `BrickNotFoundError`, `SequenceValidationError`, `VariableResolutionError`, `BrickExecutionError`, `YamlLoadError`, `ConfigError`
+- Full coverage of all 8 exception classes: `BrickError`, `DuplicateBrickError`, `BrickNotFoundError`, `BlueprintValidationError`, `VariableResolutionError`, `BrickExecutionError`, `YamlLoadError`, `ConfigError`
 - Tests for attribute access (`.name`, `.brick_name`, `.step_name`, `.cause`, `.path`, `.reference`, `.errors`)
 - Tests for inheritance hierarchy and catchability
 
@@ -180,7 +180,7 @@ Expanded test coverage across all core modules and added a new `tests/integratio
 
 **`tests/core/test_models.py`** (expanded from 3 to 20 tests):
 - `TestStepDefinition`: 5 new tests for field storage
-- `TestSequenceDefinition`: 7 new tests for defaults and field setting
+- `TestBlueprintDefinition`: 7 new tests for defaults and field setting
 - `TestBrickMetaDefaults`: 7 new tests for all default values and overrides
 
 **`tests/integration/test_full_pipeline.py`** (19 tests, NEW):

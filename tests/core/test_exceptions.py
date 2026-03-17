@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from bricks.core.exceptions import (
+    BlueprintValidationError,
     BrickError,
     BrickExecutionError,
     BrickNotFoundError,
     ConfigError,
     DuplicateBrickError,
-    SequenceValidationError,
     VariableResolutionError,
     YamlLoadError,
 )
@@ -63,31 +63,31 @@ class TestBrickNotFoundError:
             raise BrickNotFoundError("some_brick")
 
 
-class TestSequenceValidationError:
+class TestBlueprintValidationError:
     def test_inherits_brick_error(self) -> None:
-        err = SequenceValidationError("invalid")
+        err = BlueprintValidationError("invalid")
         assert isinstance(err, BrickError), f"Expected BrickError, got {type(err).__name__}"
 
     def test_message(self) -> None:
-        err = SequenceValidationError("bad sequence")
-        assert "bad sequence" in str(err), f"Expected 'bad sequence' in {str(err)!r}"
+        err = BlueprintValidationError("bad blueprint")
+        assert "bad blueprint" in str(err), f"Expected 'bad blueprint' in {str(err)!r}"
 
     def test_errors_list(self) -> None:
-        err = SequenceValidationError("2 errors", errors=["err1", "err2"])
+        err = BlueprintValidationError("2 errors", errors=["err1", "err2"])
         assert err.errors == ["err1", "err2"], f"Expected ['err1', 'err2'], got {err.errors!r}"
 
     def test_errors_default_empty_list(self) -> None:
         # Implementation returns [] (not None) when no errors list is provided
-        err = SequenceValidationError("no errors list")
+        err = BlueprintValidationError("no errors list")
         assert err.errors == [], f"Expected [], got {err.errors!r}"
 
     def test_errors_none_becomes_empty_list(self) -> None:
-        err = SequenceValidationError("msg", errors=None)
+        err = BlueprintValidationError("msg", errors=None)
         assert err.errors == [], f"Expected [], got {err.errors!r}"
 
     def test_multiple_errors_preserved(self) -> None:
         errors = ["error 1", "error 2", "error 3"]
-        err = SequenceValidationError("3 errors", errors=errors)
+        err = BlueprintValidationError("3 errors", errors=errors)
         assert len(err.errors) == 3, f"Expected length 3, got {len(err.errors)}"
         assert "error 1" in err.errors, "Expected 'error 1' to be in collection"
 

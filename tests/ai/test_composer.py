@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bricks.ai.composer import ComposerError, SequenceComposer
+from bricks.ai.composer import BlueprintComposer, ComposerError
 from bricks.core.registry import BrickRegistry
 
 
@@ -17,7 +17,7 @@ class TestComposerInit:
             patch.dict("sys.modules", {"anthropic": None}),
             pytest.raises(ImportError, match="anthropic"),
         ):
-            SequenceComposer(registry=math_registry, api_key="test_key")
+            BlueprintComposer(registry=math_registry, api_key="test_key")
 
 
 class TestComposerCompose:
@@ -29,21 +29,21 @@ class TestComposerCompose:
         response.content = [block]
         return response
 
-    def _make_composer(self, registry: BrickRegistry) -> SequenceComposer:
-        """Create a SequenceComposer with a mocked Anthropic client."""
+    def _make_composer(self, registry: BrickRegistry) -> BlueprintComposer:
+        """Create a BlueprintComposer with a mocked Anthropic client."""
         mock_client = MagicMock()
-        composer = SequenceComposer.__new__(SequenceComposer)
+        composer = BlueprintComposer.__new__(BlueprintComposer)
         composer._registry = registry
         composer._model = "claude-haiku-4-5-20251001"
         composer._max_tokens = 4096
         composer._client = mock_client
-        from bricks.core.loader import SequenceLoader
+        from bricks.core.loader import BlueprintLoader
 
-        composer._loader = SequenceLoader()
+        composer._loader = BlueprintLoader()
         return composer
 
     def test_compose_valid_yaml(self, math_registry: BrickRegistry) -> None:
-        """A valid YAML response should produce a SequenceDefinition."""
+        """A valid YAML response should produce a BlueprintDefinition."""
         composer = self._make_composer(math_registry)
 
         valid_yaml = """
@@ -65,11 +65,11 @@ outputs_map:
         mock_response = self._make_mock_response(valid_yaml)
         composer._client.messages.create.return_value = mock_response
 
-        sequence = composer.compose("Add two numbers a and b")
+        blueprint = composer.compose("Add two numbers a and b")
 
-        assert sequence.name == "add_sequence", f"Expected 'add_sequence', got {sequence.name!r}"
-        assert len(sequence.steps) == 1, f"Expected length 1, got {len(sequence.steps)}"
-        assert sequence.steps[0].brick == "add", f"Expected 'add', got {sequence.steps[0].brick!r}"
+        assert blueprint.name == "add_sequence", f"Expected 'add_sequence', got {blueprint.name!r}"
+        assert len(blueprint.steps) == 1, f"Expected length 1, got {len(blueprint.steps)}"
+        assert blueprint.steps[0].brick == "add", f"Expected 'add', got {blueprint.steps[0].brick!r}"
 
     def test_compose_invalid_yaml_raises_composer_error(self, math_registry: BrickRegistry) -> None:
         """Invalid YAML in response raises ComposerError."""
@@ -117,17 +117,17 @@ outputs_map:
 
 
 class TestExtractYaml:
-    def _make_bare_composer(self) -> SequenceComposer:
-        """Create a SequenceComposer with mocked internals for unit testing."""
+    def _make_bare_composer(self) -> BlueprintComposer:
+        """Create a BlueprintComposer with mocked internals for unit testing."""
         reg = BrickRegistry()
-        composer = SequenceComposer.__new__(SequenceComposer)
+        composer = BlueprintComposer.__new__(BlueprintComposer)
         composer._registry = reg
         composer._model = "test"
         composer._max_tokens = 1024
         composer._client = MagicMock()
-        from bricks.core.loader import SequenceLoader
+        from bricks.core.loader import BlueprintLoader
 
-        composer._loader = SequenceLoader()
+        composer._loader = BlueprintLoader()
         return composer
 
     def test_extracts_yaml_block(self) -> None:
@@ -164,14 +164,14 @@ class TestExtractYaml:
 class TestBuildBricksContext:
     def test_builds_context_with_registered_bricks(self, math_registry: BrickRegistry) -> None:
         """_build_bricks_context returns a list with brick info."""
-        composer = SequenceComposer.__new__(SequenceComposer)
+        composer = BlueprintComposer.__new__(BlueprintComposer)
         composer._registry = math_registry
         composer._model = "test"
         composer._max_tokens = 1024
         composer._client = MagicMock()
-        from bricks.core.loader import SequenceLoader
+        from bricks.core.loader import BlueprintLoader
 
-        composer._loader = SequenceLoader()
+        composer._loader = BlueprintLoader()
 
         context = composer._build_bricks_context()
 
@@ -188,14 +188,14 @@ class TestBuildBricksContext:
     def test_builds_empty_context_for_empty_registry(self) -> None:
         """_build_bricks_context returns an empty list for an empty registry."""
         reg = BrickRegistry()
-        composer = SequenceComposer.__new__(SequenceComposer)
+        composer = BlueprintComposer.__new__(BlueprintComposer)
         composer._registry = reg
         composer._model = "test"
         composer._max_tokens = 1024
         composer._client = MagicMock()
-        from bricks.core.loader import SequenceLoader
+        from bricks.core.loader import BlueprintLoader
 
-        composer._loader = SequenceLoader()
+        composer._loader = BlueprintLoader()
 
         context = composer._build_bricks_context()
         assert context == [], f"Expected [], got {context!r}"

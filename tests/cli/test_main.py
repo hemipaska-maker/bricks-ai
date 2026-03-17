@@ -32,7 +32,7 @@ class TestInitCommand:
         result = runner.invoke(app, ["init"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert (tmp_path / "bricks.config.yaml").exists(), "Expected bricks.config.yaml to exist"
-        assert (tmp_path / "sequences").is_dir(), "Expected sequences/ to be a directory"
+        assert (tmp_path / "blueprints").is_dir(), "Expected blueprints/ to be a directory"
         assert (tmp_path / "bricks_lib").is_dir(), "Expected bricks_lib/ to be a directory"
         assert (tmp_path / "bricks_lib" / "__init__.py").exists(), "Expected bricks_lib/__init__.py to exist"
 
@@ -41,7 +41,7 @@ class TestInitCommand:
         result = runner.invoke(app, ["init"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "bricks.config.yaml" in result.output, "Expected 'bricks.config.yaml' in output"
-        assert "sequences" in result.output, "Expected 'sequences' in output"
+        assert "blueprints" in result.output, "Expected 'blueprints' in output"
         assert "bricks_lib" in result.output, "Expected 'bricks_lib' in output"
         assert "initialised" in result.output, "Expected 'initialised' in output"
 
@@ -66,9 +66,9 @@ class TestInitCommand:
         assert "already exists" in result.output, "Expected 'already exists' in output"
 
     def test_init_idempotent_directories(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """init succeeds even if sequences/ and bricks_lib/ already exist."""
+        """init succeeds even if blueprints/ and bricks_lib/ already exist."""
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "sequences").mkdir()
+        (tmp_path / "blueprints").mkdir()
         (tmp_path / "bricks_lib").mkdir()
         result = runner.invoke(app, ["init"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
@@ -134,20 +134,64 @@ class TestNewBrickCommand:
         assert "BrickModel" in content, "Expected BrickModel in content"
 
 
+class TestNewBlueprintCommand:
+    """Tests for the `new blueprint` command."""
+
+    def test_new_blueprint_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["new", "blueprint", "power_cycle"])
+        assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
+        bp_file = tmp_path / "blueprints" / "power_cycle.yaml"
+        assert bp_file.exists(), f"Expected {bp_file} to exist"
+
+    def test_new_blueprint_content(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["new", "blueprint", "power_cycle"])
+        content = (tmp_path / "blueprints" / "power_cycle.yaml").read_text()
+        assert "name: power_cycle" in content, "Expected 'name: power_cycle' in content"
+        assert "steps:" in content, "Expected 'steps:' in content"
+
+    def test_new_blueprint_normalises_hyphens(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["new", "blueprint", "my-cool-blueprint"])
+        assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
+        assert (tmp_path / "blueprints" / "my_cool_blueprint.yaml").exists(), "Expected my_cool_blueprint.yaml to exist"
+
+    def test_new_blueprint_uses_config_base_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "bricks.config.yaml").write_text("sequences:\n  base_dir: 'my_bps/'\n")
+        result = runner.invoke(app, ["new", "blueprint", "test_bp"])
+        assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
+        assert (tmp_path / "my_bps" / "test_bp.yaml").exists(), "Expected test_bp.yaml in my_bps/"
+
+    def test_new_blueprint_output_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["new", "blueprint", "foo"])
+        assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
+        assert "foo.yaml" in result.output, "Expected 'foo.yaml' in output"
+
+    def test_new_blueprint_outputs_map(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["new", "blueprint", "check_outputs"])
+        content = (tmp_path / "blueprints" / "check_outputs.yaml").read_text()
+        assert "outputs_map:" in content, "Expected 'outputs_map:' in content"
+
+
 class TestNewSequenceCommand:
-    """Tests for the `new sequence` command."""
+    """Tests for the `new sequence` command (alias for 'new blueprint')."""
 
     def test_new_sequence_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(app, ["new", "sequence", "power_cycle"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
-        seq_file = tmp_path / "sequences" / "power_cycle.yaml"
-        assert seq_file.exists(), f"Expected {seq_file} to exist"
+        # Creates in blueprints/ (default base_dir)
+        bp_file = tmp_path / "blueprints" / "power_cycle.yaml"
+        assert bp_file.exists(), f"Expected {bp_file} to exist"
 
     def test_new_sequence_content(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
         runner.invoke(app, ["new", "sequence", "power_cycle"])
-        content = (tmp_path / "sequences" / "power_cycle.yaml").read_text()
+        content = (tmp_path / "blueprints" / "power_cycle.yaml").read_text()
         assert "name: power_cycle" in content, "Expected 'name: power_cycle' in content"
         assert "steps:" in content, "Expected 'steps:' in content"
 
@@ -155,7 +199,7 @@ class TestNewSequenceCommand:
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(app, ["new", "sequence", "my-cool-sequence"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
-        assert (tmp_path / "sequences" / "my_cool_sequence.yaml").exists(), "Expected my_cool_sequence.yaml to exist"
+        assert (tmp_path / "blueprints" / "my_cool_sequence.yaml").exists(), "Expected my_cool_sequence.yaml to exist"
 
     def test_new_sequence_uses_config_base_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -173,15 +217,15 @@ class TestNewSequenceCommand:
     def test_new_sequence_outputs_map(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
         runner.invoke(app, ["new", "sequence", "check_outputs"])
-        content = (tmp_path / "sequences" / "check_outputs.yaml").read_text()
+        content = (tmp_path / "blueprints" / "check_outputs.yaml").read_text()
         assert "outputs_map:" in content, "Expected 'outputs_map:' in content"
 
 
 class TestCheckCommand:
     """Tests for the `check` command."""
 
-    def _make_valid_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
-        """Create a bricks_lib with a registered brick and a valid sequence file."""
+    def _make_valid_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+        """Create a bricks_lib with a registered brick and a valid blueprint file."""
         monkeypatch.chdir(tmp_path)
         bricks_lib = tmp_path / "bricks_lib"
         bricks_lib.mkdir()
@@ -194,9 +238,9 @@ class TestCheckCommand:
         (tmp_path / "bricks.config.yaml").write_text(
             "registry:\n  auto_discover: true\n  paths:\n    - 'bricks_lib/'\n"
         )
-        seq_file = tmp_path / "add_seq.yaml"
-        seq_file.write_text(
-            "name: add_seq\n"
+        bp_file = tmp_path / "add_bp.yaml"
+        bp_file.write_text(
+            "name: add_bp\n"
             "steps:\n"
             "  - name: do_add\n"
             "    brick: add\n"
@@ -207,11 +251,11 @@ class TestCheckCommand:
             "outputs_map:\n"
             "  total: '${result}'\n"
         )
-        return bricks_lib, seq_file
+        return bricks_lib, bp_file
 
-    def test_check_valid_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        _, seq_file = self._make_valid_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["check", str(seq_file)])
+    def test_check_valid_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _, bp_file = self._make_valid_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["check", str(bp_file)])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "valid" in result.output, "Expected 'valid' in output"
 
@@ -234,23 +278,23 @@ class TestCheckCommand:
 
     def test_check_unknown_brick_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
-        seq_file = tmp_path / "unknown_brick.yaml"
-        seq_file.write_text("name: test_seq\nsteps:\n  - name: s1\n    brick: does_not_exist\n")
-        result = runner.invoke(app, ["check", str(seq_file)])
+        bp_file = tmp_path / "unknown_brick.yaml"
+        bp_file.write_text("name: test_bp\nsteps:\n  - name: s1\n    brick: does_not_exist\n")
+        result = runner.invoke(app, ["check", str(bp_file)])
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
 
-    def test_check_empty_sequence_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_check_empty_blueprint_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
-        seq_file = tmp_path / "empty.yaml"
-        seq_file.write_text("name: empty_seq\nsteps: []\n")
-        result = runner.invoke(app, ["check", str(seq_file)])
+        bp_file = tmp_path / "empty.yaml"
+        bp_file.write_text("name: empty_bp\nsteps: []\n")
+        result = runner.invoke(app, ["check", str(bp_file)])
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
 
 
 class TestDryRunCommand:
     """Tests for the `dry-run` command."""
 
-    def _make_valid_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    def _make_valid_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         monkeypatch.chdir(tmp_path)
         bricks_lib = tmp_path / "bricks_lib"
         bricks_lib.mkdir()
@@ -263,9 +307,9 @@ class TestDryRunCommand:
         (tmp_path / "bricks.config.yaml").write_text(
             "registry:\n  auto_discover: true\n  paths:\n    - 'bricks_lib/'\n"
         )
-        seq_file = tmp_path / "greet.yaml"
-        seq_file.write_text(
-            "name: greet_seq\n"
+        bp_file = tmp_path / "greet.yaml"
+        bp_file.write_text(
+            "name: greet_bp\n"
             "steps:\n"
             "  - name: say_hello\n"
             "    brick: greet\n"
@@ -275,17 +319,17 @@ class TestDryRunCommand:
             "outputs_map:\n"
             "  message: '${greeting}'\n"
         )
-        return seq_file
+        return bp_file
 
-    def test_dry_run_valid_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        seq_file = self._make_valid_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["dry-run", str(seq_file)])
+    def test_dry_run_valid_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        bp_file = self._make_valid_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["dry-run", str(bp_file)])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "valid" in result.output.lower(), "Expected 'valid' in output"
 
     def test_dry_run_valid_message_contains_passed(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        seq_file = self._make_valid_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["dry-run", str(seq_file)])
+        bp_file = self._make_valid_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["dry-run", str(bp_file)])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "passed" in result.output.lower(), "Expected 'passed' in output"
 
@@ -301,9 +345,9 @@ class TestDryRunCommand:
 
     def test_dry_run_unknown_brick_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
-        seq_file = tmp_path / "unknown.yaml"
-        seq_file.write_text("name: test_seq\nsteps:\n  - name: s1\n    brick: unknown_brick\n")
-        result = runner.invoke(app, ["dry-run", str(seq_file)])
+        bp_file = tmp_path / "unknown.yaml"
+        bp_file.write_text("name: test_bp\nsteps:\n  - name: s1\n    brick: unknown_brick\n")
+        result = runner.invoke(app, ["dry-run", str(bp_file)])
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
 
     def test_dry_run_invalid_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -317,7 +361,7 @@ class TestDryRunCommand:
 class TestRunCommand:
     """Tests for the `run` command."""
 
-    def _make_runnable_sequence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    def _make_runnable_blueprint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         monkeypatch.chdir(tmp_path)
         bricks_lib = tmp_path / "bricks_lib"
         bricks_lib.mkdir()
@@ -330,9 +374,9 @@ class TestRunCommand:
         (tmp_path / "bricks.config.yaml").write_text(
             "registry:\n  auto_discover: true\n  paths:\n    - 'bricks_lib/'\n"
         )
-        seq_file = tmp_path / "double_seq.yaml"
-        seq_file.write_text(
-            "name: double_seq\n"
+        bp_file = tmp_path / "double_bp.yaml"
+        bp_file.write_text(
+            "name: double_bp\n"
             "inputs:\n"
             "  x: int\n"
             "steps:\n"
@@ -344,7 +388,7 @@ class TestRunCommand:
             "outputs_map:\n"
             "  result: '${doubled}'\n"
         )
-        return seq_file
+        return bp_file
 
     def test_run_missing_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -357,8 +401,8 @@ class TestRunCommand:
         assert "not found" in result.output, "Expected 'not found' in output"
 
     def test_run_invalid_input_format(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        seq_file = self._make_runnable_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["run", str(seq_file), "--input", "no_equals"])
+        bp_file = self._make_runnable_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["run", str(bp_file), "--input", "no_equals"])
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
         assert "key=value" in result.output, "Expected 'key=value' in output"
 
@@ -370,21 +414,21 @@ class TestRunCommand:
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
 
     def test_run_completes_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        seq_file = self._make_runnable_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["run", str(seq_file), "--input", "x=5"])
+        bp_file = self._make_runnable_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["run", str(bp_file), "--input", "x=5"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "completed" in result.output, "Expected 'completed' in output"
 
     def test_run_outputs_shown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        seq_file = self._make_runnable_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["run", str(seq_file), "--input", "x=3"])
+        bp_file = self._make_runnable_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["run", str(bp_file), "--input", "x=3"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "Outputs:" in result.output, "Expected 'Outputs:' in output"
 
     def test_run_input_json_parsing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Numeric inputs are parsed as JSON (int/float)."""
-        seq_file = self._make_runnable_sequence(tmp_path, monkeypatch)
-        result = runner.invoke(app, ["run", str(seq_file), "--input", "x=7"])
+        bp_file = self._make_runnable_blueprint(tmp_path, monkeypatch)
+        result = runner.invoke(app, ["run", str(bp_file), "--input", "x=7"])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
 
     def test_run_no_outputs_map(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -397,9 +441,9 @@ class TestRunCommand:
         (tmp_path / "bricks.config.yaml").write_text(
             "registry:\n  auto_discover: true\n  paths:\n    - 'bricks_lib/'\n"
         )
-        seq_file = tmp_path / "noop_seq.yaml"
-        seq_file.write_text("name: noop_seq\nsteps:\n  - name: do_noop\n    brick: noop\n")
-        result = runner.invoke(app, ["run", str(seq_file)])
+        bp_file = tmp_path / "noop_bp.yaml"
+        bp_file.write_text("name: noop_bp\nsteps:\n  - name: do_noop\n    brick: noop\n")
+        result = runner.invoke(app, ["run", str(bp_file)])
         assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}"
         assert "completed" in result.output, "Expected 'completed' in output"
 
@@ -513,7 +557,7 @@ class TestComposeCommand:
         mock_composer_instance.compose.side_effect = NotImplementedError("stub")
         mock_composer_cls = mock.MagicMock(return_value=mock_composer_instance)
         mock_module = mock.MagicMock()
-        mock_module.SequenceComposer = mock_composer_cls
+        mock_module.BlueprintComposer = mock_composer_cls
 
         with mock.patch.dict(sys.modules, {"bricks.ai.composer": mock_module}):
             result = runner.invoke(app, ["compose", "do something"], input="fake_key\n")

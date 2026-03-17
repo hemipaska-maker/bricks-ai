@@ -3,34 +3,51 @@
 from bricks.core.brick import BaseBrick, BrickModel, brick
 from bricks.core.config import (
     AiConfig,
+    BlueprintsConfig,
     BricksConfig,
     ConfigLoader,
     RegistryConfig,
-    SequencesConfig,
 )
 from bricks.core.context import ExecutionContext
 from bricks.core.discovery import BrickDiscovery
-from bricks.core.engine import SequenceEngine
+from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import (
+    BlueprintValidationError,
     BrickError,
     BrickExecutionError,
     BrickNotFoundError,
     ConfigError,
     DuplicateBrickError,
-    SequenceValidationError,
     VariableResolutionError,
     YamlLoadError,
 )
-from bricks.core.loader import SequenceLoader
-from bricks.core.models import BrickMeta, SequenceDefinition, StepDefinition
+from bricks.core.loader import BlueprintLoader
+from bricks.core.models import BlueprintDefinition, BrickMeta, StepDefinition
 from bricks.core.registry import BrickRegistry
 from bricks.core.resolver import ReferenceResolver
-from bricks.core.schema import brick_schema, registry_schema, sequence_schema
-from bricks.core.validation import SequenceValidator
+from bricks.core.schema import blueprint_schema, brick_schema, registry_schema
+from bricks.core.utils import blueprint_to_yaml
+from bricks.core.validation import BlueprintValidator
+
+# Deprecated aliases — will be removed in v1.0.0
+SequenceDefinition = BlueprintDefinition
+SequenceEngine = BlueprintEngine
+SequenceLoader = BlueprintLoader
+SequenceValidator = BlueprintValidator
+SequenceValidationError = BlueprintValidationError
+SequencesConfig = BlueprintsConfig
+sequence_schema = blueprint_schema
+sequence_to_yaml = blueprint_to_yaml
 
 __all__ = [
     "AiConfig",
     "BaseBrick",
+    "BlueprintDefinition",
+    "BlueprintEngine",
+    "BlueprintLoader",
+    "BlueprintValidationError",
+    "BlueprintValidator",
+    "BlueprintsConfig",
     "BrickDiscovery",
     "BrickError",
     "BrickExecutionError",
@@ -45,6 +62,7 @@ __all__ = [
     "ExecutionContext",
     "ReferenceResolver",
     "RegistryConfig",
+    # Deprecated aliases — will be removed in v1.0.0
     "SequenceDefinition",
     "SequenceEngine",
     "SequenceLoader",
@@ -54,8 +72,11 @@ __all__ = [
     "StepDefinition",
     "VariableResolutionError",
     "YamlLoadError",
+    "blueprint_schema",
+    "blueprint_to_yaml",
     "brick",
     "brick_schema",
     "registry_schema",
     "sequence_schema",
+    "sequence_to_yaml",
 ]

@@ -19,9 +19,10 @@
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Bricks](#bricks-1)
-  - [Sequences (Blueprints)](#sequences-blueprints)
+  - [Blueprints](#blueprints)
   - [Validation](#validation)
   - [Execution](#execution)
+  - [Teardown Hooks](#teardown-hooks)
 - [CLI Reference](#cli-reference)
 - [Auto-Discovery](#auto-discovery)
 - [Configuration](#configuration)
@@ -69,13 +70,14 @@ Full methodology, raw data, and reproducible scripts: [benchmark/showcase/README
 ## Features
 
 - **Typed building blocks** — decorate any Python function with `@brick` or subclass `BaseBrick`
-- **YAML sequences** — compose bricks into readable, auditable pipelines
-- **Full validation** — 7 checks catch bad references, missing bricks, and empty sequences before execution
+- **YAML blueprints** — compose bricks into readable, auditable pipelines
+- **Full validation** — 7 checks catch bad references, missing bricks, and empty blueprints before execution
 - **`${variable}` interpolation** — wire step outputs into downstream step inputs
+- **Teardown hooks** — optional cleanup on failure; engine reverse-tears down all completed steps
 - **Auto-discovery** — scan a directory and register all bricks automatically
 - **JSON schema export** — generate schemas for every registered brick
 - **8-command CLI** — `init`, `new`, `check`, `run`, `dry-run`, `list`, `compose`
-- **AI composition** — describe a sequence in plain English and let Claude generate the YAML
+- **AI composition** — describe a blueprint in plain English and let Claude generate the YAML
 - **Benchmarked** — [real token savings and determinism proof](benchmark/showcase/README.md) with live API calls
 - **290 tests**, mypy `--strict` clean, ruff clean
 
@@ -116,10 +118,10 @@ def format_label(value: float, label: str) -> str:
     return f"{label}: {value}"
 ```
 
-### 2. Write a YAML sequence
+### 2. Write a YAML blueprint
 
 ```yaml
-# sequences/area.yaml
+# blueprints/area.yaml
 name: calculate_area
 description: "Compute and format a rectangle area"
 inputs:
@@ -155,20 +157,19 @@ outputs_map:
 ### 3. Validate and run
 
 ```python
-from bricks.core import SequenceLoader, SequenceValidator, SequenceEngine
+from bricks.core import BlueprintLoader, BlueprintValidator, BlueprintEngine
 
 registry = BrickRegistry()
 # ... register bricks ...
 
-loader = SequenceLoader()
-sequence = loader.load_file("sequences/area.yaml")
+loader = BlueprintLoader()
+blueprint = loader.load_file("blueprints/area.yaml")
 
-validator = SequenceValidator(registry=registry)
-errors = validator.validate(sequence)
-assert errors == []
+validator = BlueprintValidator(registry=registry)
+validator.validate(blueprint)  # raises BlueprintValidationError on failure
 
-engine = SequenceEngine(registry=registry)
-outputs = engine.run(sequence, inputs={"width": 7.5, "height": 4.2})
+engine = BlueprintEngine(registry=registry)
+outputs = engine.run(blueprint, inputs={"width": 7.5, "height": 4.2})
 # {"area": 31.5, "display": "Area (m²): 31.5"}
 ```
 
@@ -206,22 +207,22 @@ class ConvertTemperature(BaseBrick):
         return celsius * 9 / 5 + 32
 ```
 
-### Sequences (Blueprints)
+### Blueprints
 
-Sequences (also called Blueprints) are YAML files that wire bricks together using `${variable}` references:
+Blueprints are YAML files that wire bricks together using `${variable}` references:
 
 | Reference | Resolves to |
 |---|---|
-| `${inputs.name}` | A declared sequence input |
+| `${inputs.name}` | A declared blueprint input |
 | `${save_as_name}` | The result of a previous step |
 
-Outputs are declared in `outputs_map` and returned by `SequenceEngine.run()`.
+Outputs are declared in `outputs_map` and returned by `BlueprintEngine.run()`.
 
 ### Validation
 
-`SequenceValidator.validate(sequence)` runs 7 checks without executing anything:
+`BlueprintValidator.validate(blueprint)` runs 7 checks without executing anything:
 
-1. Sequence has at least one step
+1. Blueprint has at least one step
 2. Every `brick:` name exists in the registry
 3. No duplicate step names
 4. `outputs_map` values reference known `save_as` names or inputs
@@ -231,7 +232,25 @@ Outputs are declared in `outputs_map` and returned by `SequenceEngine.run()`.
 
 ### Execution
 
-`SequenceEngine.run(sequence, inputs={})` executes steps in order, resolving `${...}` references at each step and collecting results into `outputs_map`.
+`BlueprintEngine.run(blueprint, inputs={})` executes steps in order, resolving `${...}` references at each step and collecting results into `outputs_map`.
+
+### Teardown Hooks
+
+Bricks support optional cleanup when a step fails:
+
+```python
+def cleanup_file(inputs: dict, error: Exception) -> None:
+    """Called automatically if the step fails."""
+    path = inputs.get("path")
+    if path and Path(path).exists():
+        Path(path).unlink()
+
+@brick(tags=["io"], destructive=True, teardown=cleanup_file)
+def write_to_file(path: str, content: str) -> dict:
+    ...
+```
+
+On failure the engine calls the failing step's teardown, then reverse-teardowns all previously completed steps. Teardown exceptions are suppressed so they never mask the original error.
 
 ---
 
@@ -243,14 +262,14 @@ bricks --help
 
 | Command | Description |
 |---|---|
-| `bricks init` | Scaffold a new project (`bricks.config.yaml`, `sequences/`, `bricks_lib/`) |
+| `bricks init` | Scaffold a new project (`bricks.config.yaml`, `blueprints/`, `bricks_lib/`) |
 | `bricks new brick <name>` | Generate a `@brick`-decorated stub in `bricks_lib/<name>.py` |
-| `bricks new sequence <name>` | Generate a YAML sequence template in `sequences/` |
-| `bricks check <file.yaml>` | Validate a sequence without executing |
-| `bricks run <file.yaml> --input key=value` | Execute a sequence and print outputs |
-| `bricks dry-run <file.yaml>` | Validate a sequence (alias for `check`) |
+| `bricks new blueprint <name>` | Generate a YAML blueprint template in `blueprints/` |
+| `bricks check <file.yaml>` | Validate a blueprint without executing |
+| `bricks run <file.yaml> --input key=value` | Execute a blueprint and print outputs |
+| `bricks dry-run <file.yaml>` | Validate a blueprint (alias for `check`) |
 | `bricks list` | List all registered bricks with tags and descriptions |
-| `bricks compose "<intent>"` | AI-generate a YAML sequence from natural language |
+| `bricks compose "<intent>"` | AI-generate a YAML blueprint from natural language |
 
 **Example:**
 
@@ -261,14 +280,14 @@ bricks init
 # Create a new brick
 bricks new brick calculate_tax
 
-# Create a new sequence
-bricks new sequence invoice_total
+# Create a new blueprint
+bricks new blueprint invoice_total
 
-# Validate the sequence
-bricks check sequences/invoice_total.yaml
+# Validate the blueprint
+bricks check blueprints/invoice_total.yaml
 
 # Run with inputs
-bricks run sequences/invoice_total.yaml --input quantity=5 --input unit_price=12.0
+bricks run blueprints/invoice_total.yaml --input quantity=5 --input unit_price=12.0
 
 # List registered bricks
 bricks list
@@ -313,8 +332,8 @@ registry:
   paths:
     - bricks_lib/
 
-sequences:
-  base_dir: sequences/
+blueprints:
+  base_dir: blueprints/
 
 ai:
   model: claude-3-5-sonnet-20241022
@@ -334,17 +353,17 @@ print(config.ai.model)  # "claude-3-5-sonnet-20241022"
 
 ## AI Composition
 
-With the `ai` extra installed (`pip install -e ".[ai]"`), describe a sequence in plain English and let Claude generate the YAML:
+With the `ai` extra installed (`pip install -e ".[ai]"`), describe a blueprint in plain English and let Claude generate the YAML:
 
 ```python
-from bricks.ai import SequenceComposer
+from bricks.ai import BlueprintComposer
 
-composer = SequenceComposer(registry=registry, api_key="sk-ant-...")
-sequence = composer.compose(
+composer = BlueprintComposer(registry=registry, api_key="sk-ant-...")
+blueprint = composer.compose(
     "Multiply quantity by unit price, apply a fractional discount, "
     "round to 2 decimal places, and return a formatted label."
 )
-# Returns a validated SequenceDefinition ready to run
+# Returns a validated BlueprintDefinition ready to run
 ```
 
 Or from the CLI:
@@ -369,15 +388,15 @@ python examples/ai_composer.py --live --api-key sk-ant-...
 
 | File | Description |
 |---|---|
-| `examples/yaml_sequence.py` | Load and execute a YAML sequence end-to-end |
+| `examples/yaml_blueprint.py` | Load and execute a YAML blueprint end-to-end |
 | `examples/class_based_brick.py` | Class-based bricks with `BaseBrick` |
 | `examples/discovery_example.py` | Auto-discovery of bricks from a directory |
-| `examples/ai_composer.py` | AI-powered sequence composition (demo + live) |
-| `examples/sequences/power_cycle_test.yaml` | Reference hardware test sequence |
+| `examples/ai_composer.py` | AI-powered blueprint composition (demo + live) |
+| `examples/blueprints/power_cycle_test.yaml` | Reference hardware test blueprint |
 | `benchmark/showcase/` | Token savings & determinism benchmark with real API data |
 
 ```bash
-python examples/yaml_sequence.py
+python examples/yaml_blueprint.py
 python examples/class_based_brick.py
 python examples/discovery_example.py
 python examples/ai_composer.py       # demo mode, no key needed

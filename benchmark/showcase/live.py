@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from bricks.core import BrickRegistry
-from bricks.core.utils import sequence_to_yaml, strip_code_fence
+from bricks.core.utils import blueprint_to_yaml, strip_code_fence
 
 
 def setup_logger(output_dir: Path) -> tuple[logging.Logger, Path]:
@@ -47,7 +47,7 @@ def bricks_api_call(
     logger: logging.Logger,
     label: str = "bricks",
 ) -> tuple[str, int, int]:
-    """Call SequenceComposer and return (yaml_str, input_tokens, output_tokens).
+    """Call BlueprintComposer and return (yaml_str, input_tokens, output_tokens).
 
     Args:
         intent: Natural language task description.
@@ -58,10 +58,10 @@ def bricks_api_call(
     Returns:
         (yaml_str, input_tokens, output_tokens) as reported by the API.
     """
-    from bricks.ai import SequenceComposer
+    from bricks.ai import BlueprintComposer
 
     api_key = _require_api_key()
-    composer = SequenceComposer(registry=registry, api_key=api_key)
+    composer = BlueprintComposer(registry=registry, api_key=api_key)
 
     logger.info("[%s] API call -> YAML generation", label)
     logger.debug("[%s] intent: %s", label, intent)
@@ -79,7 +79,7 @@ def bricks_api_call(
         elapsed,
     )
 
-    yaml_str = sequence_to_yaml(sequence)
+    yaml_str = blueprint_to_yaml(sequence)
     logger.debug("[%s] generated YAML:\n%s", label, yaml_str)
 
     return yaml_str, in_tok, out_tok

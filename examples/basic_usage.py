@@ -1,14 +1,14 @@
-"""Basic Bricks usage: register bricks and run a simple sequence."""
+"""Basic Bricks usage: register bricks and run a simple blueprint."""
 
 from typing import cast
 
 from bricks.core import (
+    BlueprintEngine,
     BrickRegistry,
-    SequenceEngine,
     brick,
 )
 from bricks.core.brick import BrickFunction
-from bricks.core.models import SequenceDefinition, StepDefinition
+from bricks.core.models import BlueprintDefinition, StepDefinition
 
 # --- Create a registry ---
 registry = BrickRegistry()
@@ -36,8 +36,8 @@ print("Registered bricks:")
 for name, meta in registry.list_all():
     print(f"  {name}: {meta.description} (tags={meta.tags})")
 
-# --- Build a sequence programmatically ---
-sequence = SequenceDefinition(
+# --- Build a blueprint programmatically ---
+blueprint = BlueprintDefinition(
     name="add_then_multiply",
     description="Add two numbers, then multiply the result",
     inputs={"x": "float", "y": "float", "factor": "float"},
@@ -59,7 +59,7 @@ sequence = SequenceDefinition(
 )
 
 # --- Execute ---
-engine = SequenceEngine(registry=registry)
-result = engine.run(sequence, inputs={"x": 3.0, "y": 4.0, "factor": 2.0})
-print(f"\nSequence result: {result}")
+engine = BlueprintEngine(registry=registry)
+result = engine.run(blueprint, inputs={"x": 3.0, "y": 4.0, "factor": 2.0})
+print(f"\nBlueprint result: {result}")
 # Expected: {'final_result': 14.0}  (3+4=7, 7*2=14)

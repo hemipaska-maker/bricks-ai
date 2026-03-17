@@ -1,5 +1,5 @@
 # My Workflow & Skill Document
-> Generated from the Bricks project -- a deterministic sequencing engine for typed Python building blocks.
+> Generated from the Bricks project -- a deterministic execution engine for typed Python building blocks.
 
 ---
 
@@ -36,7 +36,7 @@ bricks/
 │   │   ├── exceptions.py     # All custom exceptions
 │   │   ├── models.py         # Pydantic models
 │   │   ├── context.py        # ExecutionContext
-│   │   ├── engine.py         # SequenceEngine
+│   │   ├── engine.py         # BlueprintEngine
 │   │   ├── validation.py     # Dry-run validation
 │   │   └── resolver.py       # ${variable} resolver
 │   ├── cli/                  # Typer CLI
@@ -44,7 +44,7 @@ bricks/
 │   │   └── main.py           # Typer app with command stubs
 │   └── ai/                   # AI composition layer
 │       ├── __init__.py
-│       └── composer.py       # SequenceComposer stub
+│       └── composer.py       # BlueprintComposer stub
 ├── tests/                    # Mirrors source structure exactly
 │   ├── __init__.py
 │   ├── core/
@@ -79,7 +79,7 @@ bricks/
 
 ### Naming
 - **Files/modules:** `snake_case` (`registry.py`, `resolver.py`)
-- **Classes:** `PascalCase` (`BrickRegistry`, `SequenceEngine`)
+- **Classes:** `PascalCase` (`BrickRegistry`, `BlueprintEngine`)
 - **Functions/variables:** `snake_case` (`resolve_reference`, `step_index`)
 - **Private attributes:** single leading underscore (`_bricks`, `_results`)
 - **Test files:** `test_<module>.py`, mirroring source
@@ -134,7 +134,7 @@ from bricks.core.brick import brick
 - Pydantic validates Input/Output automatically
 
 ### Validation-First
-- `SequenceValidator.validate()` checks everything before execution
+- `BlueprintValidator.validate()` checks everything before execution
 - `bricks dry-run` uses this for CLI-level dry runs
 - Always validate, then execute
 

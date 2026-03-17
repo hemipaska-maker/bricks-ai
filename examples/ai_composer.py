@@ -1,4 +1,4 @@
-"""Example: AI-powered sequence composition with SequenceComposer.
+"""Example: AI-powered blueprint composition with BlueprintComposer.
 
 This example demonstrates two modes:
 
@@ -7,7 +7,7 @@ This example demonstrates two modes:
     pipeline without making a real API call.
 
   Live mode  (requires anthropic package + API key):
-    Calls the Anthropic Messages API and asks Claude to generate a sequence
+    Calls the Anthropic Messages API and asks Claude to generate a blueprint
     from a natural language intent string.
 
 Usage::
@@ -30,10 +30,10 @@ import sys
 from typing import Any, cast
 
 from bricks.core.brick import BrickFunction, brick
-from bricks.core.engine import SequenceEngine
+from bricks.core.engine import BlueprintEngine
 from bricks.core.registry import BrickRegistry
 from bricks.core.schema import registry_schema
-from bricks.core.validation import SequenceValidator
+from bricks.core.validation import BlueprintValidator
 
 # ── 1. Define a small library of bricks ──────────────────────────────────────
 
@@ -80,7 +80,7 @@ def build_registry() -> BrickRegistry:
     return registry
 
 
-# ── 3. Demo mode: simulate a composed sequence without an API call ─────────────
+# ── 3. Demo mode: simulate a composed blueprint without an API call ────────────
 
 
 # This is what a well-behaved Claude response would look like for the intent:
@@ -144,7 +144,7 @@ outputs_map:
 
 
 def run_demo(registry: BrickRegistry) -> None:
-    """Run the example in demo mode using a pre-written YAML sequence."""
+    """Run the example in demo mode using a pre-written YAML blueprint."""
     print("=" * 60)
     print("DEMO MODE  (no API key required)")
     print("=" * 60)
@@ -158,31 +158,30 @@ def run_demo(registry: BrickRegistry) -> None:
         print(f"  {s['name']}{tags} - {s['description']}")
 
     # Parse the pre-written YAML (same path the real composer would take)
-    from bricks.core.loader import SequenceLoader
+    from bricks.core.loader import BlueprintLoader
 
-    loader = SequenceLoader()
-    sequence = loader.load_string(_DEMO_YAML)
+    loader = BlueprintLoader()
+    blueprint = loader.load_string(_DEMO_YAML)
 
-    print(f"\nComposed sequence: {sequence.name!r}")
-    print(f"  Description: {sequence.description}")
-    print(f"  Inputs:  {list(sequence.inputs.keys())}")
-    print(f"  Steps:   {len(sequence.steps)}")
-    for step in sequence.steps:
+    print(f"\nComposed blueprint: {blueprint.name!r}")
+    print(f"  Description: {blueprint.description}")
+    print(f"  Inputs:  {list(blueprint.inputs.keys())}")
+    print(f"  Steps:   {len(blueprint.steps)}")
+    for step in blueprint.steps:
         print(f"    [{step.name}]  brick={step.brick}  save_as={step.save_as}")
-    print(f"  Outputs: {list(sequence.outputs_map.keys())}")
+    print(f"  Outputs: {list(blueprint.outputs_map.keys())}")
 
     # Validate
-    validator = SequenceValidator(registry=registry)
-    errors = validator.validate(sequence)
-    assert errors == [], f"Validation failed: {errors}"  # noqa: S101
-    print("\nOK Sequence validated (no errors)")
+    validator = BlueprintValidator(registry=registry)
+    validator.validate(blueprint)
+    print("\nOK Blueprint validated (no errors)")
 
     # Execute with sample inputs: 5 items x 12.00 each, 10% discount (0.10)
     # Expected: gross=60, savings=6, net=54, price=54.0
     inputs = {"quantity": 5.0, "unit_price": 12.0, "discount_fraction": 0.10}
     print(f"\nRunning with inputs: {inputs}")
-    engine = SequenceEngine(registry=registry)
-    outputs = engine.run(sequence, inputs=inputs)
+    engine = BlueprintEngine(registry=registry)
+    outputs = engine.run(blueprint, inputs=inputs)
 
     print("\nOutputs:")
     for k, v in outputs.items():
@@ -206,7 +205,7 @@ def run_live(registry: BrickRegistry, api_key: str) -> None:
     print("=" * 60)
 
     try:
-        from bricks.ai.composer import ComposerError, SequenceComposer
+        from bricks.ai.composer import BlueprintComposer, ComposerError
     except ImportError:
         print(
             "\nError: the 'anthropic' package is not installed.\nInstall it with:  pip install bricks[ai]\n",
@@ -221,31 +220,31 @@ def run_live(registry: BrickRegistry, api_key: str) -> None:
     )
 
     print(f"\nIntent:\n  {intent}\n")
-    print(f"Model: {SequenceComposer.DEFAULT_MODEL}")
+    print(f"Model: {BlueprintComposer.DEFAULT_MODEL}")
     print("Calling Anthropic API …\n")
 
-    composer = SequenceComposer(registry=registry, api_key=api_key)
+    composer = BlueprintComposer(registry=registry, api_key=api_key)
 
     try:
-        sequence = composer.compose(intent)
+        blueprint = composer.compose(intent)
     except ComposerError as exc:
         print(f"Composition failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Composed sequence: {sequence.name!r}")
-    print(f"  Steps ({len(sequence.steps)}):")
-    for step in sequence.steps:
+    print(f"Composed blueprint: {blueprint.name!r}")
+    print(f"  Steps ({len(blueprint.steps)}):")
+    for step in blueprint.steps:
         print(f"    [{step.name}]  brick={step.brick}  save_as={step.save_as}")
-    print(f"  Outputs: {list(sequence.outputs_map.keys())}")
+    print(f"  Outputs: {list(blueprint.outputs_map.keys())}")
 
     # Validate against the registry
-    validator = SequenceValidator(registry=registry)
+    validator = BlueprintValidator(registry=registry)
     try:
-        validator.validate(sequence)
-        print("\nOK Sequence validated")
+        validator.validate(blueprint)
+        print("\nOK Blueprint validated")
     except Exception as exc:
         print(f"\nValidation errors: {exc}", file=sys.stderr)
-        print("(The AI-generated sequence has structural issues — try again.)")
+        print("(The AI-generated blueprint has structural issues — try again.)")
         sys.exit(1)
 
     # Run with sample inputs: 5 items x 12.00 each, 10% discount as a fraction
@@ -256,9 +255,9 @@ def run_live(registry: BrickRegistry, api_key: str) -> None:
     }
     print(f"\nRunning with inputs: {inputs}")
 
-    engine = SequenceEngine(registry=registry)
+    engine = BlueprintEngine(registry=registry)
     try:
-        outputs = engine.run(sequence, inputs=inputs)
+        outputs = engine.run(blueprint, inputs=inputs)
     except Exception as exc:
         print(f"\nExecution error: {exc}", file=sys.stderr)
         sys.exit(1)
