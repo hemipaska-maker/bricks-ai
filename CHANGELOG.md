@@ -7,6 +7,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.1] — 2026-03-17
+
+### Summary
+Enhanced benchmark suite with complexity curve, unique run folders, and reproducibility metadata.
+
+### Added
+- Scenario A redesigned as a 3-level complexity curve: A-3 (room area), A-6 (property price), A-12 (full valuation)
+- `add` and `subtract` bricks in `benchmark/showcase/bricks/math_bricks.py`
+- `property_price.yaml` (6-step Blueprint) and `property_valuation.yaml` (12-step Blueprint)
+- Unique timestamped run folder per benchmark execution: `run_YYYYMMDD_HHMMSS_vX.Y.Z/`
+- `run_metadata.json` — captures version, model, git commit, OS, command for reproducibility
+- `benchmark.log` — full execution trace written on every run
+- `benchmark/tests/test_showcase.py` — 21 tests covering new bricks and all scenarios
+
+### Changed
+- Scenario C updated to use A-6 Blueprint with 10 property input sets (was room dimensions)
+- Scenario D updated to use A-6 Blueprint (property price, 4 required functions)
+- `results.json` restructured: `complexity_curve` / `reuse` / `determinism` top-level keys
+- Benchmark README rewritten for new 3-scenario structure
+
+### Removed
+- Scenario B (API pipeline) — removed entirely
+
+---
+
 ## [0.1.0] — 2026-03-17
 
 ### Summary
