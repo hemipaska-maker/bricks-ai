@@ -16,7 +16,7 @@ def build_showcase_registry(*brick_fns: BrickFunction) -> BrickRegistry:
             ``__brick_meta__`` attribute.
 
     Returns:
-        A populated BrickRegistry ready for use with SequenceEngine.
+        A populated BrickRegistry ready for use with BlueprintEngine.
     """
     registry = BrickRegistry()
     for fn in brick_fns:

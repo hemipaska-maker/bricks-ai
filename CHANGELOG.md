@@ -7,6 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.1] — 2026-03-18
+
+### Summary
+Teardown hooks (Mission 004). On step failure, the engine calls teardown before re-raising, then reverse-teardowns all previously completed steps.
+
+### Added
+- `BaseBrick.teardown(inputs, metadata, error)` — optional no-op hook; override for cleanup
+- `@brick(teardown=fn)` — attach a teardown callable `(inputs: dict, error: Exception) -> None` to a function brick
+- `BrickFunction` Protocol now declares `__brick_teardown__` attribute
+- `BlueprintEngine` calls teardown on the failing step, then reverse-teardowns completed steps (rollback semantics)
+- Teardown exceptions are suppressed — original `BrickExecutionError` is always what propagates
+- 10 new tests in `tests/core/test_teardown.py`
+
+---
+
 ## [0.2.0] — 2026-03-18
 
 ### Summary

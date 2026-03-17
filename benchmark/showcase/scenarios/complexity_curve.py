@@ -325,10 +325,10 @@ def _build_registry_a12() -> object:
 
 def _execute_blueprint(blueprint_file: str, inputs: dict[str, Any], registry: object) -> dict[str, Any]:
     """Load and run a blueprint through the Bricks engine."""
-    from bricks.core import SequenceEngine, SequenceLoader
+    from bricks.core import BlueprintEngine, BlueprintLoader
 
-    loader = SequenceLoader()
-    engine = SequenceEngine(registry=registry)  # type: ignore[arg-type]
+    loader = BlueprintLoader()
+    engine = BlueprintEngine(registry=registry)  # type: ignore[arg-type]
     yaml_str = (_BLUEPRINTS / blueprint_file).read_text()
     sequence = loader.load_string(yaml_str)
     return engine.run(sequence, inputs=inputs)

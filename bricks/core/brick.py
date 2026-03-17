@@ -28,6 +28,7 @@ class BrickFunction(Protocol):
     """
 
     __brick_meta__: BrickMeta
+    __brick_teardown__: Callable[[dict[str, Any], Exception], None] | None
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the brick function."""
@@ -79,12 +80,25 @@ class BaseBrick(ABC):
 
         Args:
             inputs: Validated input data.
-            metadata: Execution metadata (sequence name, step index, etc.).
+            metadata: Execution metadata (blueprint name, step index, etc.).
 
         Returns:
             Dictionary matching the Output schema fields.
         """
         ...
+
+    def teardown(self, inputs: BrickModel, metadata: BrickMeta, error: Exception) -> None:  # noqa: B027
+        """Optional cleanup method called by the engine on step failure.
+
+        Override this in subclasses that need cleanup (close connections,
+        delete temp files, release resources, etc.).
+
+        Args:
+            inputs: The validated inputs that were passed to execute().
+            metadata: Execution metadata.
+            error: The exception that caused the failure.
+        """
+        pass  # Default: no-op
 
 
 def brick(
@@ -93,6 +107,7 @@ def brick(
     destructive: bool = False,
     idempotent: bool = True,
     description: str = "",
+    teardown: Callable[[dict[str, Any], Exception], None] | None = None,
 ) -> Callable[[Callable[..., Any]], BrickFunction]:
     """Decorator that registers a function as a Brick.
 
@@ -101,11 +116,15 @@ def brick(
         destructive: Whether the brick modifies external state irreversibly.
         idempotent: Whether repeated execution produces the same result.
         description: Human-readable description.
+        teardown: Optional callable invoked on step failure for cleanup.
+            Signature: ``(inputs: dict, error: Exception) -> None``.
+            Teardown exceptions are suppressed by the engine.
 
     Returns:
-        The original function, unwrapped, with a ``__brick_meta__`` attribute
-        attached. The return type is ``BrickFunction`` so callers can safely
-        access ``fn.__brick_meta__`` without type-ignore suppression.
+        The original function, unwrapped, with ``__brick_meta__`` and
+        ``__brick_teardown__`` attributes attached. The return type is
+        ``BrickFunction`` so callers can safely access ``fn.__brick_meta__``
+        without type-ignore suppression.
 
     Example::
 
@@ -122,6 +141,7 @@ def brick(
             idempotent=idempotent,
             description=description or func.__doc__ or "",
         )
+        func.__brick_teardown__ = teardown  # type: ignore[attr-defined]
         return cast(BrickFunction, func)
 
     return decorator

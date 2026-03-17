@@ -8,8 +8,8 @@ from typing import Any
 
 from benchmark.showcase.scenarios import CODEGEN_SYSTEM
 from benchmark.showcase.tokens import count_tokens
-from bricks.core import SequenceEngine
-from bricks.core.models import SequenceDefinition
+from bricks.core import BlueprintEngine
+from bricks.core.models import BlueprintDefinition
 
 _BLUEPRINTS = Path(__file__).parent.parent / "blueprints"
 
@@ -179,18 +179,18 @@ def bricks_approach() -> dict[str, Any]:
     }
 
 
-def _build_engine() -> SequenceEngine:
-    """Build a SequenceEngine with math and string bricks registered."""
+def _build_engine() -> BlueprintEngine:
+    """Build a BlueprintEngine with math and string bricks registered."""
     from benchmark.showcase.bricks import build_showcase_registry
     from benchmark.showcase.bricks.math_bricks import add, multiply, round_value
     from benchmark.showcase.bricks.string_bricks import format_result
 
     registry = build_showcase_registry(multiply, round_value, add, format_result)
-    return SequenceEngine(registry=registry)
+    return BlueprintEngine(registry=registry)
 
 
-def _load_sequence(yaml_str: str) -> SequenceDefinition:
-    """Load a SequenceDefinition from a YAML string."""
-    from bricks.core import SequenceLoader
+def _load_sequence(yaml_str: str) -> BlueprintDefinition:
+    """Load a BlueprintDefinition from a YAML string."""
+    from bricks.core import BlueprintLoader
 
-    return SequenceLoader().load_string(yaml_str)
+    return BlueprintLoader().load_string(yaml_str)

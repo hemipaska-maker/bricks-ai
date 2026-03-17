@@ -333,16 +333,16 @@ def run_bricks(n: int = 5) -> dict[str, Any]:
     from benchmark.showcase.bricks import build_showcase_registry
     from benchmark.showcase.bricks.math_bricks import add, multiply, round_value
     from benchmark.showcase.bricks.string_bricks import format_result
-    from bricks.core import SequenceEngine, SequenceLoader
-    from bricks.core.exceptions import SequenceValidationError
-    from bricks.core.validation import SequenceValidator
+    from bricks.core import BlueprintEngine, BlueprintLoader
+    from bricks.core.exceptions import BlueprintValidationError
+    from bricks.core.validation import BlueprintValidator
 
     blueprint_yaml = (_BLUEPRINTS / "property_price.yaml").read_text()
 
     registry = build_showcase_registry(multiply, round_value, add, format_result)
-    loader = SequenceLoader()
-    engine = SequenceEngine(registry=registry)
-    validator = SequenceValidator(registry=registry)
+    loader = BlueprintLoader()
+    engine = BlueprintEngine(registry=registry)
+    validator = BlueprintValidator(registry=registry)
     sequence = loader.load_string(blueprint_yaml)
 
     inputs_list = [
@@ -360,7 +360,7 @@ def run_bricks(n: int = 5) -> dict[str, Any]:
         try:
             validator.validate(sequence)
             validation_passed.append(True)
-        except SequenceValidationError:
+        except BlueprintValidationError:
             validation_passed.append(False)
         result = engine.run(sequence, inputs=inp)
         executions.append(result)
