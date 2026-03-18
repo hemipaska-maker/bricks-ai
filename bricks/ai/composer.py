@@ -101,7 +101,7 @@ class BlueprintComposer:
             ImportError: If the ``anthropic`` package is not installed.
         """
         try:
-            import anthropic  # noqa: PLC0415  # type: ignore[import-not-found]
+            import anthropic  # noqa: PLC0415
 
             self._client = anthropic.Anthropic(api_key=api_key)
         except ImportError as exc:

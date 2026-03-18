@@ -27,7 +27,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,ai,benchmark]"
 
       - name: Run tests
         run: pytest --tb=short -q
@@ -47,7 +47,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,ai]"
 
       - name: Ruff lint
         run: ruff check .
