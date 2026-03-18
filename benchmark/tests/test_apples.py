@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+# Provide a stub anthropic module so tests run without the real package installed.
+# The actual client is always replaced by a MagicMock inside each test anyway.
+if "anthropic" not in sys.modules:
+    sys.modules["anthropic"] = MagicMock()  # type: ignore[assignment]
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
