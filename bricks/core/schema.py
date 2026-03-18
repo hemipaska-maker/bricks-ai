@@ -26,13 +26,19 @@ def brick_schema(name: str, registry: BrickRegistry) -> dict[str, Any]:
         BrickNotFoundError: If the brick name is not registered.
     """
     callable_, meta = registry.get(name)
+    params = _callable_params(callable_)
+    input_keys = list(params.keys())
+    output_keys = _output_keys(callable_)
     schema: dict[str, Any] = {
         "name": meta.name,
         "description": meta.description,
         "tags": meta.tags,
+        "category": meta.category,
+        "input_keys": input_keys,
+        "output_keys": output_keys,
         "destructive": meta.destructive,
         "idempotent": meta.idempotent,
-        "parameters": _callable_params(callable_),
+        "parameters": params,
     }
     return schema
 
@@ -97,6 +103,40 @@ def catalog_schema(catalog: TieredCatalog) -> dict[str, Any]:
             "Use get_brick(name) to fetch a specific brick."
         ),
     }
+
+
+def _output_keys(callable_: Any) -> list[str]:
+    """Extract output key names from a callable's return type annotation.
+
+    Inspects the return type annotation for ``dict[str, ...]`` patterns
+    and falls back to calling the function's class-based Output schema
+    if available. Returns an empty list if output keys cannot be determined.
+
+    Args:
+        callable_: A Python callable (function or class instance).
+
+    Returns:
+        List of output key names.
+    """
+    # Class-based brick: check for Output inner class
+    cls = callable_ if isinstance(callable_, type) else type(callable_)
+    output_cls = getattr(cls, "Output", None)
+    if output_cls is not None and hasattr(output_cls, "model_fields"):
+        return list(output_cls.model_fields.keys())
+
+    # Function-based brick: inspect return annotation for TypedDict or dict hints
+    try:
+        hints = inspect.get_annotations(callable_, eval_str=True)
+        ret = hints.get("return")
+        if ret is not None:
+            origin = getattr(ret, "__origin__", None)
+            if origin is dict:
+                # Can't extract keys from generic dict[str, X]
+                return []
+    except Exception:  # noqa: S110
+        pass
+
+    return []
 
 
 def _callable_params(callable_: Any) -> dict[str, Any]:

@@ -211,3 +211,46 @@ catalog:
         assert config.catalog.common_set == ["add", "format_result"], (
             f"Expected ['add', 'format_result'], got {config.catalog.common_set!r}"
         )
+
+
+# ── Enriched list_bricks schema ──────────────────────────────────────────────
+
+
+class TestEnrichedListBricks:
+    def test_list_bricks_includes_category(self) -> None:
+        """list_bricks() results include category field."""
+        catalog = TieredCatalog(registry=_make_registry(), common_set=["add"])
+        result = catalog.list_bricks()
+        assert "category" in result[0], f"Expected 'category' in schema keys: {list(result[0].keys())}"
+
+    def test_list_bricks_includes_input_keys(self) -> None:
+        """list_bricks() results include input_keys field."""
+        catalog = TieredCatalog(registry=_make_registry(), common_set=["add"])
+        result = catalog.list_bricks()
+        assert "input_keys" in result[0], f"Expected 'input_keys' in schema keys: {list(result[0].keys())}"
+        assert result[0]["input_keys"] == ["a", "b"], f"Expected ['a', 'b'], got {result[0]['input_keys']!r}"
+
+    def test_list_bricks_includes_output_keys(self) -> None:
+        """list_bricks() results include output_keys field."""
+        catalog = TieredCatalog(registry=_make_registry(), common_set=["add"])
+        result = catalog.list_bricks()
+        assert "output_keys" in result[0], f"Expected 'output_keys' in schema keys: {list(result[0].keys())}"
+
+    def test_category_default_is_general(self) -> None:
+        """Bricks without explicit category default to 'general'."""
+        catalog = TieredCatalog(registry=_make_registry(), common_set=["add"])
+        result = catalog.list_bricks()
+        assert result[0]["category"] == "general", f"Expected 'general', got {result[0]['category']!r}"
+
+    def test_custom_category_in_schema(self) -> None:
+        """@brick(category='math') is reflected in list_bricks()."""
+        reg = BrickRegistry()
+
+        @brick(tags=["math"], category="math")
+        def my_add(a: float, b: float) -> dict[str, float]:
+            return {"result": a + b}
+
+        reg.register("my_add", my_add, my_add.__brick_meta__)
+        catalog = TieredCatalog(registry=reg, common_set=["my_add"])
+        result = catalog.list_bricks()
+        assert result[0]["category"] == "math", f"Expected 'math', got {result[0]['category']!r}"

@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.4] — 2026-03-18
+
+### Summary
+Agent Skill Prompt + Enriched Brick Metadata (Mission 011). Reduces agent turns and token waste by teaching the optimal Bricks workflow upfront and enriching `list_bricks()` with category, input keys, and output keys so agents can pick bricks without extra `lookup_brick` calls.
+
+### Added
+- `bricks/skills/AGENT_PROMPT.md` — system prompt snippet for any agent (<500 tokens)
+- `category` parameter on `@brick()` decorator (default: `"general"`)
+- `category` field on `BrickMeta` model
+- `category` field on `BaseBrick.Meta`
+- `input_keys` and `output_keys` in `brick_schema()` / `list_bricks()` response
+- `_output_keys()` helper in `schema.py` for extracting output field names
+- Tests for category field, enriched list_bricks, AGENT_PROMPT.md validation
+
+### Changed
+- `APPLES_SYSTEM` prompt rewritten to incorporate Agent Skill Prompt content (streamlined workflow, enriched metadata references)
+- Showcase math bricks: added `category="math"`
+- Showcase string bricks: added `category="string"`
+
+### Baseline (v0.4.2 — before these changes)
+| Scenario | No Tools | Bricks | Ratio | Bricks turns |
+|----------|----------|--------|-------|--------------|
+| A2-3     | 1,407    | 7,151  | 5.1x  | 4            |
+| A2-6     | 1,638    | 32,036 | 19.6x | 10           |
+| A2-12    | 1,746    | 23,899 | 13.7x | 7            |
+
+Re-run with `python -m benchmark.showcase.run --live` to measure improvement.
+
+---
+
 ## [0.4.3] — 2026-03-18
 
 ### Summary

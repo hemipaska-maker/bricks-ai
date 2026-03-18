@@ -408,3 +408,65 @@ class TestCostEstimation:
         assert cost > 0
         # Haiku pricing: $0.80/M input + $4.00/M output = $4.80
         assert abs(cost - 4.80) < 0.01
+
+
+# ── Agent Skill Prompt ──────────────────────────────────────────────────────
+
+
+class TestAgentSkillPrompt:
+    """Tests for bricks/skills/AGENT_PROMPT.md."""
+
+    def test_file_exists(self) -> None:
+        from pathlib import Path
+
+        prompt_path = Path(__file__).parent.parent.parent / "bricks" / "skills" / "AGENT_PROMPT.md"
+        assert prompt_path.exists(), f"Expected AGENT_PROMPT.md at {prompt_path}"
+
+    def test_under_500_tokens(self) -> None:
+        from pathlib import Path
+
+        prompt_path = Path(__file__).parent.parent.parent / "bricks" / "skills" / "AGENT_PROMPT.md"
+        text = prompt_path.read_text(encoding="utf-8")
+        # Approximate token count: split on whitespace (conservative upper bound)
+        word_count = len(text.split())
+        assert word_count < 500, f"AGENT_PROMPT.md has ~{word_count} words (proxy for tokens), expected < 500"
+
+    def test_contains_key_sections(self) -> None:
+        from pathlib import Path
+
+        prompt_path = Path(__file__).parent.parent.parent / "bricks" / "skills" / "AGENT_PROMPT.md"
+        text = prompt_path.read_text(encoding="utf-8")
+        assert "list_bricks" in text
+        assert "execute_blueprint" in text
+        assert "save_as" in text
+        assert "${inputs." in text
+
+
+# ── Enriched list_bricks in benchmark context ──────────────────────────────
+
+
+class TestEnrichedBenchmarkBricks:
+    """Tests that showcase bricks have categories and enriched metadata."""
+
+    def test_showcase_math_bricks_have_category(self) -> None:
+        from benchmark.showcase.bricks.math_bricks import multiply
+
+        assert multiply.__brick_meta__.category == "math"
+
+    def test_showcase_string_bricks_have_category(self) -> None:
+        from benchmark.showcase.bricks.string_bricks import format_result
+
+        assert format_result.__brick_meta__.category == "string"
+
+    def test_list_bricks_has_enriched_fields(self) -> None:
+        from bricks.core.catalog import TieredCatalog
+
+        registry = _build_registry_a6()
+        all_names = [name for name, _ in registry.list_all()]
+        catalog = TieredCatalog(registry, common_set=all_names)
+        result = catalog.list_bricks()
+
+        for brick_schema in result:
+            assert "category" in brick_schema, f"Missing 'category' in {brick_schema['name']}"
+            assert "input_keys" in brick_schema, f"Missing 'input_keys' in {brick_schema['name']}"
+            assert "output_keys" in brick_schema, f"Missing 'output_keys' in {brick_schema['name']}"

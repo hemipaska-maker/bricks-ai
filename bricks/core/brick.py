@@ -64,6 +64,7 @@ class BaseBrick(ABC):
         """Brick metadata. Subclasses should override."""
 
         tags: ClassVar[list[str]] = []
+        category: str = "general"
         destructive: bool = False
         idempotent: bool = True
         description: str = ""
@@ -104,6 +105,7 @@ class BaseBrick(ABC):
 def brick(
     *,
     tags: list[str] | None = None,
+    category: str = "general",
     destructive: bool = False,
     idempotent: bool = True,
     description: str = "",
@@ -113,6 +115,7 @@ def brick(
 
     Args:
         tags: Classification tags for the brick.
+        category: High-level category (e.g. ``"math"``, ``"string"``).
         destructive: Whether the brick modifies external state irreversibly.
         idempotent: Whether repeated execution produces the same result.
         description: Human-readable description.
@@ -137,6 +140,7 @@ def brick(
         func.__brick_meta__ = BrickMeta(  # type: ignore[attr-defined]
             name=func.__name__,
             tags=tags or [],
+            category=category,
             destructive=destructive,
             idempotent=idempotent,
             description=description or func.__doc__ or "",

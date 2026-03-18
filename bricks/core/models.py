@@ -13,6 +13,7 @@ class BrickMeta(BaseModel):
 
     name: str
     tags: list[str] = Field(default_factory=list)
+    category: str = "general"
     destructive: bool = False
     idempotent: bool = True
     description: str = ""

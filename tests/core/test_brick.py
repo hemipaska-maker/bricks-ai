@@ -94,6 +94,22 @@ class TestBrickDecorator:
         meta = cast(BrickFunction, my_func).__brick_meta__
         assert meta.tags == ["tag1", "tag2", "tag3"], f"Expected ['tag1', 'tag2', 'tag3'], got {meta.tags!r}"
 
+    def test_decorator_category_default(self) -> None:
+        @brick()
+        def my_func() -> None:
+            pass
+
+        meta = cast(BrickFunction, my_func).__brick_meta__
+        assert meta.category == "general", f"Expected 'general', got {meta.category!r}"
+
+    def test_decorator_category_custom(self) -> None:
+        @brick(category="math")
+        def my_func(a: float, b: float) -> dict[str, float]:
+            return {"result": a + b}
+
+        meta = cast(BrickFunction, my_func).__brick_meta__
+        assert meta.category == "math", f"Expected 'math', got {meta.category!r}"
+
 
 class TestBrickModel:
     def test_subclass_validates(self) -> None:
