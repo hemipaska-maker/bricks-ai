@@ -156,6 +156,23 @@ class TestRunWithoutTools:
         call_kwargs = mock_create.call_args
         assert "tools" not in call_kwargs.kwargs
 
+    def test_on_turn_callback_called(self) -> None:
+        from benchmark.mcp.agent_runner import AgentRunner
+
+        mock_resp = _make_text_response("code", in_tok=10, out_tok=5)
+        callback = MagicMock()
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_resp
+            runner = AgentRunner(api_key="test-key")
+            runner.run_without_tools("A task.", on_turn=callback)
+
+        callback.assert_called_once()
+        args = callback.call_args[0]
+        assert args[0] == 1  # turn
+        assert args[1] == "no_tools"  # mode
+        assert args[2] == 10  # input_tokens
+        assert args[3] == 5  # output_tokens
+
 
 # ── run_with_bricks ───────────────────────────────────────────────────────────
 
@@ -164,7 +181,7 @@ class TestRunWithBricks:
     """Tests for AgentRunner.run_with_bricks()."""
 
     def test_tool_loop_two_turns(self) -> None:
-        """Turn 1: tool_use(list_bricks) → Turn 2: end_turn."""
+        """Turn 1: tool_use(list_bricks) -> Turn 2: end_turn."""
         from benchmark.mcp.agent_runner import AgentRunner
 
         tool_resp = _make_tool_response("list_bricks", "tc_001", {}, in_tok=20, out_tok=10)
@@ -211,6 +228,21 @@ class TestRunWithBricks:
         assert result.total_input_tokens == 50
         assert result.total_output_tokens == 15
         assert result.total_tokens == 65
+
+    def test_on_turn_callback_called_per_turn(self) -> None:
+        from benchmark.mcp.agent_runner import AgentRunner
+
+        tool_resp = _make_tool_response("list_bricks", "t1", {}, in_tok=20, out_tok=10)
+        final_resp = _make_text_response("Done.", in_tok=30, out_tok=5)
+
+        callback = MagicMock()
+        registry = _build_registry_a6()
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.side_effect = [tool_resp, final_resp]
+            runner = AgentRunner(api_key="test-key")
+            runner.run_with_bricks("A task.", registry, on_turn=callback)
+
+        assert callback.call_count == 2
 
 
 # ── _execute_tool (real engine) ───────────────────────────────────────────────
@@ -288,3 +320,91 @@ outputs_map:
         assert isinstance(result, list)
         names = [r["name"] for r in result]
         assert "multiply" in names
+
+    def test_execute_blueprint_error_returns_dict(self) -> None:
+        from benchmark.mcp.agent_runner import _execute_tool
+        from bricks.core.catalog import TieredCatalog
+        from bricks.core.engine import BlueprintEngine
+        from bricks.core.loader import BlueprintLoader
+        from bricks.core.validation import BlueprintValidator
+
+        registry = _build_registry_a6()
+        catalog = TieredCatalog(registry)
+        engine = BlueprintEngine(registry=registry)
+        loader = BlueprintLoader()
+        validator = BlueprintValidator(registry=registry)
+
+        result = _execute_tool(
+            "execute_blueprint",
+            {"blueprint_yaml": "invalid: yaml: ["},
+            catalog,
+            engine,
+            loader,
+            validator,
+        )
+        assert result["success"] is False
+        assert "error" in result
+
+
+# ── CLI flag parsing ──────────────────────────────────────────────────────────
+
+
+class TestCLIScenarioExpansion:
+    """Tests for the --scenario flag parsing logic."""
+
+    def test_expand_all(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["all"])
+        assert result == ["A2-3", "A2-6", "A2-12", "C2", "D2"]
+
+    def test_expand_a2(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["A2"])
+        assert result == ["A2-3", "A2-6", "A2-12"]
+
+    def test_expand_single(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["A2-3"])
+        assert result == ["A2-3"]
+
+    def test_expand_multiple(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["A2-3", "C2"])
+        assert result == ["A2-3", "C2"]
+
+    def test_expand_dedup(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["A2-3", "A2"])
+        assert result == ["A2-3", "A2-6", "A2-12"]
+
+    def test_expand_preserves_order(self) -> None:
+        from benchmark.showcase.run import expand_scenarios
+
+        result = expand_scenarios(["D2", "A2-3"])
+        assert result == ["A2-3", "D2"]
+
+
+# ── Cost estimation ──────────────────────────────────────────────────────────
+
+
+class TestCostEstimation:
+    """Tests for the cost estimation helper."""
+
+    def test_zero_tokens(self) -> None:
+        from benchmark.showcase.run import _estimate_cost
+
+        assert _estimate_cost(0, 0) == 0.0
+
+    def test_known_cost(self) -> None:
+        from benchmark.showcase.run import _estimate_cost
+
+        # 1M input + 1M output
+        cost = _estimate_cost(1_000_000, 1_000_000)
+        assert cost > 0
+        # Haiku pricing: $0.80/M input + $4.00/M output = $4.80
+        assert abs(cost - 4.80) < 0.01

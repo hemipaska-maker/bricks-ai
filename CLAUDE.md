@@ -112,12 +112,20 @@ bricks --help
 - `0.x.0` = phase completion (major milestone)
 - `0.0.x` = feature or fix within a phase
 - Version lives in two places (always keep in sync): `pyproject.toml` `version` field and `bricks/__init__.py` `__version__`
-- Every version bump gets a git tag: `v0.1.0`, `v0.2.0`, etc.
-- Version map: v0.1.0 (benchmark), v0.2.0 (Phase 1), v0.3.0 (Phase 2), v0.4.0 (Phase 3), v0.5.0 (Phase 4), v1.0.0 (public release)
+- Every version bump gets a git tag matching the new version
+
+**Versioning rule for missions:** Mission files never specify a target version number. At the end of each mission, Claude Code reads the current `__version__` from `bricks/__init__.py` and increments the patch by 1. The PM tab does not set versions — the coder is the single source of truth.
+
+**GitHub push rule:** After every commit and tag, always push both to GitHub:
+```bash
+git push origin main
+git push origin --tags
+```
+Every mission must end with both the commit and the tag live on GitHub. No exceptions.
 
 ## File Maintenance Contract
 
-After every version bump, update: `pyproject.toml`, `bricks/__init__.py`, `CHANGELOG.md`, git tag.
+After every version bump, update: `pyproject.toml`, `bricks/__init__.py`, `CHANGELOG.md`, git tag, push to GitHub.
 After every phase completion, also update: `PROGRESS.md`, `CLAUDE.md`, `MY-WORKFLOW.md`, `README.md`.
 After any rename (e.g., Sequence -> Blueprint), update ALL of: `CLAUDE.md`, `MY-WORKFLOW.md`, `PROGRESS.md`, `README.md`, `CHANGELOG.md`.
 

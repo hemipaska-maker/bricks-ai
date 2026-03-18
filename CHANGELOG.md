@@ -7,6 +7,41 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.3] — 2026-03-18
+
+### Summary
+Benchmark UX overhaul (Mission 012). Removed legacy benchmark entirely, redesigned CLI with granular `--scenario` flag, added real-time per-turn logging with token counts and timing, summary tables, and total cost estimation.
+
+### Added
+- Granular `--scenario` flag: accepts `all`, `A2`, `A2-3`, `A2-6`, `A2-12`, `C2`, `D2`
+- Multiple `--scenario` values supported: `--scenario A2-3 --scenario C2`
+- Per-turn real-time logging with token counts and timing per API call
+- Summary table per A2 scenario with no_tools vs bricks comparison
+- Total token cost estimation printed at end of run
+- `on_turn` callback support in `AgentRunner.run_without_tools()` and `run_with_bricks()`
+- `expand_scenarios()` helper for CLI flag parsing
+- `_estimate_cost()` helper for token cost estimation
+- New tests: CLI scenario expansion, cost estimation, on_turn callbacks, error handling
+
+### Removed
+- Legacy benchmark code: `benchmark/showcase/scenarios/` (complexity_curve, session_cache, determinism)
+- Legacy live runner: `benchmark/showcase/live.py`
+- Legacy blueprints: `benchmark/showcase/blueprints/`
+- Legacy token counter: `benchmark/showcase/tokens.py`
+- Legacy CLI flags: `--scenario A/C/D`, `--apples`, `--all`
+- Legacy output writers: `_print_curve_table`, `_write_json`, `_write_markdown`, `_write_chart`, `_write_determinism_report`
+- Legacy scenario runners: `run_scenario_a/c/d()`, `run_scenario_a/c/d_live()`
+- Legacy tests: `benchmark/tests/test_showcase.py`
+- Estimated mode (no `--live` = error with help message)
+
+### Changed
+- `--live` is now required (no estimated mode)
+- `benchmark/showcase/run.py` rewritten as apples-only entry point
+- `benchmark/showcase/README.md` rewritten for new CLI and output format
+- A2/C2/D2 scenario runners now accept `on_turn` callback and return input/output token breakdowns
+
+---
+
 ## [0.4.2] — 2026-03-18
 
 ### Summary

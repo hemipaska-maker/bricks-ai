@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 from benchmark.mcp.agent_result import AgentResult, ToolCallRecord
@@ -14,6 +15,10 @@ from bricks.core.catalog import TieredCatalog
 from bricks.core.engine import BlueprintEngine
 from bricks.core.loader import BlueprintLoader
 from bricks.core.validation import BlueprintValidator
+
+# Type alias for the per-turn callback.
+# (turn, mode, input_tokens, output_tokens, elapsed, tool_calls)
+OnTurnCallback = Callable[..., None] | None
 
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 MAX_TURNS = 20
@@ -65,7 +70,12 @@ class AgentRunner:
         """
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
 
-    def run_without_tools(self, task: str, model: str = DEFAULT_MODEL) -> AgentResult:
+    def run_without_tools(
+        self,
+        task: str,
+        model: str = DEFAULT_MODEL,
+        on_turn: OnTurnCallback = None,
+    ) -> AgentResult:
         """Run task with no tools — agent generates Python code.
 
         Single-turn: one API call with APPLES_SYSTEM, no tools attached.
@@ -73,6 +83,7 @@ class AgentRunner:
         Args:
             task: Natural language task description.
             model: Anthropic model ID.
+            on_turn: Optional callback fired after each API turn.
 
         Returns:
             AgentResult with ``mode="no_tools"`` and ``turns=1``.
@@ -94,6 +105,9 @@ class AgentRunner:
         elapsed = time.monotonic() - t0
         in_tok: int = response.usage.input_tokens
         out_tok: int = response.usage.output_tokens
+
+        if on_turn:
+            on_turn(1, "no_tools", in_tok, out_tok, elapsed)
 
         text = ""
         for block in response.content:
@@ -120,6 +134,7 @@ class AgentRunner:
         task: str,
         registry: BrickRegistry,
         model: str = DEFAULT_MODEL,
+        on_turn: OnTurnCallback = None,
     ) -> AgentResult:
         """Run task with Bricks MCP tools — agent discovers and executes Blueprints.
 
@@ -130,6 +145,7 @@ class AgentRunner:
             task: Natural language task description (identical to no_tools mode).
             registry: BrickRegistry with available bricks.
             model: Anthropic model ID.
+            on_turn: Optional callback fired after each API turn.
 
         Returns:
             AgentResult with ``mode="bricks"`` and all tool call records.
@@ -155,6 +171,7 @@ class AgentRunner:
         t0 = time.monotonic()
 
         for _ in range(MAX_TURNS):
+            turn_t0 = time.monotonic()
             response = client.messages.create(
                 model=model,
                 max_tokens=2048,
@@ -162,11 +179,14 @@ class AgentRunner:
                 tools=BRICKS_TOOLS,  # type: ignore[arg-type]
                 messages=messages,  # type: ignore[arg-type]
             )
+            turn_elapsed = time.monotonic() - turn_t0
             turns += 1
             total_input += response.usage.input_tokens
             total_output += response.usage.output_tokens
 
             if response.stop_reason == "end_turn":
+                if on_turn:
+                    on_turn(turns, "bricks", response.usage.input_tokens, response.usage.output_tokens, turn_elapsed)
                 for block in response.content:
                     if block.type == "text":
                         final_answer = block.text
@@ -176,6 +196,7 @@ class AgentRunner:
             # stop_reason == "tool_use": append assistant turn and process tools
             messages.append({"role": "assistant", "content": response.content})
 
+            turn_tool_calls: list[dict[str, Any]] = []
             tool_results = []
             for block in response.content:
                 if block.type != "tool_use":
@@ -196,6 +217,17 @@ class AgentRunner:
                     exec_out = tool_output.get("outputs")
                     last_execution_result = exec_out if isinstance(exec_out, dict) else None
 
+                summary = ""
+                if block.name == "list_bricks" and isinstance(tool_output, list):
+                    summary = f"-> {len(tool_output)} bricks found"
+                elif block.name == "execute_blueprint" and isinstance(tool_output, dict):
+                    if tool_output.get("success"):
+                        summary = "-> success"
+                    else:
+                        err = str(tool_output.get("error", ""))[:60]
+                        summary = f"-> error: {err}"
+
+                turn_tool_calls.append({"name": block.name, "summary": summary})
                 tool_calls.append(ToolCallRecord(name=block.name, inputs=tool_input, output=tool_output))
                 tool_results.append(
                     {
@@ -203,6 +235,16 @@ class AgentRunner:
                         "tool_use_id": block.id,
                         "content": json.dumps(tool_output),
                     }
+                )
+
+            if on_turn:
+                on_turn(
+                    turns,
+                    "bricks",
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
+                    turn_elapsed,
+                    turn_tool_calls,
                 )
 
             messages.append({"role": "user", "content": tool_results})

@@ -5,14 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from benchmark.mcp.agent_result import AgentResult
-from benchmark.mcp.agent_runner import AgentRunner
+from benchmark.mcp.agent_runner import AgentRunner, OnTurnCallback
 from benchmark.mcp.scenarios import TASK_A2_6
 from bricks.core import BrickRegistry
 
 REUSE_RUNS = 10
 
 
-def run_c2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
+def run_c2(
+    runner: AgentRunner,
+    registry: BrickRegistry,
+    on_turn: OnTurnCallback = None,
+) -> dict[str, Any]:
     """Run A2-6 task 10 times in both modes and return comparison dict.
 
     No_tools: 10 separate conversations — code is regenerated every time.
@@ -22,6 +26,7 @@ def run_c2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
     Args:
         runner: Configured AgentRunner instance.
         registry: BrickRegistry for the bricks mode.
+        on_turn: Optional per-turn callback for logging.
 
     Returns:
         Comparison dict with per-mode token totals.
@@ -31,11 +36,11 @@ def run_c2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
     first_blueprint: str | None = None
 
     for i in range(REUSE_RUNS):
-        no_tools = runner.run_without_tools(TASK_A2_6)
+        no_tools = runner.run_without_tools(TASK_A2_6, on_turn=on_turn)
         no_tools_results.append(no_tools)
 
         if i == 0:
-            bricks = runner.run_with_bricks(TASK_A2_6, registry)
+            bricks = runner.run_with_bricks(TASK_A2_6, registry, on_turn=on_turn)
             first_blueprint = bricks.blueprint_yaml
             bricks_results.append(bricks)
         else:
@@ -54,20 +59,26 @@ def run_c2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
                 )
             )
 
-    no_tools_total = sum(r.total_tokens for r in no_tools_results)
-    bricks_total = sum(r.total_tokens for r in bricks_results)
+    nt_input = sum(r.total_input_tokens for r in no_tools_results)
+    nt_output = sum(r.total_output_tokens for r in no_tools_results)
+    br_input = sum(r.total_input_tokens for r in bricks_results)
+    br_output = sum(r.total_output_tokens for r in bricks_results)
 
     return {
         "runs": REUSE_RUNS,
         "step_count": 6,
         "no_tools": {
-            "total_tokens": no_tools_total,
-            "per_run_avg": no_tools_total // REUSE_RUNS,
+            "total_tokens": nt_input + nt_output,
+            "input_tokens": nt_input,
+            "output_tokens": nt_output,
+            "per_run_avg": (nt_input + nt_output) // REUSE_RUNS,
         },
         "bricks": {
-            "total_tokens": bricks_total,
+            "total_tokens": br_input + br_output,
+            "input_tokens": br_input,
+            "output_tokens": br_output,
             "first_run_tokens": bricks_results[0].total_tokens,
-            "reuse_tokens": bricks_total - bricks_results[0].total_tokens,
+            "reuse_tokens": (br_input + br_output) - bricks_results[0].total_tokens,
         },
         "blueprint_yaml": first_blueprint,
     }

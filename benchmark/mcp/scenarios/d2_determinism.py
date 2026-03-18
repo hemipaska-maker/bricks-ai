@@ -5,14 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from benchmark.mcp.agent_result import AgentResult
-from benchmark.mcp.agent_runner import AgentRunner
+from benchmark.mcp.agent_runner import AgentRunner, OnTurnCallback
 from benchmark.mcp.scenarios import TASK_A2_6
 from bricks.core import BrickRegistry
 
 DETERMINISM_RUNS = 5
 
 
-def run_d2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
+def run_d2(
+    runner: AgentRunner,
+    registry: BrickRegistry,
+    on_turn: OnTurnCallback = None,
+) -> dict[str, Any]:
     """Run A2-6 task 5 times with identical inputs in both modes.
 
     No_tools: compare generated code across 5 runs — shows variability.
@@ -21,6 +25,7 @@ def run_d2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
     Args:
         runner: Configured AgentRunner instance.
         registry: BrickRegistry for the bricks mode.
+        on_turn: Optional per-turn callback for logging.
 
     Returns:
         Dict with per-mode uniqueness metrics and per-run token counts.
@@ -29,8 +34,8 @@ def run_d2(runner: AgentRunner, registry: BrickRegistry) -> dict[str, Any]:
     bricks_results: list[AgentResult] = []
 
     for _ in range(DETERMINISM_RUNS):
-        no_tools_results.append(runner.run_without_tools(TASK_A2_6))
-        bricks_results.append(runner.run_with_bricks(TASK_A2_6, registry))
+        no_tools_results.append(runner.run_without_tools(TASK_A2_6, on_turn=on_turn))
+        bricks_results.append(runner.run_with_bricks(TASK_A2_6, registry, on_turn=on_turn))
 
     codes = [r.code_generated or "" for r in no_tools_results]
     unique_codes = len(set(codes))
