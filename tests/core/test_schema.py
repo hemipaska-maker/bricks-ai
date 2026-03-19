@@ -222,3 +222,75 @@ class TestCompactBrickSignatures:
         assert lines[2].startswith("multiply(")
         assert lines[3].startswith("round_value(")
         assert lines[4].startswith("subtract(")
+
+
+class TestOutputKeyTable:
+    """Tests for output_key_table()."""
+
+    def test_table_format(self) -> None:
+        """Table includes all bricks with arrow-separated name → keys."""
+        from bricks.core.schema import output_key_table
+
+        reg = BrickRegistry()
+
+        @brick(description="Add a + b. Returns {result: a+b}.")
+        def add(a: float, b: float) -> dict[str, float]:
+            return {"result": a + b}
+
+        @brick(description="Format display. Returns {display: str}.")
+        def fmt(label: str, value: float) -> dict[str, str]:
+            return {"display": f"{label}: {value}"}
+
+        reg.register("add", add, add.__brick_meta__)
+        reg.register("fmt", fmt, fmt.__brick_meta__)
+
+        result = output_key_table(reg)
+        assert "Output keys" in result
+        assert "add" in result
+        assert "→ result" in result
+        assert "fmt" in result
+        assert "→ display" in result
+
+    def test_table_alignment(self) -> None:
+        """Names are padded to the same width for readability."""
+        from bricks.core.schema import output_key_table
+
+        reg = BrickRegistry()
+
+        @brick(description="Returns {result: float}.")
+        def short(x: float) -> dict[str, float]:
+            return {"result": x}
+
+        @brick(description="Returns {value: float}.")
+        def much_longer_name(x: float) -> dict[str, float]:
+            return {"value": x}
+
+        reg.register("short", short, short.__brick_meta__)
+        reg.register("much_longer_name", much_longer_name, much_longer_name.__brick_meta__)
+
+        result = output_key_table(reg)
+        lines = [ln for ln in result.split("\n") if "→" in ln]
+        # Both arrow positions should align
+        arrow_positions = [ln.index("→") for ln in lines]
+        assert len(set(arrow_positions)) == 1, f"Arrows not aligned: positions {arrow_positions}"
+
+    def test_showcase_bricks_table(self) -> None:
+        """Showcase bricks produce a valid output key table."""
+        from benchmark.showcase.bricks import build_showcase_registry
+        from benchmark.showcase.bricks.math_bricks import add, multiply, round_value
+        from benchmark.showcase.bricks.string_bricks import format_result
+        from bricks.core.schema import output_key_table
+
+        reg = build_showcase_registry(multiply, round_value, add, format_result)
+        result = output_key_table(reg)
+        assert "multiply" in result
+        assert "→ result" in result
+        assert "format_result" in result
+        assert "→ display" in result
+
+    def test_empty_registry(self) -> None:
+        """Empty registry returns empty string."""
+        from bricks.core.schema import output_key_table
+
+        reg = BrickRegistry()
+        assert output_key_table(reg) == ""

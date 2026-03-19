@@ -293,6 +293,16 @@ def run_benchmark(
 
         nt = result["no_tools"]
         br = result["bricks"]
+
+        # Log execution result and blueprint YAML
+        if br.get("execution_result"):
+            print(f"  [{label}]   Execution: OK — outputs: {br['execution_result']}")
+            logger.debug("%s execution outputs: %s", label, br["execution_result"])
+        if br.get("blueprint_yaml"):
+            logger.debug("%s blueprint YAML:\n%s", label, br["blueprint_yaml"])
+
+        # Log no-tools tokens
+        print(f"  [{label}] No-tools: {nt['total_tokens']:,} tokens")
         ratio = f"{nt['total_tokens'] / br['total_tokens']:.1f}x" if br["total_tokens"] > 0 else "inf"
         print(f"  [{label}] done  no_tools={nt['total_tokens']:,}  bricks={br['total_tokens']:,}  ({ratio})")
 
@@ -355,6 +365,55 @@ def run_benchmark(
     print(f"  summary.md   -> {md_path}")
 
 
+# ── compose mode helpers ───────────────────────────────────────────────────
+
+
+def _count_yaml_steps(yaml_text: str) -> int:
+    """Count steps in a YAML blueprint string."""
+    return yaml_text.count("- name:")
+
+
+def _log_compose_calls(
+    label: str,
+    result: Any,
+    logger: logging.Logger,
+) -> None:
+    """Print and log per-call detail for a compose result.
+
+    Args:
+        label: Scenario label (e.g. 'A2-12').
+        result: ComposeResult with calls list.
+        logger: Logger for DEBUG-level detail.
+    """
+    for call in result.calls:
+        suffix = " (retry)" if call.call_number > 1 else ""
+        total = call.input_tokens + call.output_tokens
+        print(
+            f"  [{label}] Call {call.call_number}/compose{suffix}: "
+            f"{call.input_tokens:,} input + {call.output_tokens:,} output "
+            f"= {total:,} tokens ({call.duration_seconds:.1f}s)"
+        )
+
+        lines = len(call.yaml_text.strip().splitlines())
+        steps = _count_yaml_steps(call.yaml_text)
+        print(f"  [{label}]   YAML: {lines} lines, {steps} steps")
+
+        if call.is_valid:
+            print(f"  [{label}]   Validation: OK")
+        else:
+            errors_str = "; ".join(call.validation_errors[:3])
+            print(f"  [{label}]   Validation: FAILED — {errors_str}")
+
+        logger.debug("%s call %d YAML:\n%s", label, call.call_number, call.yaml_text)
+        if call.validation_errors:
+            logger.debug(
+                "%s call %d errors: %s",
+                label,
+                call.call_number,
+                call.validation_errors,
+            )
+
+
 # ── compose mode runner ────────────────────────────────────────────────────
 
 
@@ -393,11 +452,6 @@ def run_benchmark_compose(
 
     a2_scenarios = [s for s in scenarios if s.startswith("A2-")]
 
-    print()
-    print("  +----------+--------+-----------+---------+-----------+---------+-------+")
-    print("  | Task     | Calls  | Compose   | Valid?  | No-tools  | Ratio   | Retry |")
-    print("  +----------+--------+-----------+---------+-----------+---------+-------+")
-
     for label in a2_scenarios:
         task_str, reg_fn = a2_tasks[label]
         registry = reg_fn()
@@ -408,11 +462,8 @@ def run_benchmark_compose(
         total_input += result.total_input_tokens
         total_output += result.total_output_tokens
 
-        # Run no-tools for comparison
-        nt_result = runner.run_without_tools(task_str)
-        total_input += nt_result.total_input_tokens
-        total_output += nt_result.total_output_tokens
-        nt_tokens = nt_result.total_tokens
+        # Per-call detail
+        _log_compose_calls(label, result, logger)
 
         # Execute the composed blueprint if valid
         if result.is_valid:
@@ -420,21 +471,23 @@ def run_benchmark_compose(
                 bp_def = loader.load_string(result.blueprint_yaml)
                 engine = BlueprintEngine(registry=registry)
                 exec_result = engine.run(bp_def, inputs={})
-                logger.info("%s compose outputs: %s", label, exec_result.outputs)
+                print(f"  [{label}]   Execution: OK — outputs: {exec_result.outputs}")
+                logger.info("%s execution outputs: %s", label, exec_result.outputs)
             except Exception as exc:
-                logger.warning("%s compose execution failed: %s", label, exc)
+                print(f"  [{label}]   Execution: FAILED — {exc}")
+                logger.warning("%s execution failed: %s", label, exc)
 
+        # Run no-tools for comparison
+        nt_result = runner.run_without_tools(task_str)
+        total_input += nt_result.total_input_tokens
+        total_output += nt_result.total_output_tokens
+        nt_tokens = nt_result.total_tokens
+        print(f"  [{label}] No-tools: {nt_tokens:,} tokens")
+
+        # Summary line
         ratio = f"{result.total_tokens / nt_tokens:.1f}x" if nt_tokens > 0 else "N/A"
-        retry = "Yes" if result.api_calls > 1 else "No"
-        valid = "Yes" if result.is_valid else "No"
-
-        print(
-            f"  | {label:<8} | {result.api_calls:>6} | {result.total_tokens:>9,} "
-            f"| {valid:<7} | {nt_tokens:>9,} | {ratio:>7} | {retry:<5} |"
-        )
-
-    print("  +----------+--------+-----------+---------+-----------+---------+-------+")
-    print()
+        print(f"  [{label}] done  compose={result.total_tokens:,}  no_tools={nt_tokens:,}  ({ratio})")
+        print()
 
     elapsed = time.monotonic() - t0
     cost = _estimate_cost(total_input, total_output)

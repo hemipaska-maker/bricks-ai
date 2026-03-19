@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from typing import TYPE_CHECKING, Any
 
 from bricks.core.models import BlueprintDefinition
@@ -129,6 +130,56 @@ def compact_brick_signatures(registry: BrickRegistry) -> str:
         output_str = _signature_output(callable_)
         lines.append(f"{name}({param_str}) → {output_str}")
     return "\n".join(lines)
+
+
+def output_key_table(registry: BrickRegistry) -> str:
+    """Generate an output-key reference table for LLM system prompts.
+
+    Maps each brick name to its output field names so the LLM knows
+    exactly which keys to use in ``${step.key}`` references.
+
+    Falls back to parsing keys from ``meta.description`` when
+    ``_output_keys()`` returns empty (function-based bricks with
+    ``dict[str, X]`` return type).
+
+    Args:
+        registry: The registry to enumerate.
+
+    Returns:
+        Multi-line reference table, e.g.::
+
+            Output keys (use EXACTLY in ${step.key} references):
+              multiply      → result
+              format_result → display
+    """
+    entries: list[tuple[str, str]] = []
+    for name, meta in sorted(registry.list_all(), key=lambda x: x[0]):
+        callable_, _ = registry.get(name)
+        keys = _output_keys(callable_)
+        if not keys:
+            keys = _parse_description_keys(meta.description)
+        entries.append((name, ", ".join(keys) if keys else "dict"))
+
+    if not entries:
+        return ""
+
+    max_name = max(len(name) for name, _ in entries)
+    lines = ["Output keys (use EXACTLY in ${step.key} references):"]
+    for name, keys_str in entries:
+        lines.append(f"  {name:<{max_name}} → {keys_str}")
+    return "\n".join(lines)
+
+
+def _parse_description_keys(description: str) -> list[str]:
+    """Extract output key names from a brick description's {key: type} pattern.
+
+    Args:
+        description: Brick description string (e.g. "Returns {result: float}").
+
+    Returns:
+        List of key names found, or empty list.
+    """
+    return re.findall(r"\{(\w+):", description)
 
 
 def _signature_params(callable_: Any) -> str:

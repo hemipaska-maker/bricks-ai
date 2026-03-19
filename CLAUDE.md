@@ -99,12 +99,53 @@ bricks --help
 
 ## Code Conventions
 
+### Naming & Structure
 - `snake_case` for functions/variables, `PascalCase` for classes
-- Raise specific exceptions over generic ones -- no silent failures
 - Keep modules small and focused -- one responsibility per file
 - Tests mirror source structure in `tests/` (e.g., `tests/core/test_brick.py`)
 - All exceptions inherit from `BrickError`
 - Decorator returns unwrapped functions -- no behavior change
+
+### Pythonic Code Standards
+Write professional, idiomatic Python. Every piece of code should look like it belongs in a well-maintained open-source library.
+
+**Functions & Methods:**
+- Single responsibility -- a function does ONE thing, named as a verb (`validate_blueprint`, not `blueprint_validator_logic`)
+- Max 30 lines per function. If longer, extract helpers with clear names
+- Use early returns to avoid deep nesting: `if not x: return` over `if x: <100 lines of code>`
+- Use `*args` and `**kwargs` only when genuinely needed (e.g., decorators). Be explicit about parameters
+- Type hints on ALL parameters and return values -- no exceptions
+- Default mutable arguments: NEVER `def f(x=[])`, always `def f(x: list[str] | None = None)`
+
+**Docstrings:**
+- Google style docstrings on all public functions, classes, and methods
+- Include `Args:`, `Returns:`, `Raises:` sections. No lazy one-liners on public API
+- Private helpers (`_foo`) need at least a one-line docstring explaining intent
+
+**Data & Control Flow:**
+- Prefer list/dict/set comprehensions over manual loops when the intent is clear
+- Use `pathlib.Path` over `os.path` everywhere
+- Use `contextlib.suppress(Exception)` over bare `try/except: pass`
+- Use `enum.Enum` for fixed choices, not string constants scattered in code
+- Use `dataclasses` or Pydantic models for structured data, never raw dicts passed between functions
+- Raise specific exceptions over generic ones -- no silent failures, no bare `except:`
+
+**Testing:**
+- Use `pytest` fixtures, not setUp/tearDown
+- One assert per test when possible -- name the test after what it asserts (`test_multiply_returns_product`)
+- Use `pytest.raises` for expected exceptions, `pytest.mark.parametrize` for variant inputs
+- Test edge cases: empty inputs, None, negative numbers, boundary values
+- No magic numbers in tests -- use named constants or fixtures
+
+**Imports:**
+- Group: stdlib → third-party → local, separated by blank lines
+- Use `from __future__ import annotations` in every module
+- Prefer absolute imports (`from bricks.core.models import ...`) over relative
+
+**Error Messages:**
+- Include the offending value: `f"Brick {name!r} not found"` not `"Brick not found"`
+- Include context: `f"Step {step.name!r}: brick {step.brick!r} not found in registry"`
+- Suggest fixes when possible: `f"Did you mean {closest_match!r}?"`
 
 ## Versioning
 
@@ -128,6 +169,15 @@ Every mission must end with both the commit and the tag live on GitHub. No excep
 After every version bump, update: `pyproject.toml`, `bricks/__init__.py`, `CHANGELOG.md`, git tag, push to GitHub.
 After every phase completion, also update: `PROGRESS.md`, `CLAUDE.md`, `MY-WORKFLOW.md`, `README.md`.
 After any rename (e.g., Sequence -> Blueprint), update ALL of: `CLAUDE.md`, `MY-WORKFLOW.md`, `PROGRESS.md`, `README.md`, `CHANGELOG.md`.
+
+## Research Knowledge Base
+
+After every mission, update the relevant files in `../research/` (one level above Code):
+- `../research/BENCHMARK_TRACKER.md` — log any new benchmark run with raw numbers and version
+- `../research/DECISIONS_LOG.md` — log any new architecture decision with options and rationale
+- `../research/KNOWN_ISSUES.md` — add new issues discovered, mark resolved ones
+- `../research/AGENT_EFFICIENCY_RESEARCH.md` — update results table if agent token/turn metrics changed
+- `../research/SKILL_PORTABILITY.md` — update if any component's model-agnostic status changes
 
 ## Benchmark Reproducibility
 

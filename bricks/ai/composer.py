@@ -6,6 +6,7 @@ plain text, which we validate and execute locally.
 
 from __future__ import annotations
 
+import inspect as _inspect
 import time
 from typing import Any
 
@@ -14,7 +15,7 @@ from pydantic import BaseModel, Field
 from bricks.core.exceptions import BlueprintValidationError, BrickError
 from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
-from bricks.core.schema import compact_brick_signatures
+from bricks.core.schema import _output_keys, _parse_description_keys, compact_brick_signatures, output_key_table
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import strip_code_fence
 from bricks.core.validation import BlueprintValidator
@@ -34,6 +35,19 @@ class ComposerError(BrickError):
         self.cause = cause
 
 
+class CallDetail(BaseModel):
+    """Detail for a single API call within a compose attempt."""
+
+    call_number: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    duration_seconds: float = 0.0
+    yaml_text: str = ""
+    is_valid: bool = False
+    validation_errors: list[str] = Field(default_factory=list)
+
+
 class ComposeResult(BaseModel):
     """Result of a Blueprint composition attempt."""
 
@@ -41,6 +55,7 @@ class ComposeResult(BaseModel):
     blueprint_yaml: str = ""
     is_valid: bool = False
     validation_errors: list[str] = Field(default_factory=list)
+    calls: list[CallDetail] = Field(default_factory=list)
     api_calls: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
@@ -49,13 +64,15 @@ class ComposeResult(BaseModel):
     duration_seconds: float = 0.0
 
 
-# System prompt — under 300 tokens without signatures.
+# System prompt — under 300 tokens without signatures/output_keys/example.
 _COMPOSE_SYSTEM = """\
 You are a Blueprint composer. Given a task and available bricks, output ONLY \
 a valid Blueprint YAML block. No explanation, no markdown fences, just raw YAML.
 
 Available bricks:
 {signatures}
+
+{output_keys}
 
 Blueprint format:
 name: blueprint_name
@@ -79,7 +96,10 @@ Rules:
 - Only use brick names from the list above.
 - Every step referenced later needs save_as.
 - Step names must be unique snake_case.
-- outputs_map values must use ${{inputs.X}} or ${{save_as.field}} syntax.\
+- outputs_map values must use ${{inputs.X}} or ${{save_as.field}} syntax.
+- Output keys are listed above. Use EXACTLY those keys in ${{step.key}} references.
+
+{example}\
 """
 
 _RETRY_PROMPT = """\
@@ -92,6 +112,114 @@ Errors:
 
 Output ONLY the corrected YAML. Nothing else.\
 """
+
+
+def _build_example(registry: BrickRegistry) -> str:
+    """Auto-generate a 2-step worked example from the first two bricks in the registry.
+
+    Shows exact ``${save_as.output_key}`` syntax so the LLM sees a concrete
+    reference chain. Uses literal params for step 1, a cross-step reference
+    for step 2.
+
+    Args:
+        registry: Registry of available bricks (sorted alphabetically).
+
+    Returns:
+        A YAML example block prefixed with ``Example (2-step chain):``.
+    """
+    bricks = sorted(registry.list_all(), key=lambda x: x[0])
+    if len(bricks) < 2:
+        return ""
+
+    name1, meta1 = bricks[0]
+    name2, meta2 = bricks[1]
+    callable1, _ = registry.get(name1)
+    callable2, _ = registry.get(name2)
+
+    keys1 = _output_keys(callable1) or _parse_description_keys(meta1.description)
+    keys2 = _output_keys(callable2) or _parse_description_keys(meta2.description)
+    out_key1 = keys1[0] if keys1 else "result"
+    out_key2 = keys2[0] if keys2 else "result"
+
+    # Build param strings for each brick
+    params1 = _build_literal_params(callable1)
+    params2 = _build_ref_params(callable2, "step1", out_key1)
+
+    lines = [
+        "Example (2-step chain):",
+        "name: example",
+        "steps:",
+        "  - name: step1",
+        f"    brick: {name1}",
+        "    params:",
+        *[f"      {line}" for line in params1],
+        "    save_as: step1",
+        "  - name: step2",
+        f"    brick: {name2}",
+        "    params:",
+        *[f"      {line}" for line in params2],
+        "    save_as: step2",
+        "outputs_map:",
+        f'  output: "${{step2.{out_key2}}}"',
+    ]
+    return "\n".join(lines)
+
+
+def _build_literal_params(callable_: Any) -> list[str]:
+    """Build literal param lines for a worked example.
+
+    Args:
+        callable_: A brick callable.
+
+    Returns:
+        List of ``key: value`` strings.
+    """
+    try:
+        sig = _inspect.signature(callable_)
+        lines: list[str] = []
+        for pname, param in sig.parameters.items():
+            if pname in ("self", "inputs", "metadata"):
+                continue
+            ann = param.annotation
+            if ann is float or ann is int:
+                lines.append(f"{pname}: 1.0")
+            else:
+                lines.append(f'{pname}: "example"')
+        return lines
+    except (ValueError, TypeError):
+        return ["x: 1.0"]
+
+
+def _build_ref_params(callable_: Any, ref_step: str, ref_key: str) -> list[str]:
+    """Build param lines with a cross-step reference for a worked example.
+
+    Args:
+        callable_: A brick callable.
+        ref_step: The save_as name to reference.
+        ref_key: The output key to reference.
+
+    Returns:
+        List of ``key: value`` strings, first numeric param uses a reference.
+    """
+    try:
+        sig = _inspect.signature(callable_)
+        lines: list[str] = []
+        used_ref = False
+        for pname, param in sig.parameters.items():
+            if pname in ("self", "inputs", "metadata"):
+                continue
+            ann = param.annotation
+            if (ann is float or ann is int) and not used_ref:
+                lines.append(f'{pname}: "${{{ref_step}.{ref_key}}}"')
+                used_ref = True
+            elif ann is float or ann is int:
+                lines.append(f"{pname}: 1.0")
+            else:
+                lines.append(f'{pname}: "example"')
+        return lines
+    except (ValueError, TypeError):
+        return [f'{ref_step}: "${{{ref_step}.{ref_key}}}"']
+
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 _MAX_TOKENS = 2048
@@ -166,49 +294,81 @@ class BlueprintComposer:
         t0 = time.monotonic()
         pool = self._selector.select(task, registry)
         signatures = compact_brick_signatures(pool)
-        system = _COMPOSE_SYSTEM.format(signatures=signatures)
+        keys_table = output_key_table(pool)
+        example = _build_example(pool)
+        system = _COMPOSE_SYSTEM.format(
+            signatures=signatures,
+            output_keys=keys_table,
+            example=example,
+        )
         validator = BlueprintValidator(registry=pool)
 
-        total_input = 0
-        total_output = 0
-        api_calls = 0
-        yaml_text = ""
-        validation_errors: list[str] = []
+        calls: list[CallDetail] = []
 
         # First call
-        yaml_text, in_tok, out_tok = self._call_api(system, task)
-        total_input += in_tok
-        total_output += out_tok
-        api_calls += 1
-
-        is_valid, validation_errors = self._validate_yaml(yaml_text, validator)
+        detail = self._compose_call(1, system, task, validator)
+        calls.append(detail)
 
         # Retry on failure (fresh call, no history)
-        if not is_valid and api_calls < _MAX_API_CALLS:
+        if not detail.is_valid and len(calls) < _MAX_API_CALLS:
             retry_prompt = _RETRY_PROMPT.format(
-                yaml=yaml_text,
-                errors="\n".join(f"- {e}" for e in validation_errors),
+                yaml=detail.yaml_text,
+                errors="\n".join(f"- {e}" for e in detail.validation_errors),
             )
-            yaml_text, in_tok, out_tok = self._call_api(system, retry_prompt)
-            total_input += in_tok
-            total_output += out_tok
-            api_calls += 1
+            detail = self._compose_call(2, system, retry_prompt, validator)
+            calls.append(detail)
 
-            is_valid, validation_errors = self._validate_yaml(yaml_text, validator)
-
+        last = calls[-1]
+        total_input = sum(c.input_tokens for c in calls)
+        total_output = sum(c.output_tokens for c in calls)
         elapsed = time.monotonic() - t0
 
         return ComposeResult(
             task=task,
-            blueprint_yaml=yaml_text,
-            is_valid=is_valid,
-            validation_errors=validation_errors,
-            api_calls=api_calls,
+            blueprint_yaml=last.yaml_text,
+            is_valid=last.is_valid,
+            validation_errors=last.validation_errors,
+            calls=calls,
+            api_calls=len(calls),
             total_input_tokens=total_input,
             total_output_tokens=total_output,
             total_tokens=total_input + total_output,
             model=self._model,
             duration_seconds=elapsed,
+        )
+
+    def _compose_call(
+        self,
+        call_number: int,
+        system: str,
+        user_message: str,
+        validator: BlueprintValidator,
+    ) -> CallDetail:
+        """Make one API call, validate, and return a CallDetail.
+
+        Args:
+            call_number: 1 for first attempt, 2 for retry.
+            system: System prompt.
+            user_message: User message (task or retry prompt).
+            validator: BlueprintValidator to check the result.
+
+        Returns:
+            CallDetail with per-call tokens, YAML, and validation status.
+        """
+        call_t0 = time.monotonic()
+        yaml_text, in_tok, out_tok = self._call_api(system, user_message)
+        is_valid, errors = self._validate_yaml(yaml_text, validator)
+        call_elapsed = time.monotonic() - call_t0
+
+        return CallDetail(
+            call_number=call_number,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            total_tokens=in_tok + out_tok,
+            duration_seconds=call_elapsed,
+            yaml_text=yaml_text,
+            is_valid=is_valid,
+            validation_errors=errors,
         )
 
     def _call_api(self, system: str, user_message: str) -> tuple[str, int, int]:

@@ -7,6 +7,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.8] — 2026-03-19
+
+### Summary
+Eliminate retry via output key table + worked example in system prompt (Mission 017). Added `output_key_table()` for explicit output-key reference and `_build_example()` for auto-generated 2-step worked examples showing exact `${save_as.key}` chaining syntax. Target: 1 API call, 0 retries.
+
+### Added
+- `output_key_table(registry)` in `bricks/core/schema.py` — aligned table mapping brick names → output field keys
+- `_parse_description_keys(description)` — regex fallback extracting keys from `{key: type}` patterns in descriptions
+- `_build_example(registry)` in `bricks/ai/composer.py` — auto-generates 2-step worked YAML example
+- `_build_literal_params()`, `_build_ref_params()` — helpers for worked example generation
+- Tests: `TestOutputKeyTable` (4 tests) in `test_schema.py`
+
+### Changed
+- `_COMPOSE_SYSTEM` prompt — added `{output_keys}` table, `{example}` worked example, and output-key rule
+- `compose()` — formats output key table and worked example into system prompt
+- `bricks/core/__init__.py` — exports `output_key_table`
+
+---
+
 ## [0.4.7] — 2026-03-19
 
 ### Summary

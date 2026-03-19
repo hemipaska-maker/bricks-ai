@@ -34,7 +34,13 @@ from bricks.core.models import (
 )
 from bricks.core.registry import BrickRegistry
 from bricks.core.resolver import ReferenceResolver
-from bricks.core.schema import blueprint_schema, brick_schema, catalog_schema, registry_schema
+from bricks.core.schema import (
+    blueprint_schema,
+    brick_schema,
+    catalog_schema,
+    output_key_table,
+    registry_schema,
+)
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import blueprint_to_yaml
 from bricks.core.validation import BlueprintValidator
@@ -94,6 +100,7 @@ __all__ = [
     "brick",
     "brick_schema",
     "catalog_schema",
+    "output_key_table",
     "registry_schema",
     "sequence_schema",
     "sequence_to_yaml",
