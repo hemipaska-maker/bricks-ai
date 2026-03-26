@@ -59,6 +59,7 @@ def _compare(
             "input_tokens": no_tools.total_input_tokens,
             "output_tokens": no_tools.total_output_tokens,
             "code_lines": len((no_tools.code_generated or "").splitlines()),
+            "final_answer": no_tools.final_answer,
         },
         "bricks": {
             "turns": bricks.turns,

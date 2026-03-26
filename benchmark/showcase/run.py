@@ -150,6 +150,7 @@ def run_benchmark(
         ScenarioResult,
         TotalRecord,
         check_correctness,
+        check_no_tools_answer,
         write_scenario_result,
     )
 
@@ -187,7 +188,10 @@ def run_benchmark(
         if br.get("blueprint_yaml"):
             logger.debug("%s blueprint YAML:\n%s", label, br["blueprint_yaml"])
 
-        print(f"  [{label}] No-tools: {nt['total_tokens']:,} tokens")
+        nt_correct = check_no_tools_answer(nt.get("final_answer", ""), task.expected_outputs)
+        nt_label = "CORRECT" if nt_correct else "WRONG"
+        print(f"  [{label}] No-tools: {nt['total_tokens']:,} tokens  answer={nt_label}")
+        logger.info("%s no-tools answer: %s", label, nt_label)
         ratio = f"{nt['total_tokens'] / br['total_tokens']:.1f}x" if br["total_tokens"] > 0 else "inf"
         print(f"  [{label}] done  no_tools={nt['total_tokens']:,}  bricks={br['total_tokens']:,}  ({ratio})")
 
@@ -225,6 +229,7 @@ def run_benchmark(
                 no_tools_input=nt.get("input_tokens", 0),
                 no_tools_output=nt.get("output_tokens", 0),
                 ratio=ratio_val,
+                no_tools_correct=nt_correct,
             ),
         )
         write_scenario_result(run_dir, scenario_result)
@@ -311,6 +316,7 @@ def run_benchmark_compose(
         ScenarioResult,
         TotalRecord,
         check_correctness,
+        check_no_tools_answer,
         write_scenario_result,
     )
     from bricks.ai.composer import BlueprintComposer
@@ -385,7 +391,10 @@ def run_benchmark_compose(
         total_input += nt_result.total_input_tokens
         total_output += nt_result.total_output_tokens
         nt_tokens = nt_result.total_tokens
-        print(f"  [{label}] No-tools: {nt_tokens:,} tokens")
+        nt_correct = check_no_tools_answer(nt_result.final_answer, task.expected_outputs)
+        nt_label = "CORRECT" if nt_correct else "WRONG"
+        print(f"  [{label}] No-tools: {nt_tokens:,} tokens  answer={nt_label}")
+        logger.info("%s no-tools answer: %s", label, nt_label)
 
         ratio_val = result.total_tokens / nt_tokens if nt_tokens > 0 else 0.0
         ratio = f"{ratio_val:.1f}x" if nt_tokens > 0 else "N/A"
@@ -415,6 +424,7 @@ def run_benchmark_compose(
                 no_tools_input=nt_result.total_input_tokens,
                 no_tools_output=nt_result.total_output_tokens,
                 ratio=ratio_val,
+                no_tools_correct=nt_correct,
             ),
         )
         json_path = write_scenario_result(run_dir, scenario_result)

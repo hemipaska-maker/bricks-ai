@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.13] — 2026-03-26
+
+### Added
+- `check_no_tools_answer()` in `result_writer.py` — scans no-tools LLM response text for expected numeric values (text search, no code execution)
+- `BaselineRecord.no_tools_correct: bool` — persisted in per-scenario JSON result files
+- Console and log output now shows `answer=CORRECT / WRONG` for no-tools baseline runs
+- `no_tools.final_answer` threaded through `a2_complexity._compare()` so tool_use mode can also check no-tools answer
+
+---
+
 ## [0.4.12] — 2026-03-25
 
 ### Fixed
