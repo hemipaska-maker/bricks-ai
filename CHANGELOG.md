@@ -7,6 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.15] — 2026-03-26
+
+### Added
+- `bricks/selector/` package — tiered brick selection system
+- `BrickQuery` Pydantic model — structured query with `categories`, `tags`, `keywords`, `input_types`, `output_types`
+- `SelectionTier` ABC — pluggable scoring interface; swap or extend tiers without changing the caller
+- `KeywordTier` — Tier 1 deterministic scorer: matches task keywords against brick name, description, tags, and category (zero cost)
+- `EmbeddingProvider` ABC + `EmbeddingTier` — Tier 2 cosine-similarity scorer; activates only on Tier 1 miss; off by default
+- `TieredBrickSelector(BrickSelector)` — runs tiers in order; first tier with results wins; safe fallback to full registry on 0 results
+- `TieredBrickSelector.select_query()` — accept a pre-built `BrickQuery` directly (bypasses tokenisation)
+- `SelectorConfig` in `BricksConfig` — `max_results` (default 20), `embedding_provider` (default empty = Tier 1 only)
+- 27 new tests in `tests/selector/test_tiered_selector.py`
+
+---
+
 ## [0.4.14] — 2026-03-26
 
 ### Added

@@ -9,6 +9,7 @@ from bricks.core.config import (
     CatalogConfig,
     ConfigLoader,
     RegistryConfig,
+    SelectorConfig,
     StoreConfig,
 )
 from bricks.core.context import ExecutionContext
@@ -49,6 +50,7 @@ from bricks.core.schema import (
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import blueprint_to_yaml
 from bricks.core.validation import BlueprintValidator
+from bricks.selector import BrickQuery, TieredBrickSelector
 
 # Deprecated aliases — use bricks.compat for warnings, these are kept
 # for backward compatibility and will be removed in v1.0.0
@@ -77,6 +79,7 @@ __all__ = [
     "BrickMeta",
     "BrickModel",
     "BrickNotFoundError",
+    "BrickQuery",
     "BrickRegistry",
     "BrickSelector",
     "BricksConfig",
@@ -89,9 +92,11 @@ __all__ = [
     "ExecutionResult",
     "ReferenceResolver",
     "RegistryConfig",
+    "SelectorConfig",
     "StepDefinition",
     "StepResult",
     "StoreConfig",
+    "TieredBrickSelector",
     "TieredCatalog",
     "VariableResolutionError",
     "Verbosity",

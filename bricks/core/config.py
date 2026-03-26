@@ -59,6 +59,20 @@ class StoreConfig(BaseModel):
     ttl_days: int = 30
 
 
+class SelectorConfig(BaseModel):
+    """Brick selector configuration.
+
+    Attributes:
+        max_results: Maximum number of bricks returned by the selector.
+        embedding_provider: Dotted path to an ``EmbeddingProvider`` class.
+            Empty string disables Tier 2 (embedding) — Tier 1 keyword
+            matching only.
+    """
+
+    max_results: int = 20
+    embedding_provider: str = ""
+
+
 class BricksConfig(BaseModel):
     """Top-level Bricks project configuration.
 
@@ -71,6 +85,7 @@ class BricksConfig(BaseModel):
     ai: AiConfig = Field(default_factory=AiConfig)
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
+    selector: SelectorConfig = Field(default_factory=SelectorConfig)
 
 
 class ConfigLoader:
