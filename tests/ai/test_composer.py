@@ -64,6 +64,7 @@ def _make_composer(registry: BrickRegistry) -> BlueprintComposer:
 
     composer._loader = BlueprintLoader()
     composer._selector = AllBricksSelector()
+    composer._store = None
     return composer
 
 

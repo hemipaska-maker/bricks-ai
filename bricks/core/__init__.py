@@ -9,6 +9,7 @@ from bricks.core.config import (
     CatalogConfig,
     ConfigLoader,
     RegistryConfig,
+    StoreConfig,
 )
 from bricks.core.context import ExecutionContext
 from bricks.core.discovery import BrickDiscovery
@@ -19,6 +20,7 @@ from bricks.core.exceptions import (
     BrickExecutionError,
     BrickNotFoundError,
     ConfigError,
+    DuplicateBlueprintError,
     DuplicateBrickError,
     VariableResolutionError,
     YamlLoadError,
@@ -81,6 +83,7 @@ __all__ = [
     "CatalogConfig",
     "ConfigError",
     "ConfigLoader",
+    "DuplicateBlueprintError",
     "DuplicateBrickError",
     "ExecutionContext",
     "ExecutionResult",
@@ -88,6 +91,7 @@ __all__ = [
     "RegistryConfig",
     "StepDefinition",
     "StepResult",
+    "StoreConfig",
     "TieredCatalog",
     "VariableResolutionError",
     "Verbosity",

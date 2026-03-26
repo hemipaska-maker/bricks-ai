@@ -8,17 +8,21 @@ from __future__ import annotations
 
 import inspect as _inspect
 import time
-from typing import Any
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from bricks.core.exceptions import BlueprintValidationError, BrickError
+from bricks.core.exceptions import BlueprintValidationError, BrickError, DuplicateBlueprintError
 from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
 from bricks.core.schema import compact_brick_signatures, output_key_table, output_keys, parse_description_keys
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import strip_code_fence
 from bricks.core.validation import BlueprintValidator
+
+if TYPE_CHECKING:
+    from bricks.store.blueprint_store import BlueprintStore
 
 
 class ComposerError(BrickError):
@@ -65,6 +69,7 @@ class ComposeResult(BaseModel):
     model: str = ""
     duration_seconds: float = 0.0
     system_prompt: str = ""
+    cache_hit: bool = False
 
 
 # System prompt — under 300 tokens without signatures/output_keys/example.
@@ -104,6 +109,7 @@ Rules:
 - Step names must be unique snake_case.
 - outputs_map values must use ${{inputs.X}} or ${{save_as.field}} syntax.
 - Output keys are listed above. Use EXACTLY those keys in ${{step.key}} references.
+- Use a descriptive, unique blueprint name (the name: field).
 
 {example}\
 """
@@ -240,6 +246,27 @@ _MAX_TOKENS = 2048
 _MAX_API_CALLS = 2
 
 
+def _extract_blueprint_name(yaml_text: str) -> str:
+    """Extract the ``name:`` value from Blueprint YAML text.
+
+    Scans for the first ``name:`` line without loading the full YAML document,
+    so it works even on partially-valid YAML.
+
+    Args:
+        yaml_text: Raw YAML string from the LLM.
+
+    Returns:
+        The blueprint name, or ``"unknown"`` if not found.
+    """
+    for line in yaml_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("name:"):
+            parts = stripped.split(":", 1)
+            if len(parts) == 2:
+                return parts[1].strip().strip('"').strip("'") or "unknown"
+    return "unknown"
+
+
 class BlueprintComposer:
     """Composes Blueprint YAML from a natural language task using a single LLM call.
 
@@ -262,6 +289,7 @@ class BlueprintComposer:
         api_key: str,
         model: str = _DEFAULT_MODEL,
         selector: BrickSelector | None = None,
+        store: BlueprintStore | None = None,
     ) -> None:
         """Initialise the composer.
 
@@ -269,6 +297,8 @@ class BlueprintComposer:
             api_key: Anthropic API key.
             model: The Claude model to use.
             selector: BrickSelector for Stage 1 filtering. Defaults to AllBricksSelector.
+            store: Optional blueprint store for caching. When provided, cache hits
+                   return immediately with zero API calls.
 
         Raises:
             ImportError: If the ``anthropic`` package is not installed.
@@ -285,15 +315,20 @@ class BlueprintComposer:
         self._model = model
         self._selector = selector or AllBricksSelector()
         self._loader = BlueprintLoader()
+        self._store = store
 
     def compose(self, task: str, registry: BrickRegistry) -> ComposeResult:
         """Compose a Blueprint YAML for a task.
 
-        1. Stage 1: selector.select(task, registry) → small pool
+        Flow:
+        0. If store is configured, check for a cached blueprint by fingerprint.
+           On hit: return immediately with ``cache_hit=True`` and zero tokens.
+        1. selector.select(task, registry) → small pool
         2. Build system prompt with compact brick signatures from pool
         3. Single API call: task → YAML text
         4. Parse YAML → validate → return
         5. If validation fails, ONE retry with error message (fresh call)
+        6. If result is valid, auto-save to store (name collision silently adds fingerprint).
 
         Args:
             task: Natural language task description.
@@ -305,6 +340,23 @@ class BlueprintComposer:
         Raises:
             ComposerError: If the API call itself fails (network error, etc.).
         """
+        # Cache check
+        if self._store is not None:
+            from bricks.store.models import task_fingerprint  # noqa: PLC0415
+
+            fp = task_fingerprint(task)
+            cached = self._store.get_by_fingerprint(fp)
+            if cached is not None:
+                self._store.touch(cached.name)
+                return ComposeResult(
+                    task=task,
+                    blueprint_yaml=cached.yaml,
+                    is_valid=True,
+                    api_calls=0,
+                    model=self._model,
+                    cache_hit=True,
+                )
+
         t0 = time.monotonic()
         pool = self._selector.select(task, registry)
         signatures = compact_brick_signatures(pool)
@@ -338,7 +390,7 @@ class BlueprintComposer:
         total_output = sum(c.output_tokens for c in calls)
         elapsed = time.monotonic() - t0
 
-        return ComposeResult(
+        result = ComposeResult(
             task=task,
             blueprint_yaml=last.yaml_text,
             is_valid=last.is_valid,
@@ -352,6 +404,51 @@ class BlueprintComposer:
             duration_seconds=elapsed,
             system_prompt=system,
         )
+
+        # Auto-save validated blueprint to store
+        if result.is_valid and self._store is not None:
+            self._auto_save(task, result.blueprint_yaml)
+
+        return result
+
+    def _auto_save(self, task: str, blueprint_yaml: str) -> None:
+        """Auto-save a validated blueprint to the store.
+
+        On name collision, adds the task fingerprint to the existing entry
+        instead of failing. Errors are suppressed to never mask compose results.
+
+        Args:
+            task: The original task text (used to compute the fingerprint).
+            blueprint_yaml: The validated blueprint YAML to store.
+        """
+        from bricks.store.models import StoredBlueprint, task_fingerprint  # noqa: PLC0415
+
+        if self._store is None:
+            return
+
+        fp = task_fingerprint(task)
+        bp_name = _extract_blueprint_name(blueprint_yaml)
+        now = datetime.now(timezone.utc)
+
+        try:
+            self._store.save(
+                StoredBlueprint(
+                    name=bp_name,
+                    yaml=blueprint_yaml,
+                    fingerprints=[fp],
+                    created_at=now,
+                    last_used=now,
+                )
+            )
+        except DuplicateBlueprintError:
+            # Name already in store — add fingerprint to existing entry
+            existing = self._store.get_by_name(bp_name)
+            if existing is not None and fp not in existing.fingerprints:
+                existing.fingerprints.append(fp)
+                self._store.delete(bp_name)
+                self._store.save(existing)
+        except Exception:  # noqa: S110
+            pass  # Never let store errors propagate to callers
 
     def _compose_call(
         self,

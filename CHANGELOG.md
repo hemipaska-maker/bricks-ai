@@ -7,6 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.14] — 2026-03-26
+
+### Added
+- `bricks/store/` package — `BlueprintStore` ABC with `MemoryBlueprintStore` (session) and `FileBlueprintStore` (persistent) backends
+- `StoredBlueprint` Pydantic model — `name`, `yaml`, `fingerprints`, `created_at`, `last_used`, `use_count`
+- `task_fingerprint(task)` — deterministic SHA-256 fingerprint for cache key
+- `DuplicateBlueprintError` exception — raised on name collision in store
+- `StoreConfig` in `BricksConfig` — `enabled`, `backend`, `path`, `ttl_days` (off by default)
+- `BlueprintComposer(store=...)` parameter — cache check before LLM call; auto-save after validation; `cache_hit: bool` on `ComposeResult`
+- `FileBlueprintStore.purge_stale(ttl_days)` — removes blueprints unused beyond TTL
+- System prompt rule: "Use a descriptive, unique blueprint name"
+- 31 new tests in `tests/store/test_blueprint_store.py`
+
+---
+
 ## [0.4.13] — 2026-03-26
 
 ### Added

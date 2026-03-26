@@ -15,6 +15,14 @@ class DuplicateBrickError(BrickError):
         super().__init__(f"Brick already registered: {name!r}")
 
 
+class DuplicateBlueprintError(BrickError):
+    """Raised when a blueprint name is already in the store."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__(f"Blueprint {name!r} already exists. Delete it first to replace.")
+
+
 class BrickNotFoundError(BrickError):
     """Raised when a brick name cannot be found in the registry."""
 

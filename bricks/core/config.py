@@ -43,6 +43,22 @@ class CatalogConfig(BaseModel):
     common_set: list[str] = Field(default_factory=list)
 
 
+class StoreConfig(BaseModel):
+    """Blueprint store configuration.
+
+    Attributes:
+        enabled: Whether the store is active. Off by default.
+        backend: Storage backend — ``"memory"`` (session-scoped) or ``"file"`` (persistent).
+        path: Directory path for the file backend.
+        ttl_days: Number of days before an unused blueprint is considered stale.
+    """
+
+    enabled: bool = False
+    backend: str = "memory"
+    path: str = "blueprints/"
+    ttl_days: int = 30
+
+
 class BricksConfig(BaseModel):
     """Top-level Bricks project configuration.
 
@@ -54,6 +70,7 @@ class BricksConfig(BaseModel):
     sequences: BlueprintsConfig = Field(default_factory=BlueprintsConfig)
     ai: AiConfig = Field(default_factory=AiConfig)
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
+    store: StoreConfig = Field(default_factory=StoreConfig)
 
 
 class ConfigLoader:
