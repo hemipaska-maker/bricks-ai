@@ -156,6 +156,33 @@ def test_from_config_accepts_custom_registry(tmp_path: Path) -> None:
         assert passed_registry is custom_registry
 
 
+def test_default_returns_bricks_instance() -> None:
+    """Bricks.default() returns a Bricks instance."""
+    from bricks.llm.base import LLMProvider
+
+    mock_prov = MagicMock(spec=LLMProvider)
+    result = Bricks.default(provider=mock_prov)
+    assert isinstance(result, Bricks)
+
+
+def test_default_uses_bricks_model_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bricks.default() reads BRICKS_MODEL env var for the model."""
+    from unittest.mock import patch as _patch
+
+    monkeypatch.setenv("BRICKS_MODEL", "gpt-4o-mini")
+    captured: dict[str, str] = {}
+
+    def fake_litellm_init(self_inner: Any, model: str = "claude-haiku-4-5", api_key: str = "") -> None:
+        captured["model"] = model
+        self_inner._model = model
+        self_inner._api_key = api_key or None
+
+    with _patch("bricks.llm.litellm_provider.LiteLLMProvider.__init__", fake_litellm_init):
+        Bricks.default()
+
+    assert captured.get("model") == "gpt-4o-mini"
+
+
 def test_execute_propagates_orchestrator_error(tmp_path: Path) -> None:
     """OrchestratorError raised inside the orchestrator surfaces from execute()."""
     yaml_file = tmp_path / "agent.yaml"

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from bricks.boot.bootstrapper import SystemBootstrapper
 from bricks.boot.config import SystemConfig
+from bricks.llm.base import LLMProvider
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -82,9 +83,9 @@ store:
     def test_yaml_no_llm_call(self, tmp_path: Path) -> None:
         """YAML config does not make any LLM calls."""
         p = _write(tmp_path, "agent.yaml", "name: silent\n")
-        with patch("anthropic.Anthropic") as mock_cls:
-            SystemBootstrapper().bootstrap(p)
-        mock_cls.assert_not_called()
+        mock_prov = MagicMock(spec=LLMProvider)
+        SystemBootstrapper(provider=mock_prov).bootstrap(p)
+        mock_prov.complete.assert_not_called()
 
     def test_yml_extension_supported(self, tmp_path: Path) -> None:
         """Bootstrap works with .yml extension as well as .yaml."""
@@ -105,15 +106,11 @@ store:
 class TestBootstrapperMarkdown:
     """Tests for Markdown config bootstrapping (one LLM call)."""
 
-    def _mock_llm(self, json_text: str) -> MagicMock:
-        """Return a mock Anthropic client that returns json_text."""
-        block = MagicMock()
-        block.text = json_text
-        response = MagicMock()
-        response.content = [block]
-        client = MagicMock()
-        client.messages.create.return_value = response
-        return client
+    def _mock_provider(self, json_text: str) -> MagicMock:
+        """Return a mock LLMProvider that returns json_text."""
+        mock_prov = MagicMock(spec=LLMProvider)
+        mock_prov.complete.return_value = json_text
+        return mock_prov
 
     def test_md_extracts_categories_and_tags(self, tmp_path: Path) -> None:
         """Bootstrap from .md makes one LLM call and extracts categories/tags."""
@@ -122,35 +119,31 @@ class TestBootstrapperMarkdown:
             "skill.md",
             "# CRM Processor\nFilters and aggregates CRM customer data.\n",
         )
-        mock_client = self._mock_llm('{"categories": ["data_transformation"], "tags": ["filtering"]}')
-        with patch("anthropic.Anthropic", return_value=mock_client):
-            cfg = SystemBootstrapper(api_key="key").bootstrap(p)
+        mock_prov = self._mock_provider('{"categories": ["data_transformation"], "tags": ["filtering"]}')
+        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
         assert cfg.brick_categories == ["data_transformation"]
         assert cfg.tags == ["filtering"]
 
     def test_md_extracts_title_as_name(self, tmp_path: Path) -> None:
         """The H1 heading in the .md file becomes the config name."""
         p = _write(tmp_path, "skill.md", "# My Agent\nDoes things.\n")
-        mock_client = self._mock_llm('{"categories": [], "tags": []}')
-        with patch("anthropic.Anthropic", return_value=mock_client):
-            cfg = SystemBootstrapper(api_key="key").bootstrap(p)
+        mock_prov = self._mock_provider('{"categories": [], "tags": []}')
+        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
         assert cfg.name == "My Agent"
 
     def test_md_llm_parse_failure_falls_back(self, tmp_path: Path) -> None:
         """Malformed JSON from LLM → empty categories/tags, no crash."""
         p = _write(tmp_path, "skill.md", "# Agent\nSome description.\n")
-        mock_client = self._mock_llm("not valid json at all")
-        with patch("anthropic.Anthropic", return_value=mock_client):
-            cfg = SystemBootstrapper(api_key="key").bootstrap(p)
+        mock_prov = self._mock_provider("not valid json at all")
+        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
         assert cfg.brick_categories == []
         assert cfg.tags == []
 
     def test_md_no_title_uses_stem(self, tmp_path: Path) -> None:
         """No H1 heading → file stem used as name."""
         p = _write(tmp_path, "my_skill.md", "No heading here.\n")
-        mock_client = self._mock_llm('{"categories": [], "tags": []}')
-        with patch("anthropic.Anthropic", return_value=mock_client):
-            cfg = SystemBootstrapper(api_key="key").bootstrap(p)
+        mock_prov = self._mock_provider('{"categories": [], "tags": []}')
+        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
         assert cfg.name == "my_skill"
 
 

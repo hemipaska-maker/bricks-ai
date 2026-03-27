@@ -15,6 +15,7 @@ from ruamel.yaml.error import YAMLError
 
 from bricks.boot.config import SystemConfig
 from bricks.core.config import StoreConfig
+from bricks.llm.base import LLMProvider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
@@ -45,15 +46,20 @@ class SystemBootstrapper:
         self,
         api_key: str = "",
         model: str = _DEFAULT_MODEL,
+        provider: LLMProvider | None = None,
     ) -> None:
         """Initialise the bootstrapper.
 
         Args:
-            api_key: Anthropic API key. Required only for ``.md`` files.
-            model: Claude model ID used for the extraction call.
+            api_key: API key for the default LiteLLM provider. Required only for ``.md`` files
+                when no explicit ``provider`` is given.
+            model: Model ID used for the extraction call (default LiteLLM provider only).
+            provider: Optional custom LLM provider. When given, ``api_key`` and ``model``
+                are ignored for LLM calls.
         """
         self._api_key = api_key
         self._model = model
+        self._provider = provider
         self._yaml = YAML()
         self._yaml.preserve_quotes = True
 
@@ -148,19 +154,10 @@ class SystemBootstrapper:
             on any error so the bootstrapper never raises on LLM failures.
         """
         try:
-            import anthropic  # noqa: PLC0415
+            from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
 
-            client = anthropic.Anthropic(api_key=self._api_key)
-            response = client.messages.create(
-                model=self._model,
-                max_tokens=256,
-                system=_EXTRACT_SYSTEM,
-                messages=[{"role": "user", "content": description}],
-            )
-            block = response.content[0]
-            if not hasattr(block, "text"):
-                return [], []
-            text = str(block.text).strip()
+            provider = self._provider or LiteLLMProvider(model=self._model, api_key=self._api_key)
+            text = provider.complete(prompt=description, system=_EXTRACT_SYSTEM).strip()
             parsed = json.loads(text)
             categories = [str(c) for c in parsed.get("categories", [])]
             tags = [str(t) for t in parsed.get("tags", [])]

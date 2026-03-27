@@ -29,6 +29,7 @@ from bricks.stdlib import build_stdlib_registry
 
 if TYPE_CHECKING:
     from bricks.core.registry import BrickRegistry
+    from bricks.llm.base import LLMProvider
 
 _DEFAULT_MODEL: str = "claude-haiku-4-5-20251001"
 
@@ -120,6 +121,40 @@ class Bricks:
             config = config.model_copy(update={"api_key": api_key})
         reg = registry if registry is not None else build_stdlib_registry()
         return cls(RuntimeOrchestrator(config, reg))
+
+    @classmethod
+    def default(
+        cls,
+        *,
+        model: str | None = None,
+        api_key: str = "",
+        provider: LLMProvider | None = None,
+    ) -> Bricks:
+        """Zero-config entry point — no config file needed.
+
+        Args:
+            model: LiteLLM model string. Overrides ``BRICKS_MODEL`` env var.
+                Defaults to ``claude-haiku-4-5``.
+            api_key: Explicit API key. Leave empty to read from environment.
+            provider: Custom LLM provider. When supplied, ``model`` and
+                ``api_key`` are ignored for LLM calls.
+
+        Returns:
+            A ready-to-use :class:`Bricks` instance backed by all stdlib bricks.
+
+        Raises:
+            BricksConfigError: If no API key is found when the first task is executed.
+        """
+        import os  # noqa: PLC0415
+
+        from bricks.boot.config import SystemConfig  # noqa: PLC0415
+        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
+
+        resolved_model = model or os.environ.get("BRICKS_MODEL", "claude-haiku-4-5")
+        resolved_provider = provider or LiteLLMProvider(model=resolved_model, api_key=api_key)
+        config = SystemConfig(name="default", model=resolved_model, api_key=api_key)
+        reg = build_stdlib_registry()
+        return cls(RuntimeOrchestrator(config, reg, provider=resolved_provider))
 
     # ── execution ────────────────────────────────────────────────────────────
 

@@ -323,14 +323,15 @@ def compose(
     """AI-compose a blueprint from a natural language description."""
     try:
         from bricks.ai.composer import BlueprintComposer  # noqa: PLC0415
+        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
     except ImportError as exc:
-        typer.echo("Error: AI features require the 'anthropic' package.", err=True)
+        typer.echo("Error: AI features require the 'litellm' package.", err=True)
         typer.echo("Install with: pip install bricks[ai]", err=True)
         raise typer.Exit(code=1) from exc
 
     api_key = os.environ.get("ANTHROPIC_API_KEY") or typer.prompt("Anthropic API key", hide_input=True)
     registry, _ = _setup_registry()
-    composer = BlueprintComposer(api_key=api_key)
+    composer = BlueprintComposer(provider=LiteLLMProvider(api_key=api_key))
 
     try:
         from bricks.ai.composer import ComposerError  # noqa: PLC0415

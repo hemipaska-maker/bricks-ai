@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -43,22 +43,14 @@ outputs_map:
 """
 
 
-def _make_mock_response(text: str, in_tok: int = 100, out_tok: int = 50) -> MagicMock:
-    """Build a mock Anthropic response with the given text."""
-    block = MagicMock()
-    block.text = text
-    resp = MagicMock()
-    resp.content = [block]
-    resp.usage.input_tokens = in_tok
-    resp.usage.output_tokens = out_tok
-    return resp
-
-
 def _make_composer(registry: BrickRegistry) -> BlueprintComposer:
-    """Create a BlueprintComposer with a mocked Anthropic client."""
+    """Create a BlueprintComposer with a mocked LLMProvider."""
+    from bricks.llm.base import LLMProvider
+
     composer = BlueprintComposer.__new__(BlueprintComposer)
-    composer._client = MagicMock()
-    composer._model = "claude-haiku-4-5-20251001"
+    mock_provider = MagicMock(spec=LLMProvider)
+    mock_provider.complete.return_value = _VALID_YAML
+    composer._provider = mock_provider
     from bricks.core.loader import BlueprintLoader
     from bricks.core.selector import AllBricksSelector
 
@@ -112,41 +104,35 @@ class TestComposerCompose:
     def test_compose_valid_yaml_returns_compose_result(self, math_registry: BrickRegistry) -> None:
         """A valid YAML response returns ComposeResult with is_valid=True."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.return_value = _make_mock_response(_VALID_YAML)
+        composer._provider.complete.return_value = _VALID_YAML
 
         result = composer.compose("Add 3 + 4", math_registry)
 
         assert isinstance(result, ComposeResult)
         assert result.is_valid is True
         assert result.api_calls == 1
-        assert result.total_input_tokens == 100
-        assert result.total_output_tokens == 50
-        assert result.total_tokens == 150
+        assert result.total_input_tokens == 0
+        assert result.total_output_tokens == 0
+        assert result.total_tokens == 0
         assert result.validation_errors == []
 
     def test_compose_retry_on_validation_failure(self, math_registry: BrickRegistry) -> None:
         """Invalid YAML triggers one retry; second call returns valid YAML."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.side_effect = [
-            _make_mock_response(_INVALID_YAML, in_tok=100, out_tok=50),
-            _make_mock_response(_VALID_YAML, in_tok=120, out_tok=60),
-        ]
+        composer._provider.complete.side_effect = [_INVALID_YAML, _VALID_YAML]
 
         result = composer.compose("Add numbers", math_registry)
 
         assert result.is_valid is True
         assert result.api_calls == 2
-        assert result.total_input_tokens == 220
-        assert result.total_output_tokens == 110
-        assert result.total_tokens == 330
+        assert result.total_input_tokens == 0
+        assert result.total_output_tokens == 0
+        assert result.total_tokens == 0
 
     def test_compose_max_two_calls_on_double_failure(self, math_registry: BrickRegistry) -> None:
         """If both calls fail validation, return is_valid=False with errors."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.side_effect = [
-            _make_mock_response(_INVALID_YAML),
-            _make_mock_response(_INVALID_YAML),
-        ]
+        composer._provider.complete.side_effect = [_INVALID_YAML, _INVALID_YAML]
 
         result = composer.compose("Do something", math_registry)
 
@@ -157,29 +143,24 @@ class TestComposerCompose:
     def test_compose_api_error_raises_composer_error(self, math_registry: BrickRegistry) -> None:
         """API exceptions are wrapped as ComposerError."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.side_effect = RuntimeError("network error")
+        composer._provider.complete.side_effect = RuntimeError("network error")
 
         with pytest.raises(ComposerError, match="API call failed"):
             composer.compose("something", math_registry)
 
-    def test_compose_no_text_block_raises_composer_error(self, math_registry: BrickRegistry) -> None:
-        """A response with no text block raises ComposerError."""
+    def test_compose_empty_response_results_in_invalid(self, math_registry: BrickRegistry) -> None:
+        """An empty string response from the provider results in is_valid=False."""
         composer = _make_composer(math_registry)
-        block = MagicMock(spec=[])  # no 'text' attribute
-        resp = MagicMock()
-        resp.content = [block]
-        resp.usage.input_tokens = 10
-        resp.usage.output_tokens = 5
-        composer._client.messages.create.return_value = resp
+        composer._provider.complete.return_value = ""
 
-        with pytest.raises(ComposerError, match="no text block"):
-            composer.compose("something", math_registry)
+        result = composer.compose("something", math_registry)
+        assert result.is_valid is False
 
     def test_compose_strips_code_fences(self, math_registry: BrickRegistry) -> None:
         """Code fences around YAML are stripped before parsing."""
         composer = _make_composer(math_registry)
         fenced = f"```yaml\n{_VALID_YAML}\n```"
-        composer._client.messages.create.return_value = _make_mock_response(fenced)
+        composer._provider.complete.return_value = fenced
 
         result = composer.compose("Add numbers", math_registry)
         assert result.is_valid is True
@@ -216,13 +197,13 @@ class TestComposerError:
 class TestComposerInit:
     """Tests for BlueprintComposer initialization."""
 
-    def test_raises_import_error_when_anthropic_missing(self) -> None:
-        """ImportError raised when anthropic is not installed."""
-        with (
-            patch.dict("sys.modules", {"anthropic": None}),
-            pytest.raises(ImportError, match="anthropic"),
-        ):
-            BlueprintComposer(api_key="test_key")
+    def test_accepts_llm_provider(self) -> None:
+        """BlueprintComposer accepts an LLMProvider instance."""
+        from bricks.llm.base import LLMProvider
+
+        mock_provider = MagicMock(spec=LLMProvider)
+        composer = BlueprintComposer(provider=mock_provider)
+        assert composer._provider is mock_provider
 
 
 # ── Retry Prompt ──────────────────────────────────────────────────────────
@@ -282,7 +263,7 @@ class TestComposePopulatesPrompts:
     def test_compose_sets_system_prompt(self, math_registry: BrickRegistry) -> None:
         """compose() sets system_prompt on ComposeResult."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.return_value = _make_mock_response(_VALID_YAML)
+        composer._provider.complete.return_value = _VALID_YAML
         result = composer.compose("Add 3 + 4", math_registry)
         assert result.system_prompt != ""
         assert "Blueprint composer" in result.system_prompt
@@ -290,7 +271,7 @@ class TestComposePopulatesPrompts:
     def test_compose_sets_call_detail_prompts(self, math_registry: BrickRegistry) -> None:
         """compose() sets system_prompt and user_prompt on each CallDetail."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.return_value = _make_mock_response(_VALID_YAML)
+        composer._provider.complete.return_value = _VALID_YAML
         result = composer.compose("Add 3 + 4", math_registry)
         assert len(result.calls) == 1
         call = result.calls[0]
@@ -300,10 +281,7 @@ class TestComposePopulatesPrompts:
     def test_retry_call_has_task_in_user_prompt(self, math_registry: BrickRegistry) -> None:
         """On retry, the second call's user_prompt includes the original task."""
         composer = _make_composer(math_registry)
-        composer._client.messages.create.side_effect = [
-            _make_mock_response(_INVALID_YAML),
-            _make_mock_response(_VALID_YAML),
-        ]
+        composer._provider.complete.side_effect = [_INVALID_YAML, _VALID_YAML]
         result = composer.compose("Add numbers", math_registry)
         assert result.api_calls == 2
         retry_call = result.calls[1]

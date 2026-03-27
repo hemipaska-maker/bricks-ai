@@ -15,6 +15,7 @@ from bricks.core.exceptions import OrchestratorError
 from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
 from bricks.core.selector import AllBricksSelector, BrickSelector
+from bricks.llm.base import LLMProvider
 from bricks.selector.keyword_tier import KeywordTier
 from bricks.selector.selector import TieredBrickSelector
 from bricks.store.blueprint_store import BlueprintStore, FileBlueprintStore, MemoryBlueprintStore
@@ -70,19 +71,25 @@ class RuntimeOrchestrator:
         self,
         config: SystemConfig,
         registry: BrickRegistry,
+        provider: LLMProvider | None = None,
     ) -> None:
         """Initialise the orchestrator and wire all components.
 
         Args:
             config: Resolved system configuration.
             registry: Brick registry for selection, composition, and execution.
+            provider: Optional custom LLM provider. When omitted, a
+                ``LiteLLMProvider`` is created from ``config.model`` and
+                ``config.api_key``.
         """
+        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
+
         self._registry = registry
         selector = _build_selector(config)
         store = _build_store(config)
+        resolved_provider = provider or LiteLLMProvider(model=config.model, api_key=config.api_key)
         self._composer = BlueprintComposer(
-            api_key=config.api_key,
-            model=config.model,
+            provider=resolved_provider,
             selector=selector,
             store=store,
         )

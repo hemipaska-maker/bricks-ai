@@ -20,6 +20,7 @@ from bricks.core.schema import compact_brick_signatures, output_key_table, outpu
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import strip_code_fence
 from bricks.core.validation import BlueprintValidator
+from bricks.llm.base import LLMProvider
 
 if TYPE_CHECKING:
     from bricks.store.blueprint_store import BlueprintStore
@@ -277,42 +278,28 @@ class BlueprintComposer:
     prompt containing the errors. Max 2 API calls total.
 
     Args:
-        api_key: Anthropic API key.
-        model: Model ID (default: claude-haiku-4-5-20251001).
+        provider: LLM provider used for blueprint generation.
         selector: BrickSelector for Stage 1 filtering (default: AllBricksSelector).
+        store: Optional blueprint store for caching.
     """
 
-    _client: Any
+    _provider: LLMProvider
 
     def __init__(
         self,
-        api_key: str,
-        model: str = _DEFAULT_MODEL,
+        provider: LLMProvider,
         selector: BrickSelector | None = None,
         store: BlueprintStore | None = None,
     ) -> None:
         """Initialise the composer.
 
         Args:
-            api_key: Anthropic API key.
-            model: The Claude model to use.
+            provider: LLM provider used for blueprint generation.
             selector: BrickSelector for Stage 1 filtering. Defaults to AllBricksSelector.
             store: Optional blueprint store for caching. When provided, cache hits
                    return immediately with zero API calls.
-
-        Raises:
-            ImportError: If the ``anthropic`` package is not installed.
         """
-        try:
-            import anthropic  # noqa: PLC0415
-
-            self._client = anthropic.Anthropic(api_key=api_key)
-        except ImportError as exc:
-            raise ImportError(
-                "The 'anthropic' package is required for AI composition. Install with: pip install bricks[ai]"
-            ) from exc
-
-        self._model = model
+        self._provider = provider
         self._selector = selector or AllBricksSelector()
         self._loader = BlueprintLoader()
         self._store = store
@@ -353,7 +340,7 @@ class BlueprintComposer:
                     blueprint_yaml=cached.yaml,
                     is_valid=True,
                     api_calls=0,
-                    model=self._model,
+                    model="",
                     cache_hit=True,
                 )
 
@@ -400,7 +387,7 @@ class BlueprintComposer:
             total_input_tokens=total_input,
             total_output_tokens=total_output,
             total_tokens=total_input + total_output,
-            model=self._model,
+            model="",
             duration_seconds=elapsed,
             system_prompt=system,
         )
@@ -469,7 +456,7 @@ class BlueprintComposer:
             CallDetail with per-call tokens, YAML, and validation status.
         """
         call_t0 = time.monotonic()
-        yaml_text, in_tok, out_tok = self._call_api(system, user_message)
+        yaml_text, in_tok, out_tok = self._make_api_call(system, user_message)
         is_valid, errors = self._validate_yaml(yaml_text, validator)
         call_elapsed = time.monotonic() - call_t0
 
@@ -486,8 +473,8 @@ class BlueprintComposer:
             validation_errors=errors,
         )
 
-    def _call_api(self, system: str, user_message: str) -> tuple[str, int, int]:
-        """Make a single API call and return (yaml_text, input_tokens, output_tokens).
+    def _make_api_call(self, system: str, user_message: str) -> tuple[str, int, int]:
+        """Make a single LLM call and return (yaml_text, input_tokens, output_tokens).
 
         Args:
             system: System prompt.
@@ -499,22 +486,15 @@ class BlueprintComposer:
         Raises:
             ComposerError: If the API call fails or returns no text.
         """
+        from bricks.errors import BricksComposeError, BricksConfigError  # noqa: PLC0415
+
         try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=_MAX_TOKENS,
-                system=system,
-                messages=[{"role": "user", "content": user_message}],
-            )
+            text = self._provider.complete(prompt=user_message, system=system)
+        except (BricksConfigError, BricksComposeError):
+            raise
         except Exception as exc:
             raise ComposerError(f"API call failed: {exc}", cause=exc) from exc
-
-        in_tok: int = response.usage.input_tokens
-        out_tok: int = response.usage.output_tokens
-
-        raw_text = self._extract_text(response)
-        yaml_text = strip_code_fence(raw_text)
-        return yaml_text, in_tok, out_tok
+        return strip_code_fence(text), 0, 0
 
     def _validate_yaml(self, yaml_text: str, validator: BlueprintValidator) -> tuple[bool, list[str]]:
         """Parse and validate a YAML string.
@@ -534,20 +514,3 @@ class BlueprintComposer:
             return False, exc.errors
         except Exception as exc:
             return False, [str(exc)]
-
-    def _extract_text(self, response: Any) -> str:
-        """Extract text content from an Anthropic response.
-
-        Args:
-            response: The raw Anthropic API response object.
-
-        Returns:
-            The text content of the first text block.
-
-        Raises:
-            ComposerError: If no text block is found.
-        """
-        for block in response.content:
-            if hasattr(block, "text"):
-                return str(block.text)
-        raise ComposerError("AI response contained no text block")

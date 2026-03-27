@@ -7,6 +7,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.19] — 2026-03-27
+
+### Added
+- `bricks/llm/` package — pluggable `LLMProvider` abstraction with `LLMProvider` ABC and `LiteLLMProvider` implementation
+- `bricks/errors.py` — public-facing error hierarchy: `BricksError`, `BricksConfigError`, `BricksComposeError`, `BricksExecutionError`, `BricksInputError`
+- `Bricks.default()` class method — zero-config entry point, reads `BRICKS_MODEL` env var, accepts custom `provider=`
+- `litellm>=1.0` added to `[ai]` optional dependencies
+- 3 new test modules: `tests/llm/test_provider.py`, plus 2 new tests in `tests/test_api.py`
+
+### Changed
+- `BlueprintComposer.__init__` now accepts `provider: LLMProvider` instead of `api_key`/`model`
+- `RuntimeOrchestrator.__init__` accepts optional `provider: LLMProvider` parameter
+- `SystemBootstrapper.__init__` accepts optional `provider: LLMProvider` parameter
+- All production code no longer imports `anthropic` directly; `LiteLLMProvider` routes through `litellm`
+
+---
+
 ## [0.4.18] — 2026-03-27
 
 ### Added
