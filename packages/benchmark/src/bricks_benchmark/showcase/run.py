@@ -146,13 +146,13 @@ def run_benchmark(
         run_dir: Timestamped run directory.
         logger: Logger for recording progress.
     """
-    from benchmark.mcp.agent_runner import AgentRunner
-    from benchmark.mcp.report import write_apples_json, write_apples_markdown
-    from benchmark.mcp.scenarios.a2_complexity import run_a
-    from benchmark.mcp.scenarios.c2_reuse import run_c
-    from benchmark.mcp.scenarios.d2_determinism import run_d
-    from benchmark.showcase.registry_factory import build_registry
-    from benchmark.showcase.result_writer import (
+    from bricks_benchmark.mcp.agent_runner import AgentRunner
+    from bricks_benchmark.mcp.report import write_apples_json, write_apples_markdown
+    from bricks_benchmark.mcp.scenarios.a2_complexity import run_a
+    from bricks_benchmark.mcp.scenarios.c2_reuse import run_c
+    from bricks_benchmark.mcp.scenarios.d2_determinism import run_d
+    from bricks_benchmark.showcase.registry_factory import build_registry
+    from bricks_benchmark.showcase.result_writer import (
         BaselineRecord,
         ExecutionRecord,
         ScenarioResult,
@@ -172,7 +172,7 @@ def run_benchmark(
     t0 = time.monotonic()
 
     # ── A: Complexity Curve ──────────────────────────────────────────────
-    from benchmark.mcp.scenarios.task_generator import TaskGenerator
+    from bricks_benchmark.mcp.scenarios.task_generator import TaskGenerator
 
     a_scenarios = [s for s in scenarios if s.startswith("A-")]
     a_results: list[dict[str, Any]] = []
@@ -314,10 +314,14 @@ def run_benchmark_compose(
         run_dir: Timestamped run directory.
         logger: Logger for recording progress.
     """
-    from benchmark.mcp.agent_runner import AgentRunner
-    from benchmark.mcp.scenarios.task_generator import TaskGenerator
-    from benchmark.showcase.registry_factory import build_registry
-    from benchmark.showcase.result_writer import (
+    from bricks.ai.composer import BlueprintComposer
+    from bricks.core.engine import BlueprintEngine
+    from bricks.core.loader import BlueprintLoader
+
+    from bricks_benchmark.mcp.agent_runner import AgentRunner
+    from bricks_benchmark.mcp.scenarios.task_generator import TaskGenerator
+    from bricks_benchmark.showcase.registry_factory import build_registry
+    from bricks_benchmark.showcase.result_writer import (
         BaselineRecord,
         CallRecord,
         ExecutionRecord,
@@ -327,9 +331,6 @@ def run_benchmark_compose(
         check_no_tools_answer,
         write_scenario_result,
     )
-    from bricks.ai.composer import BlueprintComposer
-    from bricks.core.engine import BlueprintEngine
-    from bricks.core.loader import BlueprintLoader
 
     api_key = _require_api_key()
     composer = BlueprintComposer(api_key=api_key)
@@ -441,7 +442,7 @@ def run_benchmark_compose(
     # ── CRM scenarios ────────────────────────────────────────────────────
     crm_scenarios = [s for s in scenarios if s in CRM_SCENARIOS]
     if crm_scenarios:
-        from benchmark.showcase.crm_scenario import (
+        from bricks_benchmark.showcase.crm_scenario import (
             run_crm_hallucination,
             run_crm_pipeline,
             run_crm_reuse,

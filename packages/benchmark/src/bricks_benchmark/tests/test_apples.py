@@ -70,9 +70,9 @@ def _build_registry_a6() -> Any:
     Returns:
         A BrickRegistry with multiply, round_value, add, and format_result.
     """
-    from benchmark.showcase.bricks import build_showcase_registry
-    from benchmark.showcase.bricks.math_bricks import add, multiply, round_value
-    from benchmark.showcase.bricks.string_bricks import format_result
+    from bricks_benchmark.showcase.bricks import build_showcase_registry
+    from bricks_benchmark.showcase.bricks.math_bricks import add, multiply, round_value
+    from bricks_benchmark.showcase.bricks.string_bricks import format_result
 
     return build_showcase_registry(multiply, round_value, add, format_result)
 
@@ -84,7 +84,7 @@ class TestAgentResultModel:
     """Tests for AgentResult and ToolCallRecord models."""
 
     def test_total_tokens_field(self) -> None:
-        from benchmark.mcp.agent_result import AgentResult
+        from bricks_benchmark.mcp.agent_result import AgentResult
 
         result = AgentResult(
             task="test task",
@@ -97,7 +97,7 @@ class TestAgentResultModel:
         assert result.total_tokens == 10
 
     def test_mode_and_defaults(self) -> None:
-        from benchmark.mcp.agent_result import AgentResult
+        from bricks_benchmark.mcp.agent_result import AgentResult
 
         result = AgentResult(
             task="t",
@@ -115,7 +115,7 @@ class TestAgentResultModel:
         assert result.execution_result is None
 
     def test_tool_call_record(self) -> None:
-        from benchmark.mcp.agent_result import ToolCallRecord
+        from bricks_benchmark.mcp.agent_result import ToolCallRecord
 
         rec = ToolCallRecord(name="list_bricks", inputs={}, output=["brick_a"])
         assert rec.name == "list_bricks"
@@ -129,7 +129,7 @@ class TestRunWithoutTools:
     """Tests for AgentRunner.run_without_tools()."""
 
     def test_mode_and_turns(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         mock_resp = _make_text_response("def calc(): return 42")
         with patch("anthropic.Anthropic") as mock_cls:
@@ -141,7 +141,7 @@ class TestRunWithoutTools:
         assert result.turns == 1
 
     def test_token_counting(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         mock_resp = _make_text_response("x = 1", in_tok=10, out_tok=5)
         with patch("anthropic.Anthropic") as mock_cls:
@@ -154,8 +154,8 @@ class TestRunWithoutTools:
         assert result.total_tokens == 15
 
     def test_uses_apples_system_prompt(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
-        from benchmark.mcp.scenarios import APPLES_SYSTEM
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.scenarios import APPLES_SYSTEM
 
         mock_resp = _make_text_response("code here")
         with patch("anthropic.Anthropic") as mock_cls:
@@ -168,7 +168,7 @@ class TestRunWithoutTools:
         assert call_kwargs.kwargs["system"] == APPLES_SYSTEM
 
     def test_no_tools_passed(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         mock_resp = _make_text_response("code")
         with patch("anthropic.Anthropic") as mock_cls:
@@ -181,7 +181,7 @@ class TestRunWithoutTools:
         assert "tools" not in call_kwargs.kwargs
 
     def test_on_turn_callback_called(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         mock_resp = _make_text_response("code", in_tok=10, out_tok=5)
         callback = MagicMock()
@@ -206,7 +206,7 @@ class TestRunWithBricks:
 
     def test_tool_loop_two_turns(self) -> None:
         """Turn 1: tool_use(list_bricks) -> Turn 2: end_turn."""
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         tool_resp = _make_tool_response("list_bricks", "tc_001", {}, in_tok=20, out_tok=10)
         final_resp = _make_text_response("Done.", in_tok=30, out_tok=5)
@@ -223,7 +223,7 @@ class TestRunWithBricks:
         assert result.tool_calls[0].name == "list_bricks"
 
     def test_uses_dynamic_system_prompt_with_brick_signatures(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         final_resp = _make_text_response("Done.")
         registry = _build_registry_a6()
@@ -240,7 +240,7 @@ class TestRunWithBricks:
         assert "Do NOT call list_bricks" in system_prompt
 
     def test_token_accumulation_across_turns(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         tool_resp = _make_tool_response("list_bricks", "t1", {}, in_tok=20, out_tok=10)
         final_resp = _make_text_response("Result.", in_tok=30, out_tok=5)
@@ -256,7 +256,7 @@ class TestRunWithBricks:
         assert result.total_tokens == 65
 
     def test_on_turn_callback_called_per_turn(self) -> None:
-        from benchmark.mcp.agent_runner import AgentRunner
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
 
         tool_resp = _make_tool_response("list_bricks", "t1", {}, in_tok=20, out_tok=10)
         final_resp = _make_text_response("Done.", in_tok=30, out_tok=5)
@@ -278,11 +278,12 @@ class TestExecuteTool:
     """Tests for _execute_tool with real Bricks engine components."""
 
     def test_list_bricks_returns_list(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
         from bricks.core.catalog import TieredCatalog
         from bricks.core.engine import BlueprintEngine
         from bricks.core.loader import BlueprintLoader
         from bricks.core.validation import BlueprintValidator
+
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         registry = _build_registry_a6()
         catalog = TieredCatalog(registry)
@@ -294,11 +295,12 @@ class TestExecuteTool:
         assert isinstance(result, list)
 
     def test_execute_blueprint_success(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
         from bricks.core.catalog import TieredCatalog
         from bricks.core.engine import BlueprintEngine
         from bricks.core.loader import BlueprintLoader
         from bricks.core.validation import BlueprintValidator
+
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         registry = _build_registry_a6()
         catalog = TieredCatalog(registry)
@@ -330,11 +332,12 @@ outputs_map:
         assert result["outputs"]["result"] == 7.0
 
     def test_lookup_brick_returns_matches(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
         from bricks.core.catalog import TieredCatalog
         from bricks.core.engine import BlueprintEngine
         from bricks.core.loader import BlueprintLoader
         from bricks.core.validation import BlueprintValidator
+
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         registry = _build_registry_a6()
         catalog = TieredCatalog(registry)
@@ -348,11 +351,12 @@ outputs_map:
         assert "multiply" in names
 
     def test_execute_blueprint_error_returns_dict(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
         from bricks.core.catalog import TieredCatalog
         from bricks.core.engine import BlueprintEngine
         from bricks.core.loader import BlueprintLoader
         from bricks.core.validation import BlueprintValidator
+
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         registry = _build_registry_a6()
         catalog = TieredCatalog(registry)
@@ -380,14 +384,14 @@ class TestCLIModeFlag:
 
     def test_valid_modes(self) -> None:
         """Both tool_use and compose are valid modes."""
-        from benchmark.showcase.run import VALID_MODES
+        from bricks_benchmark.showcase.run import VALID_MODES
 
         assert "tool_use" in VALID_MODES
         assert "compose" in VALID_MODES
 
     def test_compose_mode_exists(self) -> None:
         """run_benchmark_compose function is importable and callable."""
-        from benchmark.showcase.run import run_benchmark_compose
+        from bricks_benchmark.showcase.run import run_benchmark_compose
 
         assert callable(run_benchmark_compose)
 
@@ -397,42 +401,42 @@ class TestCLIScenarioExpansion:
 
     def test_expand_all(self) -> None:
         """'all' expands to A presets + C + D + CRM scenarios."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["all"])
         assert result == ["A-5", "A-25", "A-50", "C", "D", "CRM-pipeline", "CRM-hallucination", "CRM-reuse"]
 
     def test_expand_a(self) -> None:
         """'A' expands to all A presets."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["A"])
         assert result == ["A-5", "A-25", "A-50"]
 
     def test_expand_a_with_steps(self) -> None:
         """'A' with --steps uses the specified step count."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["A"], steps=12)
         assert result == ["A-12"]
 
     def test_expand_single(self) -> None:
         """Single explicit scenario passes through."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["C"])
         assert result == ["C"]
 
     def test_expand_multiple(self) -> None:
         """Multiple scenarios expand correctly."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["A", "C"], steps=5)
         assert result == ["A-5", "C"]
 
     def test_expand_preserves_order(self) -> None:
         """Order follows canonical A, C, D ordering."""
-        from benchmark.showcase.run import expand_scenarios
+        from bricks_benchmark.showcase.run import expand_scenarios
 
         result = expand_scenarios(["D", "A"], steps=5)
         assert result == ["A-5", "D"]
@@ -446,13 +450,13 @@ class TestCostEstimation:
 
     def test_zero_tokens(self) -> None:
         """Zero tokens produces zero cost."""
-        from benchmark.showcase.formatters import estimate_cost
+        from bricks_benchmark.showcase.formatters import estimate_cost
 
         assert estimate_cost(0, 0) == 0.0
 
     def test_known_cost(self) -> None:
         """1M input + 1M output at Haiku pricing = $4.80."""
-        from benchmark.showcase.formatters import estimate_cost
+        from bricks_benchmark.showcase.formatters import estimate_cost
 
         cost = estimate_cost(1_000_000, 1_000_000)
         assert cost > 0
@@ -498,12 +502,12 @@ class TestEnrichedBenchmarkBricks:
     """Tests that showcase bricks have categories and enriched metadata."""
 
     def test_showcase_math_bricks_have_category(self) -> None:
-        from benchmark.showcase.bricks.math_bricks import multiply
+        from bricks_benchmark.showcase.bricks.math_bricks import multiply
 
         assert multiply.__brick_meta__.category == "math"
 
     def test_showcase_string_bricks_have_category(self) -> None:
-        from benchmark.showcase.bricks.string_bricks import format_result
+        from bricks_benchmark.showcase.bricks.string_bricks import format_result
 
         assert format_result.__brick_meta__.category == "string"
 
@@ -528,7 +532,7 @@ class TestBuildApplesSystem:
     """Tests for build_apples_system() helper."""
 
     def test_with_registry_includes_signatures(self) -> None:
-        from benchmark.mcp.scenarios import build_apples_system
+        from bricks_benchmark.mcp.scenarios import build_apples_system
 
         registry = _build_registry_a6()
         result = build_apples_system(registry)
@@ -537,7 +541,7 @@ class TestBuildApplesSystem:
         assert "Do NOT call list_bricks" in result
 
     def test_without_registry_is_base_prompt(self) -> None:
-        from benchmark.mcp.scenarios import APPLES_SYSTEM, build_apples_system
+        from bricks_benchmark.mcp.scenarios import APPLES_SYSTEM, build_apples_system
 
         result = build_apples_system(None)
         assert result == APPLES_SYSTEM
@@ -565,7 +569,7 @@ class TestActionableErrors:
         return catalog, engine, loader, validator
 
     def test_unknown_brick_includes_available_list(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         catalog, engine, loader, validator = self._setup()
         blueprint_yaml = """\
@@ -593,7 +597,7 @@ outputs_map:
         assert "Available bricks:" in result["hint"] or "multiply" in result["hint"]
 
     def test_unknown_brick_suggests_closest_match(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         catalog, engine, loader, validator = self._setup()
         blueprint_yaml = """\
@@ -620,7 +624,7 @@ outputs_map:
         assert "multiply" in result["hint"]
 
     def test_validation_error_surfaces_all_errors(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         catalog, engine, loader, validator = self._setup()
         # Blueprint with two unknown bricks — should surface all_errors
@@ -653,7 +657,7 @@ outputs_map:
         assert len(result["all_errors"]) >= 2
 
     def test_yaml_parse_error_has_hint(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         catalog, engine, loader, validator = self._setup()
         result = _execute_tool(
@@ -668,7 +672,7 @@ outputs_map:
         assert "error" in result
 
     def test_bad_reference_includes_save_as_names(self) -> None:
-        from benchmark.mcp.tool_executor import execute_tool as _execute_tool
+        from bricks_benchmark.mcp.tool_executor import execute_tool as _execute_tool
 
         catalog, engine, loader, validator = self._setup()
         # Blueprint where step2 references a non-existent save_as name
@@ -713,10 +717,10 @@ def _build_all_showcase_registry() -> Any:
     Returns:
         A BrickRegistry with all 7 showcase bricks.
     """
-    from benchmark.showcase.bricks import build_showcase_registry
-    from benchmark.showcase.bricks.data_bricks import http_get, json_extract
-    from benchmark.showcase.bricks.math_bricks import add, multiply, round_value, subtract
-    from benchmark.showcase.bricks.string_bricks import format_result
+    from bricks_benchmark.showcase.bricks import build_showcase_registry
+    from bricks_benchmark.showcase.bricks.data_bricks import http_get, json_extract
+    from bricks_benchmark.showcase.bricks.math_bricks import add, multiply, round_value, subtract
+    from bricks_benchmark.showcase.bricks.string_bricks import format_result
 
     return build_showcase_registry(multiply, round_value, add, subtract, format_result, http_get, json_extract)
 

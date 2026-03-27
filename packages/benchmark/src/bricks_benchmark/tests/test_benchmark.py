@@ -304,7 +304,7 @@ class TestReport:
         bricks_results = [bricks_runner.run(scn) for scn in ALL_SCENARIOS]
         python_results = [python_runner.run(scn) for scn in ALL_SCENARIOS]
 
-        from benchmark.report import print_full_report
+        from bricks_benchmark.report import print_full_report
 
         print_full_report(ALL_SCENARIOS, bricks_results, python_results)
 

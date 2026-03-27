@@ -18,9 +18,9 @@ def _load_brick_map() -> dict[str, object]:
     Returns:
         Dict mapping brick names to decorated brick functions.
     """
-    from benchmark.showcase.bricks.data_bricks import http_get, json_extract
-    from benchmark.showcase.bricks.math_bricks import add, multiply, round_value, subtract
-    from benchmark.showcase.bricks.string_bricks import format_result
+    from bricks_benchmark.showcase.bricks.data_bricks import http_get, json_extract
+    from bricks_benchmark.showcase.bricks.math_bricks import add, multiply, round_value, subtract
+    from bricks_benchmark.showcase.bricks.string_bricks import format_result
 
     return {
         "multiply": multiply,
@@ -49,7 +49,7 @@ def build_registry(required_bricks: list[str]) -> BrickRegistry:
     if _BRICK_MAP is None:
         _BRICK_MAP = _load_brick_map()
 
-    from benchmark.showcase.bricks import build_showcase_registry
+    from bricks_benchmark.showcase.bricks import build_showcase_registry
 
     fns = [_BRICK_MAP[name] for name in required_bricks]
     return build_showcase_registry(*fns)

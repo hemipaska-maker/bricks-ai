@@ -14,9 +14,9 @@ from bricks_benchmark.mcp.tool_executor import (
 
 def _build_registry() -> Any:
     """Build a test BrickRegistry with math + string bricks."""
-    from benchmark.showcase.bricks import build_showcase_registry
-    from benchmark.showcase.bricks.math_bricks import add, multiply, round_value
-    from benchmark.showcase.bricks.string_bricks import format_result
+    from bricks_benchmark.showcase.bricks import build_showcase_registry
+    from bricks_benchmark.showcase.bricks.math_bricks import add, multiply, round_value
+    from bricks_benchmark.showcase.bricks.string_bricks import format_result
 
     return build_showcase_registry(multiply, round_value, add, format_result)
 

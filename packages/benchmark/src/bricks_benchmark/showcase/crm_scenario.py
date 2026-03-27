@@ -57,7 +57,7 @@ def _run_compose_once(
     Returns:
         dict with compose result and execution outputs.
     """
-    from benchmark.showcase.crm_generator import generate_crm_task
+    from bricks_benchmark.showcase.crm_generator import generate_crm_task
 
     task = generate_crm_task(seed)
     registry = _build_crm_registry()
