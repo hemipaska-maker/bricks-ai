@@ -16,6 +16,7 @@ from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.llm.base import LLMProvider
+from bricks.orchestrator.input_mapper import InputMapper
 from bricks.selector.keyword_tier import KeywordTier
 from bricks.selector.selector import TieredBrickSelector
 from bricks.store.blueprint_store import BlueprintStore, FileBlueprintStore, MemoryBlueprintStore
@@ -122,7 +123,11 @@ class RuntimeOrchestrator:
             OrchestratorError: If composition fails (YAML invalid after retries)
                 or if blueprint execution raises an error.
         """
-        compose_result = self._composer.compose(task_text, self._registry)
+        compose_result = self._composer.compose(
+            task_text,
+            self._registry,
+            input_keys=list((inputs or {}).keys()) or None,
+        )
         if not compose_result.is_valid:
             errors = "; ".join(compose_result.validation_errors)
             raise OrchestratorError(f"Composition failed for task {task_text!r}: {errors}")
@@ -131,7 +136,10 @@ class RuntimeOrchestrator:
         except Exception as exc:
             raise OrchestratorError(f"Blueprint load error for task {task_text!r}: {exc}") from exc
         try:
-            execution = self._engine.run(blueprint, inputs or {})
+            # Auto-map user input keys to blueprint variable names
+            blueprint_input_vars = list(blueprint.inputs.keys()) if blueprint.inputs else []
+            mapped = InputMapper().map(inputs or {}, blueprint_input_vars)
+            execution = self._engine.run(blueprint, mapped)
         except Exception as exc:
             raise OrchestratorError(f"Blueprint execution failed for task {task_text!r}: {exc}") from exc
         return {

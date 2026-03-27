@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.20] — 2026-03-27
+
+### Added
+- `InputMapper` class (`bricks/orchestrator/input_mapper.py`): auto-maps user input keys to blueprint variable names (single-key, positional, exact-match strategies)
+- `compose(input_keys=)` parameter hints the LLM to use user-supplied key names in blueprint `inputs:` section
+- `RuntimeOrchestrator.execute()` passes input keys to composer and runs `InputMapper` before engine execution
+- `BricksInputError` raised with helpful message when key count mismatch cannot be resolved
+
+---
+
 ## [0.4.19] — 2026-03-27
 
 ### Added

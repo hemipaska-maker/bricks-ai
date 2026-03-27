@@ -304,7 +304,12 @@ class BlueprintComposer:
         self._loader = BlueprintLoader()
         self._store = store
 
-    def compose(self, task: str, registry: BrickRegistry) -> ComposeResult:
+    def compose(
+        self,
+        task: str,
+        registry: BrickRegistry,
+        input_keys: list[str] | None = None,
+    ) -> ComposeResult:
         """Compose a Blueprint YAML for a task.
 
         Flow:
@@ -320,6 +325,9 @@ class BlueprintComposer:
         Args:
             task: Natural language task description.
             registry: BrickRegistry with available bricks.
+            input_keys: Optional list of user-supplied input key names. When
+                provided, hints the LLM to use exactly these variable names
+                in the blueprint ``inputs`` section.
 
         Returns:
             ComposeResult with blueprint YAML, validation status, and token usage.
@@ -358,8 +366,17 @@ class BlueprintComposer:
 
         calls: list[CallDetail] = []
 
+        # Build user message, appending input key hint if provided
+        user_message = task
+        if input_keys:
+            keys_str = ", ".join(input_keys)
+            user_message = (
+                f"{task}\nThe user's inputs have these keys: [{keys_str}]. "
+                f"Use ${{inputs.KEY}} to reference them exactly."
+            )
+
         # First call
-        detail = self._compose_call(1, system, task, validator)
+        detail = self._compose_call(1, system, user_message, validator)
         calls.append(detail)
 
         # Retry on failure (fresh call, no history)
