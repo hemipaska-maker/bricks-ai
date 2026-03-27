@@ -1,6 +1,6 @@
 [project]
 name = "bricks"
-version = "0.4.21"
+version = "0.4.22"
 description = "Deterministic execution engine: typed Python building blocks composed into auditable YAML blueprints."
 readme = "README.md"
 requires-python = ">=3.10"

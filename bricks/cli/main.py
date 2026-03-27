@@ -316,6 +316,85 @@ def list_bricks() -> None:
         typer.echo(f"  {name}{tags_str}{destructive_str}{desc_str}")
 
 
+store_app = typer.Typer(help="Blueprint store management.")
+app.add_typer(store_app, name="store")
+
+
+@store_app.command("seed")
+def store_seed(
+    directory: str = typer.Argument(..., help="Directory containing YAML blueprint files."),
+    store_path: str = typer.Option(
+        "./blueprint_store",
+        "--store",
+        "-s",
+        help="File store path.",
+    ),
+) -> None:
+    """Load YAML blueprints from a directory into the file store."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from bricks.core.exceptions import DuplicateBlueprintError  # noqa: PLC0415
+    from bricks.core.loader import BlueprintLoader  # noqa: PLC0415
+    from bricks.store.blueprint_store import FileBlueprintStore  # noqa: PLC0415
+    from bricks.store.models import StoredBlueprint  # noqa: PLC0415
+
+    bp_dir = Path(directory)
+    if not bp_dir.is_dir():
+        typer.echo(f"Error: Directory not found: {bp_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    store = FileBlueprintStore(store_path)
+    loader = BlueprintLoader()
+    loaded = 0
+    skipped = 0
+
+    for yaml_path in sorted(bp_dir.glob("*.yaml")):
+        try:
+            bp = loader.load_file(yaml_path)
+            yaml_text = yaml_path.read_text(encoding="utf-8")
+            stored = StoredBlueprint(
+                name=bp.name,
+                yaml=yaml_text,
+                fingerprints=[],
+                created_at=datetime.now(timezone.utc),
+            )
+            try:
+                store.save(stored)
+                typer.echo(f"  Loaded: {bp.name}")
+            except DuplicateBlueprintError:
+                store.delete(bp.name)
+                store.save(stored)
+                typer.echo(f"  Updated: {bp.name} (already existed)")
+            loaded += 1
+        except Exception as exc:
+            typer.echo(f"  Skipped {yaml_path.name}: {exc}", err=True)
+            skipped += 1
+
+    typer.echo(f"\nDone: {loaded} loaded, {skipped} skipped.")
+
+
+@store_app.command("list")
+def store_list(
+    store_path: str = typer.Option(
+        "./blueprint_store",
+        "--store",
+        "-s",
+        help="File store path.",
+    ),
+) -> None:
+    """List blueprints in the file store."""
+    from bricks.store.blueprint_store import FileBlueprintStore  # noqa: PLC0415
+
+    store = FileBlueprintStore(store_path)
+    blueprints = store.list_all()
+    if not blueprints:
+        typer.echo("No blueprints in store.")
+        return
+    typer.echo(f"Blueprints in store ({len(blueprints)}):")
+    for bp in blueprints:
+        typer.echo(f"  {bp.name} (used {bp.use_count}x)")
+
+
 @app.command()
 def compose(
     intent: str = typer.Argument(..., help="Natural language description."),

@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.22] — 2026-03-27
+
+### Added
+- `bricks store seed <dir>` CLI command: loads YAML blueprints from a directory into the file store (dev mode — 0 LLM calls on cache hit)
+- `bricks store list` CLI command: lists blueprints in the file store
+- `blueprints/crm_pipeline.yaml`, `blueprints/crm_hallucination.yaml`, `blueprints/crm_reuse.yaml` — pre-baked CRM benchmark blueprints
+- `tests/cli/test_store_seed.py` — 4 tests covering seed, update, skip-invalid, and missing-dir
+
+---
+
 ## [0.4.21] — 2026-03-27
 
 ### Added
