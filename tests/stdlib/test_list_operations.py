@@ -8,6 +8,7 @@ from bricks_stdlib.list_operations import (
     difference_lists,
     flatten_list,
     intersect_lists,
+    is_empty_list,
     map_values,
     reduce_sum,
     reverse_list,
@@ -61,3 +62,11 @@ def test_map_values_extracts_field() -> None:
 
 def test_reduce_sum_totals_values() -> None:
     assert reduce_sum([1.0, 2.0, 3.0])["result"] == pytest.approx(6.0)
+
+
+def test_is_empty_list_returns_true_for_empty() -> None:
+    assert is_empty_list([])["result"] is True
+
+
+def test_is_empty_list_returns_false_for_nonempty() -> None:
+    assert is_empty_list([1, 2, 3])["result"] is False

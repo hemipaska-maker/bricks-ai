@@ -164,3 +164,21 @@ def date_range(start: str, end: str, step_days: int = 1) -> dict[str, list[str]]
         dates.append(current.isoformat())
         current = current + timedelta(days=step_days)
     return {"result": dates}
+
+
+@brick(tags=["date", "calculation"], category="date", destructive=False)
+def days_until(target_date: str) -> dict[str, int]:
+    """Calculate the number of days from today until a target date. Returns {result: int}.
+
+    Args:
+        target_date: Target date in ``YYYY-MM-DD`` format.
+
+    Returns:
+        dict with key ``result`` containing the number of days (negative if in the past).
+
+    Raises:
+        ValueError: If ``target_date`` is not in ``YYYY-MM-DD`` format.
+    """
+    target = datetime.strptime(target_date, "%Y-%m-%d").date()
+    today = datetime.now(tz=timezone.utc).date()
+    return {"result": (target - today).days}

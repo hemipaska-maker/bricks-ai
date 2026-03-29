@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.25] — 2026-03-30
+
+### Added
+- **100 stdlib bricks** (95 → 100): `round_number`, `truncate_string`, `is_empty_list`, `days_until`, `mask_string`
+- **End-to-end smoke test** (`tests/test_smoke.py`): mocked (CI) + live (`--live`) versions
+- **README rewrite**: user-facing docs targeting LangChain/CrewAI developers — install, quick start, MCP setup, why, community packs
+- **Starter config**: `examples/agent.yaml` with comments for every field
+- **Starter skill**: `examples/skill.md` — CRM skill description template
+
 ## [0.4.24] — 2026-03-30
 
 ### Added

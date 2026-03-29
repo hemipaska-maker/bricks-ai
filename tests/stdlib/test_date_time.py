@@ -8,6 +8,7 @@ from bricks_stdlib.date_time import (
     convert_timezone,
     date_diff,
     date_range,
+    days_until,
     extract_date_parts,
     format_date,
     is_business_day,
@@ -60,3 +61,13 @@ def test_is_business_day_friday_true() -> None:
 def test_date_range_generates_dates() -> None:
     result = date_range("2024-01-01", "2024-01-04")["result"]
     assert result == ["2024-01-01", "2024-01-02", "2024-01-03"]
+
+
+def test_days_until_past_date_is_negative() -> None:
+    result = days_until("2020-01-01")["result"]
+    assert result < 0
+
+
+def test_days_until_far_future_is_positive() -> None:
+    result = days_until("2099-12-31")["result"]
+    assert result > 0

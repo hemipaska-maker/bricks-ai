@@ -319,3 +319,21 @@ def reverse_string(text: str) -> dict[str, str]:
         dict with key ``result`` containing the reversed string.
     """
     return {"result": text[::-1]}
+
+
+@brick(tags=["string", "truncate"], category="string", destructive=False)
+def truncate_string(text: str, max_length: int, suffix: str = "...") -> dict[str, str]:
+    """Truncate a string to max_length characters, appending suffix if truncated. Returns {result: str}.
+
+    Args:
+        text: Input string.
+        max_length: Maximum length of the output string (including suffix).
+        suffix: String appended when truncation occurs (default ``"..."``).
+
+    Returns:
+        dict with key ``result`` containing the truncated string.
+    """
+    if len(text) <= max_length:
+        return {"result": text}
+    cut = max(0, max_length - len(suffix))
+    return {"result": text[:cut] + suffix}

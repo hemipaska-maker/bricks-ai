@@ -11,6 +11,7 @@ from bricks_stdlib.encoding_security import (
     generate_uuid,
     html_escape,
     html_unescape,
+    mask_string,
     random_string,
     url_decode,
     url_encode,
@@ -67,3 +68,15 @@ def test_random_string_correct_length() -> None:
 def test_random_string_unknown_charset_raises() -> None:
     with pytest.raises(ValueError):
         random_string(8, "emoji")
+
+
+def test_mask_string_masks_all_but_last_four() -> None:
+    assert mask_string("1234567890")["result"] == "******7890"
+
+
+def test_mask_string_short_string_fully_masked() -> None:
+    assert mask_string("abc", 4)["result"] == "***"
+
+
+def test_mask_string_custom_mask_char() -> None:
+    assert mask_string("secret123", 3, "#")["result"] == "######123"

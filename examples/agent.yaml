@@ -1,0 +1,38 @@
+# agent.yaml — Bricks agent configuration
+#
+# Usage:
+#   bricks serve --config examples/agent.yaml
+#
+# All fields are optional. Defaults work out of the box with just an API key.
+
+# ── Identity ────────────────────────────────────────────────────────────────
+name: my-agent                  # Name shown in logs and MCP tool descriptions
+
+# ── LLM ─────────────────────────────────────────────────────────────────────
+model: claude-haiku-4-5         # Any LiteLLM model string:
+                                #   claude-haiku-4-5, gpt-4o-mini, ollama/llama3
+                                # Overrides BRICKS_MODEL environment variable.
+
+# api_key: sk-ant-...           # Explicit API key (prefer env var instead)
+                                # Environment variable: ANTHROPIC_API_KEY (Claude)
+                                #                      OPENAI_API_KEY (OpenAI)
+
+# ── Blueprint Store ──────────────────────────────────────────────────────────
+store:
+  enabled: true                 # Cache composed blueprints so repeated tasks
+                                # cost 0 tokens. Recommended: true
+  backend: file                 # "file" = persistent across restarts (recommended)
+                                # "memory" = session-only, resets on restart
+  path: blueprints/             # Directory to store blueprint YAML files
+  ttl_days: 30                  # Blueprints unused for this many days are pruned
+
+# ── Selector ─────────────────────────────────────────────────────────────────
+selector:
+  top_k: 20                     # How many bricks to include in the compose prompt.
+                                # Lower = faster, cheaper. Higher = better recall.
+                                # Default: 20. Range: 5–50.
+
+# ── Skills ───────────────────────────────────────────────────────────────────
+# skills:                       # Load skill descriptions from markdown files.
+#   - skills/crm.md             # Each file describes one skill (see skill.md).
+#   - skills/analytics.md

@@ -155,3 +155,16 @@ def reduce_sum(values: list[float]) -> dict[str, float]:
         dict with key ``result`` containing the sum.
     """
     return {"result": sum(values)}
+
+
+@brick(tags=["list", "check"], category="list", destructive=False)
+def is_empty_list(items: list[object]) -> dict[str, bool]:
+    """Check whether a list is empty. Returns {result: bool}.
+
+    Args:
+        items: List to check.
+
+    Returns:
+        dict with key ``result`` containing ``True`` if the list is empty.
+    """
+    return {"result": len(items) == 0}

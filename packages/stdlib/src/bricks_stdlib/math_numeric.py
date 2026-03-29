@@ -162,3 +162,17 @@ def floor_value(value: float) -> dict[str, int]:
         dict with key ``result`` containing the floor integer.
     """
     return {"result": math.floor(value)}
+
+
+@brick(tags=["math", "rounding"], category="math", destructive=False)
+def round_number(value: float, decimal_places: int = 0) -> dict[str, float]:
+    """Round a number to the specified number of decimal places. Returns {result: rounded}.
+
+    Args:
+        value: Input number.
+        decimal_places: Number of decimal places (default 0 rounds to integer).
+
+    Returns:
+        dict with key ``result`` containing the rounded float.
+    """
+    return {"result": round(value, decimal_places)}

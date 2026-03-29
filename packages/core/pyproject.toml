@@ -1,6 +1,6 @@
 [project]
 name = "bricks"
-version = "0.4.24"
+version = "0.4.25"
 description = "Deterministic execution engine: typed Python building blocks composed into auditable YAML blueprints."
 requires-python = ">=3.10"
 license = "MIT"

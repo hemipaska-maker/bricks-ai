@@ -23,6 +23,7 @@ from bricks_stdlib.string_processing import (
     starts_ends_with,
     strip_punctuation,
     template_string_fill,
+    truncate_string,
     truncate_text,
 )
 
@@ -124,3 +125,15 @@ def test_starts_ends_with_both_conditions() -> None:
 
 def test_reverse_string_reverses() -> None:
     assert reverse_string("abc")["result"] == "cba"
+
+
+def test_truncate_string_short_text_unchanged() -> None:
+    assert truncate_string("hello", 10)["result"] == "hello"
+
+
+def test_truncate_string_truncates_long_text() -> None:
+    assert truncate_string("hello world", 8)["result"] == "hello..."
+
+
+def test_truncate_string_custom_suffix() -> None:
+    assert truncate_string("hello world", 7, "~")["result"] == "hello ~"

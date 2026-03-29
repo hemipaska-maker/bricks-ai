@@ -165,3 +165,23 @@ def random_string(length: int, charset: str = "alphanumeric") -> dict[str, str]:
         raise ValueError(f"Unknown charset {charset!r}. Use: {', '.join(sorted(charsets))}")
     alphabet = charsets[charset]
     return {"result": "".join(secrets.choice(alphabet) for _ in range(length))}
+
+
+@brick(tags=["string", "security", "mask"], category="encoding", destructive=False)
+def mask_string(text: str, visible_chars: int = 4, mask_char: str = "*") -> dict[str, str]:
+    """Mask most characters of a string, keeping only the last N visible. Returns {result: str}.
+
+    Useful for displaying sensitive values like API keys or card numbers without exposing them.
+
+    Args:
+        text: Input string to mask.
+        visible_chars: Number of trailing characters to leave visible (default 4).
+        mask_char: Character to use for masking (default ``"*"``).
+
+    Returns:
+        dict with key ``result`` containing the masked string.
+    """
+    if len(text) <= visible_chars:
+        return {"result": mask_char * len(text)}
+    masked_count = len(text) - visible_chars
+    return {"result": mask_char * masked_count + text[-visible_chars:]}

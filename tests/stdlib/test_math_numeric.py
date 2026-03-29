@@ -14,6 +14,7 @@ from bricks_stdlib.math_numeric import (
     modulo,
     percentage,
     power,
+    round_number,
 )
 
 
@@ -57,3 +58,15 @@ def test_clamp_value_within_range() -> None:
 def test_ceil_and_floor() -> None:
     assert ceil_value(2.3)["result"] == 3
     assert floor_value(2.9)["result"] == 2
+
+
+def test_round_number_to_integer() -> None:
+    assert round_number(2.6)["result"] == 3.0
+
+
+def test_round_number_decimal_places() -> None:
+    assert round_number(3.14159, 2)["result"] == pytest.approx(3.14)
+
+
+def test_round_number_negative() -> None:
+    assert round_number(-1.5)["result"] == pytest.approx(-2.0)
