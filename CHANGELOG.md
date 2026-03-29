@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.24] — 2026-03-30
+
+### Added
+- **ClaudeCodeProvider** (`packages/provider-claudecode/`): new `LLMProvider` that routes calls through `claude -p` CLI — zero API cost on Max plan
+  - Auto-detects git-bash on Windows (`CLAUDE_CODE_GIT_BASH_PATH`)
+  - Unsets `CLAUDECODE` env var to allow nested invocation inside active session
+- **Live test mode**: `pytest --live` flag + `llm_provider` fixture in `tests/conftest.py`
+  - All live tests marked `@pytest.mark.live`, skipped by default
+  - Live tests in `tests/live/`: compose, execute, reuse/cache scenarios
+  - `live` marker registered in `pyproject.toml`
+- **CRM benchmark fixes** in `packages/benchmark/`:
+  - `crm_scenario.py`: use `input_keys=["raw_api_response"]` + fix `exec_inputs` construction
+  - `crm_generator.py`: enrich `task_text` with full input format description
+
 ## [0.4.23] — 2026-03-27
 
 ### Changed

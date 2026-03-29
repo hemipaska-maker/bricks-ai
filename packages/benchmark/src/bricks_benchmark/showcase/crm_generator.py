@@ -132,10 +132,13 @@ def generate_crm_task(seed: int = 42) -> CRMTask:
     expected = _compute_expected(records)
     return CRMTask(
         task_text=(
-            "Extract the customer list from the API response JSON. "
-            "Filter for active customers only. "
-            "Count the active customers, sum their monthly revenue, "
-            "compute the average revenue, and identify the plan with the highest total revenue."
+            "The input 'raw_api_response' is a markdown-fenced JSON string "
+            "containing a dict with key 'customers' — a list of objects with fields: "
+            "id, name, email, status (active/inactive/suspended), plan (basic/pro/enterprise), "
+            "monthly_revenue (float), signup_date. "
+            "Parse the JSON string, filter for status='active', "
+            "count the active customers, sum their monthly_revenue, compute the average, "
+            "and identify the plan with the highest total revenue."
         ),
         raw_api_response=raw_api_response,
         expected_outputs=expected,

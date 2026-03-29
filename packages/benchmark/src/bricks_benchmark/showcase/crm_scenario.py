@@ -64,7 +64,7 @@ def _run_compose_once(
     loader = BlueprintLoader()
     engine = BlueprintEngine(registry=registry)
 
-    result = composer.compose(task.task_text, registry)
+    result = composer.compose(task.task_text, registry, input_keys=["raw_api_response"])
     outputs: dict[str, Any] = {}
     error = ""
     success = False
@@ -72,9 +72,7 @@ def _run_compose_once(
     if result.is_valid:
         try:
             bp_def = loader.load_string(result.blueprint_yaml)
-            # Inject the raw API response as input
-            exec_inputs = dict(bp_def.inputs or {})
-            exec_inputs["raw_api_response"] = task.raw_api_response
+            exec_inputs = {"raw_api_response": task.raw_api_response}
             exec_result = engine.run(bp_def, inputs=exec_inputs)
             outputs = exec_result.outputs
             success = True
@@ -291,7 +289,7 @@ def run_crm_reuse(
     loader = BlueprintLoader()
     engine = BlueprintEngine(registry=registry)
 
-    first_result = composer.compose(first_task.task_text, registry)
+    first_result = composer.compose(first_task.task_text, registry, input_keys=["raw_api_response"])
     blueprint_yaml = first_result.blueprint_yaml
     compose_tokens = first_result.total_tokens
     print(f"  [CRM-reuse] Compose: {compose_tokens:,} tokens")
@@ -311,8 +309,7 @@ def run_crm_reuse(
         if first_result.is_valid:
             try:
                 bp_def = loader.load_string(blueprint_yaml)
-                exec_inputs = dict(bp_def.inputs or {})
-                exec_inputs["raw_api_response"] = task.raw_api_response
+                exec_inputs = {"raw_api_response": task.raw_api_response}
                 exec_result = engine.run(bp_def, inputs=exec_inputs)
                 outputs = exec_result.outputs
                 filtered_expected = {k: v for k, v in task.expected_outputs.items() if k in outputs}

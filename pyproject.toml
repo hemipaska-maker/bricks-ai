@@ -12,6 +12,10 @@ pythonpath = [
     "packages/core/src",
     "packages/stdlib/src",
     "packages/benchmark/src",
+    "packages/provider-claudecode/src",
+]
+markers = [
+    "live: live integration tests that call real LLM via ClaudeCodeProvider (run with --live)",
 ]
 
 [tool.mypy]

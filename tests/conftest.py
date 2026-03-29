@@ -3,12 +3,48 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 from bricks.core.brick import BrickFunction, brick
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
+from bricks.llm.base import LLMProvider
+
+
+def pytest_addoption(parser: Any) -> None:
+    """Register --live flag for live integration tests."""
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Run live integration tests using ClaudeCodeProvider",
+    )
+
+
+def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
+    """Skip all @pytest.mark.live tests unless --live flag is passed."""
+    if config.getoption("--live"):
+        return
+    skip_live = pytest.mark.skip(reason="live test — run with --live to enable")
+    for item in items:
+        if item.get_closest_marker("live"):
+            item.add_marker(skip_live)
+
+
+@pytest.fixture()
+def llm_provider(request: pytest.FixtureRequest) -> LLMProvider:
+    """Return mock provider by default; ClaudeCodeProvider with --live flag."""
+    if request.config.getoption("--live"):
+        try:
+            from bricks_provider_claudecode import ClaudeCodeProvider
+
+            return ClaudeCodeProvider()  # type: ignore[return-value]
+        except ImportError:
+            pytest.skip("bricks-provider-claudecode not installed")
+    mock: LLMProvider = MagicMock(spec=LLMProvider)
+    return mock
 
 
 @pytest.fixture()

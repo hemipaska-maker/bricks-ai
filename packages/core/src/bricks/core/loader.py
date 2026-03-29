@@ -14,6 +14,30 @@ from bricks.core.exceptions import YamlLoadError
 from bricks.core.models import BlueprintDefinition
 
 
+def _to_plain(obj: Any) -> Any:
+    """Recursively convert ruamel.yaml CommentedMap/Seq to plain Python types.
+
+    ruamel.yaml returns ``CommentedMap`` (a dict subclass) and ``CommentedSeq``
+    (a list subclass) to preserve YAML comments and key ordering.  They behave
+    like built-ins in most situations but confuse ``isinstance`` checks and type
+    annotations inside bricks (e.g. a brick expecting ``str`` receives a
+    ``CommentedMap`` instead).  Converting before Pydantic validation ensures
+    every downstream consumer only sees plain Python types.
+
+    Args:
+        obj: Any Python object, possibly containing ``CommentedMap`` /
+            ``CommentedSeq`` nodes from ruamel.yaml parsing.
+
+    Returns:
+        The same structure expressed with plain :class:`dict` and :class:`list`.
+    """
+    if isinstance(obj, dict):
+        return {k: _to_plain(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_plain(item) for item in obj]
+    return obj
+
+
 class BlueprintLoader:
     """Loads YAML files and parses them into BlueprintDefinition instances."""
 
@@ -82,6 +106,6 @@ class BlueprintLoader:
         if not isinstance(data, dict):
             raise YamlLoadError(source, TypeError(f"Expected mapping, got {type(data).__name__}"))
         try:
-            return BlueprintDefinition.model_validate(data)
+            return BlueprintDefinition.model_validate(_to_plain(data))
         except ValidationError as exc:
             raise YamlLoadError(source, exc) from exc
