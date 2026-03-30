@@ -32,11 +32,11 @@ def test_full_pipeline(llm_provider: LLMProvider) -> None:
 @pytest.mark.live
 def test_reuse_hits_cache(llm_provider: LLMProvider) -> None:
     """Second call with identical task should hit cache when store is enabled."""
-    from bricks.boot.config import SystemConfig  # noqa: PLC0415
-    from bricks.core.config import StoreConfig  # noqa: PLC0415
-    from bricks.core.registry import BrickRegistry  # noqa: PLC0415
-    from bricks.orchestrator.runtime import RuntimeOrchestrator  # noqa: PLC0415
-    from bricks_stdlib import register as _reg_stdlib  # noqa: PLC0415
+    from bricks.boot.config import SystemConfig
+    from bricks.core.config import StoreConfig
+    from bricks.core.registry import BrickRegistry
+    from bricks.orchestrator.runtime import RuntimeOrchestrator
+    from bricks_stdlib import register as _reg_stdlib
 
     registry = BrickRegistry()
     _reg_stdlib(registry)
