@@ -103,7 +103,7 @@ def run_crm_pipeline(
         seed: CRM data seed.
     """
     task = generate_crm_task(seed)
-    print("  [CRM-pipeline] Composing...", flush=True)
+    logger.info("[CRM-pipeline] Composing...")
     t0 = time.monotonic()
 
     run = _run_compose_once(composer, task.task_text, seed)
@@ -116,23 +116,27 @@ def run_crm_pipeline(
         filtered_expected = {k: v for k, v in task.expected_outputs.items() if k in outputs}
         correct = check_correctness(outputs, filtered_expected)
         status = "CORRECT" if correct else "WRONG"
-        print(f"  [CRM-pipeline]   Execution: {status} — outputs: {outputs}")
+        logger.info("[CRM-pipeline]   Execution: %s — outputs: %s", status, outputs)
+        logger.debug("[CRM-pipeline]   Expected: %s", filtered_expected)
     else:
         filtered_expected = {}
         correct = False
-        print(f"  [CRM-pipeline]   Execution: FAILED — {error}")
+        logger.error("[CRM-pipeline]   Execution: FAILED — %s", error)
 
     # No-tools baseline
     nt_result = runner.run_without_tools(task.task_text)
     nt_correct = check_no_tools_answer(nt_result.final_answer, task.expected_outputs)
     nt_label = "CORRECT" if nt_correct else "WRONG"
-    print(f"  [CRM-pipeline] No-tools: {nt_result.total_tokens:,} tokens  answer={nt_label}")
+    logger.info("[CRM-pipeline] No-tools: %d tokens  answer=%s", nt_result.total_tokens, nt_label)
 
     elapsed = time.monotonic() - t0
     ratio_val = result.total_tokens / nt_result.total_tokens if nt_result.total_tokens > 0 else 0.0
-    print(
-        f"  [CRM-pipeline] done  compose={result.total_tokens:,}  "
-        f"no_tools={nt_result.total_tokens:,}  ({ratio_val:.1f}x)  [{elapsed:.1f}s]"
+    logger.info(
+        "[CRM-pipeline] done  compose=%d  no_tools=%d  (%.1fx)  [%.1fs]",
+        result.total_tokens,
+        nt_result.total_tokens,
+        ratio_val,
+        elapsed,
     )
 
     call_records = [
@@ -182,7 +186,7 @@ def run_crm_pipeline(
         ),
     )
     json_path = write_scenario_result(run_dir, scenario_result)
-    print(f"  [CRM-pipeline] Structured result -> {json_path}")
+    logger.info("[CRM-pipeline] Structured result -> %s", json_path)
 
 
 def run_crm_hallucination(
@@ -199,7 +203,7 @@ def run_crm_hallucination(
         run_dir: Output directory.
         runs: Number of repetitions (default 10).
     """
-    print(f"  [CRM-hallucination] Running {runs}x compose + {runs}x no-tools...", flush=True)
+    logger.info("[CRM-hallucination] Running %dx compose + %dx no-tools...", runs, runs)
     t0 = time.monotonic()
 
     compose_passes = 0
@@ -232,7 +236,7 @@ def run_crm_hallucination(
 
         status = "PASS" if correct else "FAIL"
         nt_status = "PASS" if nt_correct else "FAIL"
-        print(f"  [CRM-hallucination] Run {i + 1}/{runs}: compose={status} no_tools={nt_status}")
+        logger.info("[CRM-hallucination] Run %d/%d: compose=%s no_tools=%s", i + 1, runs, status, nt_status)
         run_records.append(
             {
                 "seed": seed,
@@ -246,9 +250,11 @@ def run_crm_hallucination(
     compose_rate = compose_passes / runs * 100
     nt_rate = no_tools_passes / runs * 100
     elapsed = time.monotonic() - t0
-    print(
-        f"  [CRM-hallucination] done  "
-        f"compose_pass_rate={compose_rate:.0f}%  no_tools_pass_rate={nt_rate:.0f}%  [{elapsed:.1f}s]"
+    logger.info(
+        "[CRM-hallucination] done  compose_pass_rate=%.0f%%  no_tools_pass_rate=%.0f%%  [%.1fs]",
+        compose_rate,
+        nt_rate,
+        elapsed,
     )
 
     # Write summary JSON
@@ -265,7 +271,7 @@ def run_crm_hallucination(
     }
     summary_path = run_dir / "CRM-hallucination_compose.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"  [CRM-hallucination] Summary -> {summary_path}")
+    logger.info("[CRM-hallucination] Summary -> %s", summary_path)
 
 
 def run_crm_reuse(
@@ -280,7 +286,7 @@ def run_crm_reuse(
         run_dir: Output directory.
         seeds: Total number of seeds to run (first = compose, rest = reuse).
     """
-    print(f"  [CRM-reuse] Composing blueprint (seed=42), then reusing for {seeds - 1} more seeds...", flush=True)
+    logger.info("[CRM-reuse] Composing blueprint (seed=42), then reusing for %d more seeds...", seeds - 1)
     t0 = time.monotonic()
 
     # First run: compose fresh
@@ -292,7 +298,7 @@ def run_crm_reuse(
     first_result = composer.compose(first_task.task_text, registry, input_keys=["raw_api_response"])
     blueprint_yaml = first_result.blueprint_yaml
     compose_tokens = first_result.total_tokens
-    print(f"  [CRM-reuse] Compose: {compose_tokens:,} tokens")
+    logger.info("[CRM-reuse] Compose: %d tokens", compose_tokens)
 
     cumulative_tokens = [compose_tokens]
     reuse_correct = 0
@@ -330,11 +336,11 @@ def run_crm_reuse(
                 "error": error,
             }
         )
-        print(f"  [CRM-reuse] Reuse {i}/{seeds - 1}: {status}  cumulative={cumulative:,} tokens")
+        logger.info("[CRM-reuse] Reuse %d/%d: %s  cumulative=%d tokens", i, seeds - 1, status, cumulative)
 
     elapsed = time.monotonic() - t0
     reuse_rate = reuse_correct / (seeds - 1) * 100 if seeds > 1 else 0.0
-    print(f"  [CRM-reuse] done  reuse_pass_rate={reuse_rate:.0f}%  [{elapsed:.1f}s]")
+    logger.info("[CRM-reuse] done  reuse_pass_rate=%.0f%%  [%.1fs]", reuse_rate, elapsed)
 
     import json
 
@@ -348,4 +354,4 @@ def run_crm_reuse(
     }
     summary_path = run_dir / "CRM-reuse_compose.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"  [CRM-reuse] Summary -> {summary_path}")
+    logger.info("[CRM-reuse] Summary -> %s", summary_path)

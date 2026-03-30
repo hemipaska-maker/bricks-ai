@@ -11,6 +11,9 @@ Usage:
     python -m benchmark.showcase.run --live --mode compose --scenario CRM-pipeline
     python -m benchmark.showcase.run --live --mode compose --scenario CRM-hallucination
     python -m benchmark.showcase.run --live --mode compose --scenario CRM-reuse
+
+    # Zero-cost via ClaudeCodeProvider (no API key needed inside Claude Code session):
+    python -m benchmark.showcase.run --live --claudecode --mode compose --scenario CRM-pipeline
 """
 
 from __future__ import annotations
@@ -33,6 +36,8 @@ from bricks_benchmark.showcase.formatters import (
     print_cost_summary,
 )
 from bricks_benchmark.showcase.metadata import make_run_dir, write_metadata
+
+_run_logger = logging.getLogger("bricks_benchmark.showcase.run")
 
 # ── default output dir ─────────────────────────────────────────────────────
 _DEFAULT_OUTPUT = Path(__file__).parent / "results"
@@ -73,13 +78,21 @@ def _make_turn_callback(label: str) -> Any:
         total = input_tokens + output_tokens
         if tool_calls:
             for tc in tool_calls:
-                name = tc["name"]
+                tc_name = tc["name"]
                 summary = tc.get("summary", "")
-                print(f"  [{label}] Turn {turn}/{mode}: tool_call {name} {summary} ({elapsed:.1f}s)")
+                _run_logger.info(
+                    "[%s] Turn %d/%s: tool_call %s %s (%.1fs)", label, turn, mode, tc_name, summary, elapsed
+                )
         else:
-            print(
-                f"  [{label}] Turn {turn}/{mode}: "
-                f"{input_tokens:,} input + {output_tokens:,} output = {total:,} tokens ({elapsed:.1f}s)"
+            _run_logger.info(
+                "[%s] Turn %d/%s: %d input + %d output = %d tokens (%.1fs)",
+                label,
+                turn,
+                mode,
+                input_tokens,
+                output_tokens,
+                total,
+                elapsed,
             )
 
     return callback
@@ -129,6 +142,76 @@ def _require_api_key() -> str:
     if not key:
         raise ValueError("ANTHROPIC_API_KEY is not set.\nExport it before running:  export ANTHROPIC_API_KEY=sk-...")
     return key
+
+
+def _build_provider(claudecode: bool) -> Any:
+    """Return LiteLLMProvider or ClaudeCodeProvider depending on flag.
+
+    Args:
+        claudecode: If True, return ClaudeCodeProvider (zero cost inside Claude Code).
+
+    Returns:
+        An LLMProvider instance.
+    """
+    if claudecode:
+        from bricks_provider_claudecode import ClaudeCodeProvider
+
+        return ClaudeCodeProvider(timeout=300)
+    from bricks.llm.litellm_provider import LiteLLMProvider
+
+    api_key = _require_api_key()
+    return LiteLLMProvider(model=DEFAULT_MODEL, api_key=api_key)
+
+
+class _ProviderRunner:
+    """Drop-in replacement for AgentRunner.run_without_tools using an LLMProvider.
+
+    Used when --claudecode is set so the no-tools baseline also routes through
+    claude -p instead of the Anthropic SDK.
+    """
+
+    _SYSTEM = (
+        "You are a Python expert. The user gives you a data processing task. "
+        "Reply with a single Python code block that solves the task. "
+        "Use only the standard library. No explanations — just code."
+    )
+
+    def __init__(self, provider: Any) -> None:
+        """Initialise with an LLMProvider.
+
+        Args:
+            provider: Any LLMProvider instance.
+        """
+        self._provider = provider
+
+    def run_without_tools(self, task: str, **_kwargs: Any) -> Any:
+        """Run the no-tools baseline via LLMProvider.complete().
+
+        Token counts are set to 0 because ClaudeCodeProvider does not expose
+        token usage from the subprocess.
+
+        Args:
+            task: Natural language task description.
+
+        Returns:
+            AgentResult with mode="no_tools" and zero token counts.
+        """
+        import time
+
+        from bricks_benchmark.mcp.agent_result import AgentResult
+
+        t0 = time.monotonic()
+        answer = self._provider.complete(task, system=self._SYSTEM)
+        return AgentResult(
+            task=task,
+            mode="no_tools",
+            turns=1,
+            total_input_tokens=0,
+            total_output_tokens=0,
+            total_tokens=0,
+            final_answer=answer,
+            duration_seconds=time.monotonic() - t0,
+        )
 
 
 # ── main runner ─────────────────────────────────────────────────────────────
@@ -184,24 +267,24 @@ def run_benchmark(
         registry = build_registry(task.required_bricks)
 
         logger.info("=== %s ===", label)
-        print(f"  [{label}] Running...", flush=True)
+        logger.info("[%s] Running...", label)
         result = run_a(runner, task.task_text, step_count, registry, on_turn=_make_turn_callback(label))
 
         nt = result["no_tools"]
         br = result["bricks"]
 
         if br.get("execution_result"):
-            print(f"  [{label}]   Execution: OK — outputs: {br['execution_result']}")
+            logger.info("[%s]   Execution: OK — outputs: %s", label, br["execution_result"])
             logger.debug("%s execution outputs: %s", label, br["execution_result"])
         if br.get("blueprint_yaml"):
             logger.debug("%s blueprint YAML:\n%s", label, br["blueprint_yaml"])
 
         nt_correct = check_no_tools_answer(nt.get("final_answer", ""), task.expected_outputs)
         nt_label = "CORRECT" if nt_correct else "WRONG"
-        print(f"  [{label}] No-tools: {nt['total_tokens']:,} tokens  answer={nt_label}")
+        logger.info("[%s] No-tools: %d tokens  answer=%s", label, nt["total_tokens"], nt_label)
         logger.info("%s no-tools answer: %s", label, nt_label)
         ratio = f"{nt['total_tokens'] / br['total_tokens']:.1f}x" if br["total_tokens"] > 0 else "inf"
-        print(f"  [{label}] done  no_tools={nt['total_tokens']:,}  bricks={br['total_tokens']:,}  ({ratio})")
+        logger.info("[%s] done  no_tools=%d  bricks=%d  (%s)", label, nt["total_tokens"], br["total_tokens"], ratio)
 
         total_input += nt.get("input_tokens", 0) + br.get("input_tokens", 0)
         total_output += nt.get("output_tokens", 0) + br.get("output_tokens", 0)
@@ -249,7 +332,7 @@ def run_benchmark(
     c_result: dict[str, Any] | None = None
     if Scenario.C.value in scenarios:
         logger.info("=== C: Reuse Economics ===")
-        print("  [C] Running (10 runs)...", flush=True)
+        logger.info("[C] Running (10 runs)...")
 
         gen = TaskGenerator()
         task = gen.generate(6)
@@ -259,19 +342,18 @@ def run_benchmark(
         nt_total = c_result["no_tools"]["total_tokens"]
         br_total = c_result["bricks"]["total_tokens"]
         ratio = f"{nt_total / br_total:.1f}x" if br_total > 0 else "inf"
-        print(f"  [C] done  no_tools={nt_total:,}  bricks={br_total:,}  ({ratio})")
+        logger.info("[C] done  no_tools=%d  bricks=%d  (%s)", nt_total, br_total, ratio)
 
         total_input += c_result.get("no_tools", {}).get("input_tokens", 0)
         total_input += c_result.get("bricks", {}).get("input_tokens", 0)
         total_output += c_result.get("no_tools", {}).get("output_tokens", 0)
         total_output += c_result.get("bricks", {}).get("output_tokens", 0)
-        print()
 
     # ── D: Determinism ───────────────────────────────────────────────────
     d_result: dict[str, Any] | None = None
     if Scenario.D.value in scenarios:
         logger.info("=== D: Determinism ===")
-        print("  [D] Running (5 runs)...", flush=True)
+        logger.info("[D] Running (5 runs)...")
 
         gen = TaskGenerator()
         task = gen.generate(6)
@@ -280,8 +362,7 @@ def run_benchmark(
 
         nt_unique = d_result["no_tools"]["unique_outputs"]
         br_unique = d_result["bricks"]["unique_blueprints"]
-        print(f"  [D] done  unique_codes={nt_unique}/5  unique_blueprints={br_unique}/5")
-        print()
+        logger.info("[D] done  unique_codes=%d/5  unique_blueprints=%d/5", nt_unique, br_unique)
 
     # ── Write outputs ─────────────────────────────────────────────────────
     json_path = write_apples_json(
@@ -295,8 +376,8 @@ def run_benchmark(
 
     elapsed = time.monotonic() - t0
     print_cost_summary(total_input, total_output, elapsed)
-    print(f"  results.json -> {json_path}")
-    print(f"  summary.md   -> {md_path}")
+    logger.info("results.json -> %s", json_path)
+    logger.info("summary.md   -> %s", md_path)
 
 
 # ── compose mode runner ────────────────────────────────────────────────────
@@ -306,6 +387,7 @@ def run_benchmark_compose(
     scenarios: list[str],
     run_dir: Path,
     logger: logging.Logger,
+    claudecode: bool = False,
 ) -> None:
     """Run the compose-mode benchmark (single-call YAML, no tool_use).
 
@@ -313,13 +395,12 @@ def run_benchmark_compose(
         scenarios: List of scenario labels (e.g. ``['A-12']``).
         run_dir: Timestamped run directory.
         logger: Logger for recording progress.
+        claudecode: If True, use ClaudeCodeProvider instead of LiteLLMProvider.
     """
     from bricks.ai.composer import BlueprintComposer
     from bricks.core.engine import BlueprintEngine
     from bricks.core.loader import BlueprintLoader
-    from bricks.llm.litellm_provider import LiteLLMProvider
 
-    from bricks_benchmark.mcp.agent_runner import AgentRunner
     from bricks_benchmark.mcp.scenarios.task_generator import TaskGenerator
     from bricks_benchmark.showcase.registry_factory import build_registry
     from bricks_benchmark.showcase.result_writer import (
@@ -333,10 +414,14 @@ def run_benchmark_compose(
         write_scenario_result,
     )
 
-    api_key = _require_api_key()
-    provider = LiteLLMProvider(model=DEFAULT_MODEL, api_key=api_key)
+    provider = _build_provider(claudecode)
     composer = BlueprintComposer(provider=provider)
-    runner = AgentRunner(api_key=api_key)
+    if claudecode:
+        runner: Any = _ProviderRunner(provider)
+    else:
+        from bricks_benchmark.mcp.agent_runner import AgentRunner
+
+        runner = AgentRunner(api_key=_require_api_key())
     loader = BlueprintLoader()
     gen = TaskGenerator()
 
@@ -351,7 +436,7 @@ def run_benchmark_compose(
         task = gen.generate(step_count)
         registry = build_registry(task.required_bricks)
         logger.info("=== %s (compose) ===", label)
-        print(f"  [{label}] Composing...", flush=True)
+        logger.info("[%s] Composing...", label)
 
         result = composer.compose(task.task_text, registry)
         total_input += result.total_input_tokens
@@ -390,12 +475,10 @@ def run_benchmark_compose(
                 execution.actual_outputs = actual
                 execution.expected_outputs = filtered_expected
                 execution.correct = check_correctness(actual, filtered_expected)
-                print(f"  [{label}]   Execution: OK — outputs: {actual}")
-                logger.info("%s execution outputs: %s", label, actual)
+                logger.info("[%s]   Execution: OK — outputs: %s", label, actual)
             except Exception as exc:
                 execution.error = str(exc)
-                print(f"  [{label}]   Execution: FAILED — {exc}")
-                logger.warning("%s execution failed: %s", label, exc)
+                logger.error("[%s]   Execution: FAILED — %s", label, exc)
 
         # No-tools baseline
         nt_result = runner.run_without_tools(task.task_text)
@@ -404,13 +487,11 @@ def run_benchmark_compose(
         nt_tokens = nt_result.total_tokens
         nt_correct = check_no_tools_answer(nt_result.final_answer, task.expected_outputs)
         nt_label = "CORRECT" if nt_correct else "WRONG"
-        print(f"  [{label}] No-tools: {nt_tokens:,} tokens  answer={nt_label}")
-        logger.info("%s no-tools answer: %s", label, nt_label)
+        logger.info("[%s] No-tools: %d tokens  answer=%s", label, nt_tokens, nt_label)
 
         ratio_val = result.total_tokens / nt_tokens if nt_tokens > 0 else 0.0
         ratio = f"{ratio_val:.1f}x" if nt_tokens > 0 else "N/A"
-        print(f"  [{label}] done  compose={result.total_tokens:,}  no_tools={nt_tokens:,}  ({ratio})")
-        print()
+        logger.info("[%s] done  compose=%d  no_tools=%d  (%s)", label, result.total_tokens, nt_tokens, ratio)
 
         # Build and write structured result
         cost = estimate_cost(result.total_input_tokens, result.total_output_tokens)
@@ -439,7 +520,7 @@ def run_benchmark_compose(
             ),
         )
         json_path = write_scenario_result(run_dir, scenario_result)
-        print(f"  [{label}] Structured result -> {json_path}")
+        logger.info("[%s] Structured result -> %s", label, json_path)
 
     # ── CRM scenarios ────────────────────────────────────────────────────
     crm_scenarios = [s for s in scenarios if s in CRM_SCENARIOS]
@@ -458,7 +539,6 @@ def run_benchmark_compose(
                 run_crm_hallucination(composer, runner, run_dir)
             elif crm_label == "CRM-reuse":
                 run_crm_reuse(composer, run_dir)
-            print()
 
     elapsed = time.monotonic() - t0
     print_cost_summary(total_input, total_output, elapsed)
@@ -468,25 +548,41 @@ def run_benchmark_compose(
 
 
 def _setup_logger(run_dir: Path) -> logging.Logger:
-    """Create a logger that writes to console (WARNING+) and a log file (DEBUG).
+    """Create dual-output loggers: file (DEBUG) and console (INFO).
+
+    Configures root loggers for all Bricks namespaces so every child logger
+    (``bricks.ai.composer``, ``bricks_provider_claudecode.provider``, etc.)
+    writes to the same ``benchmark_live.log`` and console stream.
 
     Args:
         run_dir: Directory where ``benchmark_live.log`` will be written.
 
     Returns:
-        Configured logger.
+        The ``bricks`` root logger.
     """
     log_path = run_dir / "benchmark_live.log"
-    logger = logging.getLogger("bricks.showcase")
-    logger.setLevel(logging.DEBUG)
-    logger.handlers.clear()
+
+    file_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s — %(message)s")
+    console_fmt = logging.Formatter("[%(levelname)s] %(message)s")
 
     fh = logging.FileHandler(log_path, encoding="utf-8")
     fh.setLevel(logging.DEBUG)
-    fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-    logger.addHandler(fh)
+    fh.setFormatter(file_fmt)
 
-    return logger
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(console_fmt)
+
+    # Configure all Bricks namespace roots so child loggers are captured.
+    for name in ("bricks", "bricks_provider_claudecode", "bricks_benchmark"):
+        lg = logging.getLogger(name)
+        lg.setLevel(logging.DEBUG)
+        lg.handlers.clear()
+        lg.propagate = False
+        lg.addHandler(fh)
+        lg.addHandler(ch)
+
+    return logging.getLogger("bricks")
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
@@ -536,7 +632,13 @@ def main() -> None:
         "--live",
         action="store_true",
         default=False,
-        help="Required. Make real Anthropic API calls. Requires ANTHROPIC_API_KEY.",
+        help="Required. Make real LLM calls. Requires ANTHROPIC_API_KEY (or --claudecode).",
+    )
+    parser.add_argument(
+        "--claudecode",
+        action="store_true",
+        default=False,
+        help="Use ClaudeCodeProvider (claude -p) instead of Anthropic API. Zero cost on Max plan.",
     )
     args = parser.parse_args()
 
@@ -548,7 +650,7 @@ def main() -> None:
         print("  python -m benchmark.showcase.run --live")
         print("  python -m benchmark.showcase.run --live --scenario A --steps 5")
         print()
-        print("Set ANTHROPIC_API_KEY before running.")
+        print("Set ANTHROPIC_API_KEY before running, or use --claudecode for zero-cost runs.")
         sys.exit(1)
 
     raw_scenarios = args.scenarios or ["all"]
@@ -559,24 +661,21 @@ def main() -> None:
     run_dir = make_run_dir(output_dir)
 
     logger = _setup_logger(run_dir)
-    logger.info("Live mode: real API calls via Anthropic SDK")
+    provider_label = "ClaudeCodeProvider (claude -p)" if args.claudecode else "Anthropic SDK"
+    logger.info("Live mode: real LLM calls via %s", provider_label)
     logger.info("Scenarios: %s", ", ".join(scenarios))
+    logger.info("Bricks v%s", __version__)
+    logger.info("Run folder: %s", run_dir)
+    logger.info("Mode: %s", args.mode)
 
     mode = args.mode
-    print()
-    print(f"Bricks v{__version__}")
-    print(f"Run folder: {run_dir}")
-    print(f"Mode: {mode}")
-    print(f"Scenarios: {', '.join(scenarios)}")
-    print()
-
     try:
         if mode == "compose":
-            run_benchmark_compose(scenarios, run_dir, logger)
+            run_benchmark_compose(scenarios, run_dir, logger, claudecode=args.claudecode)
         else:
             run_benchmark(scenarios, run_dir, logger)
     except Exception as exc:
-        print(f"FAILED: {exc}")
+        logger.error("FAILED: %s", exc, exc_info=True)
         sys.exit(1)
 
     write_metadata(run_dir, scenarios)

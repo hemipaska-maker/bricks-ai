@@ -104,15 +104,10 @@ def _compute_expected(records: list[CRMRecord]) -> dict[str, Any]:
     active = [r for r in records if r.status == "active"]
     total_revenue = round(sum(r.monthly_revenue for r in active), 2)
     avg_revenue = round(total_revenue / len(active), 2) if active else 0.0
-    plan_revenue: dict[str, float] = {}
-    for r in active:
-        plan_revenue[r.plan] = round(plan_revenue.get(r.plan, 0.0) + r.monthly_revenue, 2)
-    top_plan = max(plan_revenue, key=lambda p: plan_revenue[p]) if plan_revenue else ""
     return {
         "active_count": len(active),
         "total_active_revenue": total_revenue,
         "avg_active_revenue": avg_revenue,
-        "top_plan": top_plan,
     }
 
 
@@ -137,8 +132,12 @@ def generate_crm_task(seed: int = 42) -> CRMTask:
             "id, name, email, status (active/inactive/suspended), plan (basic/pro/enterprise), "
             "monthly_revenue (float), signup_date. "
             "Parse the JSON string, filter for status='active', "
-            "count the active customers, sum their monthly_revenue, compute the average, "
-            "and identify the plan with the highest total revenue."
+            "count the active customers (use count_dict_list, save as 'active_count'), "
+            "sum their monthly_revenue "
+            "(use calculate_aggregates with operation='sum', save as 'total_active_revenue'), "
+            "and compute the average revenue "
+            "(use calculate_aggregates with operation='avg', save as 'avg_active_revenue'). "
+            "The outputs_map must use exactly these keys: active_count, total_active_revenue, avg_active_revenue."
         ),
         raw_api_response=raw_api_response,
         expected_outputs=expected,

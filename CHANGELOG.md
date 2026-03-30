@@ -7,6 +7,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.26] — 2026-03-30
+
+### Added
+- **Structured logging** across all Bricks namespaces: `bricks.ai.composer`, `bricks_provider_claudecode.provider`, `bricks_benchmark.showcase.*` — all emit to a shared `benchmark_live.log` (DEBUG) and console (INFO)
+- **Dual-output log setup**: `_setup_logger()` now configures all three namespace roots so every child logger goes to the same file and stream
+
+### Fixed
+- **ClaudeCodeProvider stdin delivery**: prompt now sent via `input=` (stdin) instead of CLI argument, avoiding OS argument-length limits on large prompts
+- **ClaudeCodeProvider UTF-8**: added `encoding="utf-8"` to subprocess call, fixing Windows cp1252 encoding error on Unicode chars (→) in system prompt
+- **ClaudeCodeProvider default timeout**: increased from 60s to 120s
+- **CRM benchmark correctness**: removed `top_plan` from expected outputs (no stdlib brick can reduce group_by output to a plan-name string); benchmark now checks `active_count`, `total_active_revenue`, `avg_active_revenue` — all three pass CORRECT
+- **No more print() in pipeline**: all `print()` in `crm_scenario.py` and `run.py` replaced with `logger.*` calls
+
 ## [0.4.25] — 2026-03-30
 
 ### Added

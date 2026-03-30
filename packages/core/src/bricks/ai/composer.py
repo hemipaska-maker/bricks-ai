@@ -7,6 +7,7 @@ plain text, which we validate and execute locally.
 from __future__ import annotations
 
 import inspect as _inspect
+import logging
 import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
@@ -24,6 +25,8 @@ from bricks.llm.base import LLMProvider
 
 if TYPE_CHECKING:
     from bricks.store.blueprint_store import BlueprintStore
+
+logger = logging.getLogger(__name__)
 
 
 class ComposerError(BrickError):
@@ -343,6 +346,7 @@ class BlueprintComposer:
             cached = self._store.get_by_fingerprint(fp)
             if cached is not None:
                 self._store.touch(cached.name)
+                logger.info("Cache hit for task fingerprint %s", fp)
                 return ComposeResult(
                     task=task,
                     blueprint_yaml=cached.yaml,
@@ -354,6 +358,7 @@ class BlueprintComposer:
 
         t0 = time.monotonic()
         pool = self._selector.select(task, registry)
+        logger.info("Composing blueprint for task (%d chars), %d bricks in pool", len(task), len(pool.list_all()))
         signatures = compact_brick_signatures(pool)
         keys_table = output_key_table(pool)
         example = _build_example(pool)
@@ -407,6 +412,13 @@ class BlueprintComposer:
             model="",
             duration_seconds=elapsed,
             system_prompt=system,
+        )
+
+        logger.info(
+            "Compose complete: valid=%s, %d calls, %.1fs",
+            result.is_valid,
+            result.api_calls,
+            result.duration_seconds,
         )
 
         # Auto-save validated blueprint to store
@@ -472,10 +484,30 @@ class BlueprintComposer:
         Returns:
             CallDetail with per-call tokens, YAML, and validation status.
         """
+        logger.info(
+            "Compose call #%d: system=%d chars, user=%d chars",
+            call_number,
+            len(system),
+            len(user_message),
+        )
+        logger.debug("System prompt:\n%s", system)
+        logger.debug("User message:\n%s", user_message)
+
         call_t0 = time.monotonic()
         yaml_text, in_tok, out_tok = self._make_api_call(system, user_message)
         is_valid, errors = self._validate_yaml(yaml_text, validator)
         call_elapsed = time.monotonic() - call_t0
+
+        logger.info(
+            "Compose call #%d: valid=%s, yaml=%d chars, %.1fs",
+            call_number,
+            is_valid,
+            len(yaml_text),
+            call_elapsed,
+        )
+        logger.debug("Generated YAML:\n%s", yaml_text)
+        if not is_valid:
+            logger.warning("Compose call #%d validation failed: %s", call_number, errors)
 
         return CallDetail(
             call_number=call_number,
@@ -510,6 +542,7 @@ class BlueprintComposer:
         except (BricksConfigError, BricksComposeError):
             raise
         except Exception as exc:
+            logger.error("API call failed: %s", exc, exc_info=True)
             raise ComposerError(f"API call failed: {exc}", cause=exc) from exc
         return strip_code_fence(text), 0, 0
 
