@@ -7,6 +7,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.29] — 2026-03-30
+
+### Added
+- **`Engine` ABC** in `showcase/engine.py`: `solve(task_text, raw_data) → EngineResult` — pluggable solver interface
+- **`BricksEngine`**: compose(task_text) → load(YAML) → execute(raw_data) → dict outputs; `solve_reuse()` for zero-token reuse
+- **`RawLLMEngine`**: sends task + raw_data directly to LLM, parses JSON response; handles JSON parse failure gracefully
+- **`EngineResult` / `BenchmarkResult` dataclasses**: identical output shape for both engines
+- **`run_scenario(engine, task) → BenchmarkResult`**: single unified pipeline used by all three CRM scenarios
+- **Side-by-side display** in `run_crm_pipeline()` — shows actual vs expected per key with ✓/✗ markers
+- **`BENCHMARK_DESIGN.md`**: documents unified pipeline flowchart, scenario table, and design rationale
+- **`test_engine.py`**: unit tests for Engine ABC, EngineResult, BenchmarkResult, RawLLMEngine (JSON parse, fence strip, failure)
+
+### Changed
+- **`crm_scenario.py`** fully rewritten: all three scenarios use `run_scenario(engine, task)` with both engines
+- **`run.py`**: instantiates `BricksEngine` and `RawLLMEngine` from the same provider; passes both to scenario functions
+- **Fairness fix**: `RawLLMEngine` now receives `task_text + raw_api_response` (same data as Bricks) — benchmark is now scientifically valid
+
 ## [0.4.28] — 2026-03-30
 
 ### Removed

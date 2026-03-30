@@ -1,11 +1,14 @@
-"""Benchmark showcase entry point — CRM compose-mode benchmark.
+"""Benchmark showcase entry point — CRM unified Engine pipeline.
+
+BricksEngine and RawLLMEngine receive identical input.
+Both are evaluated with the same check_correctness() function.
+Only the system under test changes.
 
 Usage:
     python -m bricks_benchmark.showcase.run --live                         # all CRM scenarios
     python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
     python -m bricks_benchmark.showcase.run --live --scenario CRM-hallucination
     python -m bricks_benchmark.showcase.run --live --scenario CRM-reuse
-    python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --scenario CRM-reuse
 
     # Zero-cost via ClaudeCodeProvider (no API key needed inside Claude Code session):
     python -m bricks_benchmark.showcase.run --live --claudecode --scenario CRM-pipeline
@@ -102,7 +105,7 @@ def run_benchmark(
     logger: logging.Logger,
     claudecode: bool = False,
 ) -> None:
-    """Run the CRM compose-mode benchmark.
+    """Run the CRM benchmark with both engines on each scenario.
 
     Args:
         scenarios: List of CRM scenario labels.
@@ -110,27 +113,27 @@ def run_benchmark(
         logger: Logger for recording progress.
         claudecode: If True, use ClaudeCodeProvider instead of LiteLLMProvider.
     """
-    from bricks.ai.composer import BlueprintComposer
-
     from bricks_benchmark.showcase.crm_scenario import (
         run_crm_hallucination,
         run_crm_pipeline,
         run_crm_reuse,
     )
+    from bricks_benchmark.showcase.engine import BricksEngine, RawLLMEngine
 
     provider = _build_provider(claudecode)
-    composer = BlueprintComposer(provider=provider)
+    bricks_engine = BricksEngine(provider=provider)
+    llm_engine = RawLLMEngine(provider=provider)
 
     t0 = time.monotonic()
 
     for crm_label in scenarios:
         logger.info("=== %s ===", crm_label)
         if crm_label == "CRM-pipeline":
-            run_crm_pipeline(composer, run_dir)
+            run_crm_pipeline(bricks_engine, llm_engine, run_dir)
         elif crm_label == "CRM-hallucination":
-            run_crm_hallucination(composer, run_dir)
+            run_crm_hallucination(bricks_engine, llm_engine, run_dir)
         elif crm_label == "CRM-reuse":
-            run_crm_reuse(composer, run_dir)
+            run_crm_reuse(bricks_engine, llm_engine, run_dir)
 
     elapsed = time.monotonic() - t0
     print_cost_summary(0, 0, elapsed)
@@ -182,7 +185,7 @@ def _setup_logger(run_dir: Path) -> logging.Logger:
 def main() -> None:
     """Parse args and run the CRM benchmark."""
     parser = argparse.ArgumentParser(
-        description="Bricks CRM benchmark: Bricks compose vs raw LLM.",
+        description="Bricks CRM benchmark: BricksEngine vs RawLLMEngine, same input, same checker.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
