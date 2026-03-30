@@ -36,7 +36,7 @@ async def run_mcp_server(engine: Any) -> None:
 
     server: Server = Server("bricks")
 
-    @server.list_tools()  # type: ignore[no-untyped-call, untyped-decorator]
+    @server.list_tools()  # type: ignore[misc, untyped-decorator, no-untyped-call]
     async def list_tools() -> list[types.Tool]:
         """Return the list of tools this server exposes."""
         return [
