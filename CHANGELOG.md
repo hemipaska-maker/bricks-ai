@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.33] — 2026-03-31
+
+### Changed
+- **Default branch renamed**: `development` → `main`; remote `development` deleted; GitHub default branch updated
+
+### Added
+- **GitHub Releases**: created for v0.4.25, v0.4.26, v0.4.27, v0.4.28, v0.4.32 with CHANGELOG-based notes
+
 ## [0.4.32] — 2026-03-31
 
 ### Added
