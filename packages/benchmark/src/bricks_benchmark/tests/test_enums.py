@@ -8,23 +8,7 @@ from bricks_benchmark.constants import (
     REUSE_RUNS,
     RunMode,
     RunStatus,
-    Scenario,
 )
-
-
-class TestScenarioEnum:
-    """Tests for the Scenario enum."""
-
-    def test_values(self) -> None:
-        """Scenario enum has expected values."""
-        assert Scenario.A.value == "A"
-        assert Scenario.C.value == "C"
-        assert Scenario.D.value == "D"
-
-    def test_string_comparison(self) -> None:
-        """Scenario values compare correctly with strings."""
-        assert Scenario.A.value == "A"
-        assert Scenario.C.value == "C"
 
 
 class TestRunModeEnum:

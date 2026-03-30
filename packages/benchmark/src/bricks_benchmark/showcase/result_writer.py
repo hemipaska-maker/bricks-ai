@@ -115,47 +115,6 @@ def check_correctness(
     return True
 
 
-def check_no_tools_answer(
-    answer: str,
-    expected: dict[str, Any],
-    tolerance: float = FLOAT_TOLERANCE,
-) -> bool:
-    """Check if expected numeric values appear in the no-tools LLM answer text.
-
-    Searches the raw text response for each expected numeric value (formatted
-    to 2 decimal places). String values are checked as substrings. This does
-    not execute any code — it is a text scan only.
-
-    Args:
-        answer: The LLM's raw text response (final_answer from AgentResult).
-        expected: Expected outputs from TaskGenerator.
-        tolerance: Relative tolerance for floating-point comparisons.
-
-    Returns:
-        True if all expected values are found in the answer text.
-    """
-    if not expected or not answer:
-        return False
-
-    for val in expected.values():
-        if isinstance(val, (int, float)):
-            fval = float(val)
-            # Try several common formatting styles
-            candidates = [
-                str(round(fval, 2)),
-                f"{fval:.2f}",
-                f"{fval:,.2f}",
-                f"{fval:.0f}",
-                str(int(fval)) if fval == int(fval) else None,
-            ]
-            if not any(c and c in answer for c in candidates):
-                return False
-        elif isinstance(val, str):
-            if val not in answer:
-                return False
-
-    return True
-
 
 def write_scenario_result(run_dir: Path, result: ScenarioResult) -> Path:
     """Write a structured scenario result JSON file.

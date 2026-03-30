@@ -7,6 +7,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.28] — 2026-03-30
+
+### Removed
+- **`mcp/` module** entirely: `AgentRunner`, `AgentResult`, `ToolCallRecord`, `TaskGenerator`, `tool_executor`, `report`, and all A/C/D scenarios — superseded by CRM compose benchmark
+- **`test_apples.py`** (753 lines) and mcp unit tests (`test_tool_executor.py`, `test_task_generator.py`)
+- **6 `apples_to_apples/` result directories** from historical runs
+- **`check_no_tools_answer()`** from `result_writer.py` — text-scan baseline replaced by structured `check_correctness()`
+- **`Scenario` enum** (A/C/D) from `constants.py`
+- **`--mode` CLI flag** — benchmark is always compose mode now
+- **`_ProviderRunner`** and **`run_benchmark()`** (tool_use runner) from `run.py`
+
+### Changed
+- `run.py` is now CRM-only: `expand_scenarios()` simplified, docstring updated, `run_benchmark()` → compose-only
+- `crm_scenario.py`: removed `runner` parameter and no-tools baseline from `run_crm_pipeline` / `run_crm_hallucination`
+- `showcase/README.md`: rewritten to describe CRM compose benchmark
+
 ## [0.4.27] — 2026-03-30
 
 ### Added

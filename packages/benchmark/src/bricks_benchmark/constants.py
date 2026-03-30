@@ -16,14 +16,6 @@ REUSE_RUNS: int = 10
 DETERMINISM_RUNS: int = 5
 
 
-class Scenario(str, Enum):
-    """Benchmark scenario identifiers."""
-
-    A = "A"  # Complexity curve (parametric steps)
-    C = "C"  # Reuse economics
-    D = "D"  # Determinism
-
-
 class RunMode(str, Enum):
     """Benchmark execution modes."""
 
