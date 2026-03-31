@@ -7,7 +7,12 @@
 #   pip install -e packages/benchmark
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages/benchmark/src/bricks_benchmark/tests"]
+testpaths = [
+    "packages/core/tests",
+    "packages/stdlib/tests",
+    "packages/benchmark/src/bricks_benchmark/tests",
+]
+addopts = "--import-mode=importlib"
 pythonpath = [
     "packages/core/src",
     "packages/stdlib/src",
