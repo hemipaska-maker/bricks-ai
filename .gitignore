@@ -35,3 +35,10 @@ Thumbs.db
 
 # PM ↔ Claude Code mission files (not part of the codebase)
 .missions/
+
+# Local IDE / tooling config (developer-specific)
+.claude/
+
+# Benchmark run results (generated data, not source code)
+# Keep curated results via git add --force when needed
+packages/benchmark/src/bricks_benchmark/showcase/results/
