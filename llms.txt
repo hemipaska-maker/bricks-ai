@@ -1,0 +1,84 @@
+# Bricks
+
+> Deterministic execution engine for AI agents. LLMs compose YAML blueprints from pre-tested building blocks. Bricks validates and executes them — same input, same output, every time.
+
+## What it does
+
+Bricks separates planning (LLM) from execution (deterministic Python):
+
+1. You describe a task in plain English
+2. The LLM picks from a catalog of typed, pre-tested bricks and writes a YAML blueprint
+3. Bricks validates the blueprint (types, connections, missing inputs) before anything runs
+4. Bricks executes it deterministically — no LLM in the loop, no hallucination risk
+5. The blueprint is cached — repeat runs cost zero tokens
+
+Proved 100% correctness across all tested models (Claude Haiku, Sonnet, GPT-4o-mini, Gemini, Ollama). Raw LLMs: 0–60%.
+
+## Install
+
+```bash
+pip install bricks-ai
+pip install "bricks-ai[stdlib,ai]"   # with standard library (100+ bricks) and LLM support
+```
+
+## Quick start
+
+```python
+from bricks.api import Bricks
+
+engine = Bricks.default()  # reads API key from environment
+result = engine.execute(
+    "filter active customers and count them",
+    {"data": customers_list}
+)
+print(result["outputs"])      # {"active_customers": [...], "count": 42}
+print(result["cache_hit"])    # True on second call — zero tokens
+```
+
+## Key concepts
+
+- **Brick**: a typed Python function decorated with `@brick(...)` or a class inheriting `BaseBrick`
+- **Blueprint**: a YAML file describing a sequence of brick steps with named inputs/outputs
+- **Registry**: flat namespace of all available bricks (`BrickRegistry`)
+- **Engine**: validates and executes a blueprint step-by-step (`BlueprintEngine.run()`)
+- **Composer**: LLM-powered layer that writes blueprints from natural language (`BlueprintComposer`)
+- **Teardown hooks**: optional cleanup called on failure, reverse-ordered across completed steps
+
+## Supported LLM providers
+
+Bricks uses LiteLLM — works with any model:
+
+- Anthropic: `export ANTHROPIC_API_KEY=sk-ant-...`
+- OpenAI: `export OPENAI_API_KEY=sk-...`
+- Google Gemini: `export GOOGLE_API_KEY=AIza...`
+- Ollama (local, free): `--model ollama/llama3`
+- Claude Code Max plan: `--model claudecode`
+
+## MCP server
+
+```json
+{
+  "mcpServers": {
+    "bricks": {
+      "command": "bricks",
+      "args": ["serve"],
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+## Community packs
+
+Publish a `bricks-{name}` package to PyPI with a `bricks.packs` entry point and it auto-registers on `Bricks.default()`.
+
+## Package names
+
+- Core engine: `bricks-ai` (import as `bricks`)
+- Standard library: `bricks-ai-stdlib` (import as `bricks_stdlib`)
+
+## Links
+
+- Repository: https://github.com/hemipaska-maker/bricks-ai
+- Issues: https://github.com/hemipaska-maker/bricks-ai/issues
+- Full docs: https://github.com/hemipaska-maker/bricks-ai#readme
