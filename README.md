@@ -4,31 +4,97 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## What is Bricks?
+**LLMs guess. Bricks computes.**
 
-Bricks is a deterministic execution engine for AI agents. Instead of generating Python code at runtime, your AI composes reusable YAML blueprints from 100 pre-tested building blocks. Blueprints are validated before execution, produce identical results every run, and cost **zero tokens** after the first call.
-
-**Benchmark:** 83% fewer tokens than code generation. 100% correctness vs ~60% for raw LLM output. Zero tokens on cached runs.
+Bricks is a deterministic execution engine for AI agents. Your LLM writes a YAML blueprint from pre-tested building blocks. Bricks validates it, then executes it — same input, same output, every time. No hallucinated math. No format failures. No token burn on repeat runs.
 
 ---
 
-## Install
+## Prove It — 30 Seconds
 
 ```bash
-pip install bricks[stdlib,ai]
+git clone https://github.com/hemipaska-maker/bricks.git
+cd bricks
+pip install -e ".[stdlib,ai]"
+export ANTHROPIC_API_KEY=sk-ant-...       # or any supported LLM — see below
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
 ```
 
-This installs the core engine + 100 stdlib bricks + LiteLLM for AI composition.
+Here's what you'll see — real results from v0.4.31, tested across three Claude models:
+
+| | BricksEngine | Raw LLM |
+|---|---|---|
+| **Correctness** | **100%** (every model, every seed) | 0-60% (varies by model) |
+| **Haiku** | ✅ `active_count: 18, revenue: 3447.50` | ❌ Hallucinated: `15, 3848.50` |
+| **Sonnet** | ✅ Correct structured output | ❌ Wrote an essay instead of JSON |
+| **10-run consistency** | **10/10 pass** | **6/10 pass** (4 hallucinated) |
+| **20-run reuse** | **20/20 pass, 3,327 tokens total** | 12/20 pass, 75,880 tokens |
+
+Bricks composed one blueprint, reused it 20 times at zero cost. The raw LLM called the API 20 times and still got 40% wrong.
 
 ---
 
-## Quick Start
+## Bring Your Own LLM
+
+Bricks works with any model. Blueprints are model-agnostic — compose with one LLM, execute anywhere.
+
+```bash
+# Anthropic (default)
+export ANTHROPIC_API_KEY=sk-ant-...
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
+
+# OpenAI
+export OPENAI_API_KEY=sk-...
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model gpt-4o-mini
+
+# Google Gemini
+export GOOGLE_API_KEY=AIza...
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model gemini/gemini-2.0-flash
+
+# Local with Ollama (free, no API key)
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model ollama/llama3
+
+# Claude Code Max plan ($0)
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model claudecode
+```
+
+---
+
+## How It Works
+
+```
+Your task → LLM composes YAML blueprint → Bricks validates → Bricks executes deterministically
+```
+
+1. You describe what you want in plain English
+2. The LLM picks from 100 pre-tested bricks and writes a YAML blueprint
+3. Bricks validates the blueprint (types, connections, missing inputs) before anything runs
+4. Bricks executes it deterministically — same blueprint, any data, identical results
+5. The blueprint is saved. Next time, zero LLM calls needed.
+
+The LLM is used once, for planning. Execution is pure Python — no LLM in the loop, no token cost, no hallucination risk.
+
+---
+
+## Why Bricks?
+
+**Correctness.** 100% across every model tested. Raw LLMs hallucinate numbers, ignore format instructions, and drift across runs. Bricks doesn't — every brick is typed and tested.
+
+**Cost.** Compose once, reuse forever. 20 runs cost 3,327 tokens with Bricks vs 75,880 with raw LLM calls. That's a 95.6% reduction. After the first call, every repeat is free.
+
+**Determinism.** Same blueprint + different data = guaranteed correct output. No randomness, no temperature, no "try again and hope."
+
+**Auditability.** Blueprints are plain YAML. Every step is named, every input/output is typed. You can inspect, version, share, and review exactly what ran.
+
+---
+
+## Quick Start — Python API
 
 ```python
 from bricks.api import Bricks
 
 # One line setup — auto-discovers all installed brick packs
-engine = Bricks.default()  # reads ANTHROPIC_API_KEY from environment
+engine = Bricks.default()  # reads API key from environment
 
 # Describe what you want in plain English
 result = engine.execute(
@@ -40,8 +106,6 @@ print(result["outputs"])      # {"active_customers": [...], "count": 42}
 print(result["cache_hit"])    # True on second call — zero tokens!
 print(result["tokens_used"])  # 0 on cache hit
 ```
-
-The first call composes a blueprint (one LLM call). Every subsequent call with the same task reuses the saved blueprint at zero cost.
 
 ---
 
@@ -67,15 +131,17 @@ Save this to `~/Library/Application Support/Claude/claude_desktop_config.json` (
 
 ---
 
-## Why?
+## Install
 
-**Token savings.** Bricks composes once and reuses forever. Repeated tasks cost 0 tokens after the first call. In the CRM benchmark: 83% fewer tokens than raw code generation.
+```bash
+# From source (recommended for now)
+git clone https://github.com/hemipaska-maker/bricks.git
+cd bricks
+pip install -e ".[stdlib,ai]"
 
-**Correctness.** Blueprints use typed, tested bricks — no hallucinated APIs, no variable name drift. 100% correctness vs ~60% for raw LLM output across 20 runs.
-
-**Reuse.** Blueprints are plain YAML files. Save them, share them, version them. One blueprint handles 1000 different inputs.
-
-**Auditability.** Every step is named. Every input/output is typed. You can inspect exactly what ran and why.
+# stdlib: 100 pre-tested bricks (data, string, math, validation, encoding)
+# ai: LiteLLM for multi-provider LLM composition
+```
 
 ---
 
@@ -105,3 +171,66 @@ def register(registry: BrickRegistry) -> None:
 After `pip install bricks-mypack`, `Bricks.default()` discovers and loads it automatically.
 
 See `examples/agent.yaml` for a full configuration reference and `examples/skill.md` for how to describe a skill.
+
+---
+
+## Benchmark: What's Actually Happening?
+
+The CRM-pipeline benchmark generates 50 fake customer records and asks: "How many are active? What's their total revenue? What's the average?"
+
+**The task prompt (what both engines receive):**
+
+> Parse the JSON string, filter for status='active', count the active customers, sum their monthly_revenue, and compute the average revenue. Return: `active_count`, `total_active_revenue`, `avg_active_revenue`.
+
+**The data (50 records, looks like this):**
+
+```json
+{
+  "customers": [
+    {"id": 1, "name": "Bob Jones", "email": "bob.jones0@example.com",
+     "status": "active", "plan": "pro", "monthly_revenue": 109.0,
+     "signup_date": "2020-07-07"},
+    {"id": 2, "name": "Carol Smith", "email": "carol.smith1@example.com",
+     "status": "inactive", "plan": "enterprise", "monthly_revenue": 514.5,
+     "signup_date": "2021-02-02"},
+    ...48 more records...
+  ]
+}
+```
+
+**What BricksEngine does:**
+
+1. LLM reads the task and the brick catalog (not the data) → composes a YAML blueprint:
+   `extract_json_from_str → filter_dict_list(status=active) → count_dict_list → calculate_aggregates(sum, avg)`
+2. Bricks validates the blueprint (types, connections, missing inputs)
+3. Bricks executes it deterministically with the 50 records
+4. Returns: `{"active_count": 18, "total_active_revenue": 3447.50, "avg_active_revenue": 191.53}` ✅
+
+**What RawLLMEngine does:**
+
+1. LLM receives the task AND the full 50-record JSON
+2. LLM tries to count, sum, and average in its head
+3. Returns... it depends on the model:
+   - **Haiku**: `{"active_count": 15, "total_active_revenue": 3848.50, ...}` ❌ (hallucinated numbers)
+   - **Sonnet**: `"Let me analyze this step by step. First, I'll identify..."` ❌ (essay instead of JSON)
+   - **ClaudeCode**: sometimes correct, sometimes wrong — 60% pass rate over 10 runs
+
+**The key insight:** Bricks uses the LLM only for planning (which bricks to chain). The actual math runs in deterministic Python. The raw LLM has to do everything — read 50 records, count, sum, divide — in one shot. That's where hallucination happens.
+
+---
+
+## Benchmark Scenarios
+
+Run the full benchmark suite to see all three scenarios:
+
+```bash
+python -m bricks_benchmark.showcase.run --live   # runs all CRM scenarios
+```
+
+| Scenario | What it proves | Bricks | Raw LLM |
+|----------|---------------|--------|---------|
+| **CRM-pipeline** | Determinism beats reasoning | ✅ Correct | ❌ Wrong (hallucination or format failure) |
+| **CRM-hallucination** | Consistency at scale (10 runs) | 10/10 (100%) | 6/10 (60%) |
+| **CRM-reuse** | Zero cost after first run (20 runs) | 20/20, 3,327 tokens | 12/20, 75,880 tokens |
+
+Results from v0.4.31, tested with ClaudeCode, Claude Haiku, and Claude Sonnet.
