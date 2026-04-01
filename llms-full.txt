@@ -1,0 +1,321 @@
+# Bricks — Full Technical Reference
+
+> Version: 0.4.36
+> PyPI: bricks-ai (core), bricks-ai-stdlib (stdlib)
+> Import: `from bricks import Bricks`
+
+---
+
+## Architecture
+
+```
+Natural language task
+        │
+        ▼
+  BlueprintComposer          ← one LLM call (cached after first run)
+        │  writes YAML
+        ▼
+  BlueprintDefinition        ← validated Pydantic model
+        │
+        ▼
+  BlueprintValidator         ← dry-run: checks types, connections, missing inputs
+        │
+        ▼
+  BlueprintEngine.run()      ← deterministic Python execution, step by step
+        │
+        ▼
+  ExecutionContext            ← tracks outputs, resolves ${variable} references
+```
+
+No LLM is involved after blueprint composition. Execution is pure Python.
+
+---
+
+## Public API
+
+### Import
+
+```python
+from bricks import Bricks
+```
+
+### `Bricks.default()`
+
+Zero-config entry point. Reads API key from environment.
+
+```python
+engine = Bricks.default(
+    model="claude-haiku-4-5",   # LiteLLM model string; overrides BRICKS_MODEL env var
+    api_key="",                  # explicit key; empty = read from env
+    provider=None,               # custom LLMProvider instance; overrides model/api_key
+)
+```
+
+Default model: `claude-haiku-4-5` (overridden by `BRICKS_MODEL` env var).
+
+### `Bricks.from_config()`
+
+Boot from a structured YAML config file. No LLM call at boot time.
+
+```python
+engine = Bricks.from_config(
+    config_path="examples/agent.yaml",   # str or Path; .yaml or .yml
+    api_key="",                           # overrides key in config file if provided
+    registry=None,                        # BrickRegistry | None; defaults to all installed packs
+)
+```
+
+### `Bricks.from_skill()`
+
+Boot from a markdown skill description. Makes one LLM call to extract domain keywords.
+
+```python
+engine = Bricks.from_skill(
+    skill_path="examples/skill.md",   # str or Path; must be .md
+    api_key="",
+    model="claude-haiku-4-5",         # model for the boot LLM call
+    registry=None,
+)
+```
+
+### `engine.execute()`
+
+Execute a natural-language task end-to-end.
+
+```python
+result = engine.execute(
+    task="filter active customers and calculate total revenue",
+    inputs={"api_response": raw_data},   # dict for ${inputs.X} references; optional
+)
+```
+
+**Returns:**
+
+```python
+{
+    "outputs":      dict,   # final output values from the blueprint
+    "cache_hit":    bool,   # True if blueprint served from store (zero tokens)
+    "api_calls":    int,    # number of LLM calls made (0 on cache hit)
+    "tokens_used":  int,    # total tokens consumed
+}
+```
+
+---
+
+## Brick authoring
+
+### Function-based brick
+
+```python
+from bricks.core.brick import brick
+from bricks.core.registry import BrickRegistry
+
+@brick(tags=["data"], destructive=False)
+def filter_active(records: list[dict]) -> list[dict]:
+    return [r for r in records if r.get("status") == "active"]
+
+registry = BrickRegistry()
+registry.register("filter_active", filter_active, filter_active.__brick_meta__)
+```
+
+### Class-based brick
+
+```python
+from bricks.core.brick import BaseBrick, BrickModel
+from bricks.core.models import BrickMeta
+from typing import Any
+
+class FilterActive(BaseBrick):
+    class Meta:
+        tags = ["data"]
+        destructive = False
+
+    class Input(BrickModel):
+        records: list[dict]
+
+    class Output(BrickModel):
+        filtered: list[dict]
+
+    def execute(self, inputs: BrickModel, metadata: BrickMeta) -> dict[str, Any]:
+        return {"filtered": [r for r in inputs.records if r.get("status") == "active"]}
+```
+
+### Teardown hooks
+
+```python
+def cleanup(inputs: dict, error: Exception) -> None:
+    # called on failure — close connections, delete temp files, etc.
+    ...
+
+@brick(tags=["io"], destructive=True, teardown=cleanup)
+def write_to_db(records: list[dict]) -> dict:
+    ...
+```
+
+For class-based bricks, override `teardown(self, inputs, metadata, error)`.
+
+The engine calls teardown on the failing step, then reverse-teardown all completed steps, then re-raises the original error.
+
+---
+
+## Blueprint YAML format
+
+```yaml
+name: crm-pipeline
+description: Filter active customers and sum revenue
+inputs:
+  raw_json: str
+
+steps:
+  - name: parse
+    brick: parse_json_string
+    inputs:
+      json_str: ${inputs.raw_json}
+
+  - name: filter
+    brick: filter_dict_list
+    inputs:
+      records: ${parse.result}
+      key: status
+      value: active
+
+  - name: count
+    brick: count_items
+    inputs:
+      items: ${filter.result}
+
+  - name: total
+    brick: sum_numbers
+    inputs:
+      numbers: ${filter.result[*].monthly_revenue}
+
+outputs:
+  active_count: ${count.result}
+  total_revenue: ${total.result}
+```
+
+**Reference syntax:** `${step_name.output_key}` — resolved by `ReferenceResolver` at runtime.
+
+---
+
+## Configuration (agent.yaml)
+
+```yaml
+name: my-agent
+model: claude-haiku-4-5        # any LiteLLM model string
+
+store:
+  enabled: true                # cache blueprints (recommended)
+  backend: file                # "file" (persistent) or "memory" (session-only)
+  path: blueprints/
+  ttl_days: 30
+
+selector:
+  top_k: 20                    # bricks included in compose prompt (5–50)
+
+skills:
+  - skills/crm.md              # markdown skill description files
+```
+
+See [examples/agent.yaml](examples/agent.yaml) for the full annotated reference.
+
+---
+
+## Standard library (bricks-ai-stdlib)
+
+100+ pre-tested bricks across 7 modules:
+
+| Module | Example bricks |
+|--------|---------------|
+| `data_transformation` | `parse_json_string`, `filter_dict_list`, `group_by_key`, `flatten_list` |
+| `string_processing` | `split_string`, `join_strings`, `regex_extract`, `truncate_string` |
+| `math_numeric` | `sum_numbers`, `average_numbers`, `round_number`, `calculate_aggregates` |
+| `list_operations` | `count_items`, `sort_list`, `deduplicate_list`, `slice_list` |
+| `validation` | `validate_email`, `validate_url`, `assert_not_empty`, `coerce_types` |
+| `encoding_security` | `base64_encode`, `base64_decode`, `hash_string`, `mask_sensitive` |
+| `date_time` | `parse_datetime`, `format_datetime`, `convert_timezone`, `date_diff` |
+
+---
+
+## MCP server
+
+Bricks exposes a `execute_task` MCP tool. Any MCP-compatible host (Claude Desktop, Cursor, etc.) can call it.
+
+```json
+{
+  "mcpServers": {
+    "bricks": {
+      "command": "bricks",
+      "args": ["serve"],
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+Config file location:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+---
+
+## Community packs
+
+Any Python package named `bricks-{name}` with a `bricks.packs` entry point auto-registers on `Bricks.default()`:
+
+```toml
+# pyproject.toml
+[project.entry-points."bricks.packs"]
+mypack = "bricks_mypack"
+```
+
+```python
+# bricks_mypack/__init__.py
+from bricks.core.brick import brick
+from bricks.core.registry import BrickRegistry
+
+@brick(tags=["custom"])
+def my_brick(value: str) -> str:
+    return value.upper()
+
+def register(registry: BrickRegistry) -> None:
+    registry.register("my_brick", my_brick, my_brick.__brick_meta__)
+```
+
+---
+
+## Benchmark results (v0.4.31, CRM-pipeline scenario)
+
+| | BricksEngine | Raw LLM |
+|---|---|---|
+| Correctness | 100% (all models, all seeds) | 0–60% |
+| 10-run consistency | 10/10 | 6/10 |
+| 20-run token cost | 3,327 tokens total | 75,880 tokens |
+
+Models tested: Claude Haiku, Claude Sonnet, GPT-4o-mini.
+
+---
+
+## Key source files
+
+- [packages/core/src/bricks/api.py](packages/core/src/bricks/api.py) — public API (`Bricks` class)
+- [packages/core/src/bricks/core/engine.py](packages/core/src/bricks/core/engine.py) — `BlueprintEngine`
+- [packages/core/src/bricks/core/brick.py](packages/core/src/bricks/core/brick.py) — `@brick`, `BaseBrick`, `BrickModel`
+- [packages/core/src/bricks/core/registry.py](packages/core/src/bricks/core/registry.py) — `BrickRegistry`
+- [packages/core/src/bricks/core/models.py](packages/core/src/bricks/core/models.py) — `BrickMeta`, `BlueprintDefinition`, `StepDefinition`
+- [packages/core/src/bricks/core/validation.py](packages/core/src/bricks/core/validation.py) — `BlueprintValidator`
+- [packages/core/src/bricks/orchestrator/runtime.py](packages/core/src/bricks/orchestrator/runtime.py) — `RuntimeOrchestrator`
+- [packages/core/src/bricks/ai/composer.py](packages/core/src/bricks/ai/composer.py) — `BlueprintComposer`
+- [packages/stdlib/src/bricks_stdlib/](packages/stdlib/src/bricks_stdlib/) — standard library bricks
+- [examples/agent.yaml](examples/agent.yaml) — full config reference
+- [examples/skill.md](examples/skill.md) — skill description format
+- [CHANGELOG.md](CHANGELOG.md) — version history
+
+---
+
+## Links
+
+- Repository: https://github.com/hemipaska-maker/bricks-ai
+- Issues: https://github.com/hemipaska-maker/bricks-ai/issues
+- PyPI (core): https://pypi.org/project/bricks-ai/
+- PyPI (stdlib): https://pypi.org/project/bricks-ai-stdlib/

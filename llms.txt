@@ -24,15 +24,16 @@ pip install "bricks-ai[stdlib,ai]"   # with standard library (100+ bricks) and L
 ## Quick start
 
 ```python
-from bricks.api import Bricks
+from bricks import Bricks
 
 engine = Bricks.default()  # reads API key from environment
 result = engine.execute(
     "filter active customers and count them",
-    {"data": customers_list}
+    inputs={"data": customers_list},
 )
 print(result["outputs"])      # {"active_customers": [...], "count": 42}
 print(result["cache_hit"])    # True on second call — zero tokens
+print(result["tokens_used"])  # 0 on cache hit
 ```
 
 ## Key concepts
@@ -44,6 +45,25 @@ print(result["cache_hit"])    # True on second call — zero tokens
 - **Composer**: LLM-powered layer that writes blueprints from natural language (`BlueprintComposer`)
 - **Teardown hooks**: optional cleanup called on failure, reverse-ordered across completed steps
 
+## API entry points
+
+```python
+from bricks import Bricks
+
+# Zero-config — reads API key from environment
+engine = Bricks.default(model="claude-haiku-4-5", api_key="")
+
+# From a YAML config file (no LLM call)
+engine = Bricks.from_config("examples/agent.yaml")
+
+# From a markdown skill description (one LLM call)
+engine = Bricks.from_skill("examples/skill.md", api_key="sk-ant-...")
+
+# Execute a task
+result = engine.execute(task="...", inputs={...})
+# Returns: {"outputs": {...}, "cache_hit": bool, "api_calls": int, "tokens_used": int}
+```
+
 ## Supported LLM providers
 
 Bricks uses LiteLLM — works with any model:
@@ -51,8 +71,8 @@ Bricks uses LiteLLM — works with any model:
 - Anthropic: `export ANTHROPIC_API_KEY=sk-ant-...`
 - OpenAI: `export OPENAI_API_KEY=sk-...`
 - Google Gemini: `export GOOGLE_API_KEY=AIza...`
-- Ollama (local, free): `--model ollama/llama3`
-- Claude Code Max plan: `--model claudecode`
+- Ollama (local, free): `model="ollama/llama3"`
+- Claude Code Max plan: `model="claudecode"`
 
 ## MCP server
 
@@ -77,8 +97,20 @@ Publish a `bricks-{name}` package to PyPI with a `bricks.packs` entry point and 
 - Core engine: `bricks-ai` (import as `bricks`)
 - Standard library: `bricks-ai-stdlib` (import as `bricks_stdlib`)
 
+## Key files
+
+- [examples/agent.yaml](examples/agent.yaml) — full agent configuration reference
+- [examples/skill.md](examples/skill.md) — skill description format
+- [examples/python_api.py](examples/python_api.py) — Python API usage
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guide
+- [CHANGELOG.md](CHANGELOG.md) — version history
+
 ## Links
 
 - Repository: https://github.com/hemipaska-maker/bricks-ai
 - Issues: https://github.com/hemipaska-maker/bricks-ai/issues
 - Full docs: https://github.com/hemipaska-maker/bricks-ai#readme
+
+## Version
+
+0.4.36
