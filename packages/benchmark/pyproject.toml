@@ -9,8 +9,8 @@ authors = [
 ]
 
 dependencies = [
-    "bricks>=0.4.23",
-    "bricks-stdlib>=0.4.23",
+    "bricks-ai>=0.4.23",
+    "bricks-ai-stdlib>=0.4.23",
     "tiktoken>=0.5",
     "matplotlib>=3.7",
 ]
