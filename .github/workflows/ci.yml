@@ -28,6 +28,7 @@ jobs:
 
       - name: Install packages
         run: |
+          pip install --upgrade pip
           pip install -e "packages/core[dev,ai]"
           pip install -e "packages/stdlib"
           pip install -e "packages/benchmark"
@@ -51,6 +52,7 @@ jobs:
 
       - name: Install packages
         run: |
+          pip install --upgrade pip
           pip install -e "packages/core[dev,ai]"
           pip install -e "packages/stdlib"
           pip install -e "packages/benchmark"
