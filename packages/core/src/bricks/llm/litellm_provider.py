@@ -51,7 +51,7 @@ class LiteLLMProvider(LLMProvider):
             BricksComposeError: If the LLM call fails for any other reason.
         """
         try:
-            import litellm  # noqa: PLC0415
+            import litellm  # noqa: PLC0415  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError("The 'litellm' package is required. Install with: pip install bricks[ai]") from exc
 

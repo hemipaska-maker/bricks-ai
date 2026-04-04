@@ -36,6 +36,10 @@ module = ["ruamel", "ruamel.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = ["litellm", "litellm.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = ["bricks.mcp.server"]
 warn_unused_ignores = false
 

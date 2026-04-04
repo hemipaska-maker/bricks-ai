@@ -55,7 +55,7 @@ def _check_python_version() -> None:
 def _check_litellm() -> None:
     """Check whether litellm is importable and report its version."""
     try:
-        import litellm  # noqa: PLC0415
+        import litellm  # noqa: PLC0415  # type: ignore[import-untyped]
 
         version = getattr(litellm, "__version__", "unknown")
         typer.echo(f"  OK       litellm {version}")
