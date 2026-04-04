@@ -12,7 +12,7 @@ steps:
   - name: filter_active
     brick: filter_dict_list
     params:
-      items: "${parsed.data}"
+      items: "${parsed.result}"
       key: "status"
       value: "active"
     save_as: filtered

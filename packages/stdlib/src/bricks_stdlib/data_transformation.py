@@ -13,13 +13,13 @@ from bricks.core.brick import brick
 
 @brick(tags=["data", "json", "parsing"], category="data_transformation", destructive=False)
 def extract_json_from_str(text: str) -> dict[str, Any]:
-    """Extract JSON from a string, stripping markdown code fences if present. Returns {data: parsed}.
+    """Extract JSON from a string, stripping markdown code fences if present. Returns {result: parsed}.
 
     Args:
         text: String containing JSON, optionally wrapped in markdown fences.
 
     Returns:
-        dict with key ``data`` containing the parsed JSON value.
+        dict with key ``result`` containing the parsed JSON value.
 
     Raises:
         ValueError: If no valid JSON is found.
@@ -30,7 +30,7 @@ def extract_json_from_str(text: str) -> dict[str, Any]:
         # strip opening fence line and closing fence
         inner = "\n".join(lines[1:-1]) if lines[-1].strip().startswith("```") else "\n".join(lines[1:])
         cleaned = inner.strip()
-    return {"data": json.loads(cleaned)}
+    return {"result": json.loads(cleaned)}
 
 
 @brick(tags=["data", "filter", "list"], category="data_transformation", destructive=False)
@@ -50,18 +50,18 @@ def filter_dict_list(items: list[dict[str, Any]], key: str, value: Any) -> dict[
 
 @brick(tags=["data", "validation", "schema"], category="data_transformation", destructive=False)
 def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> dict[str, bool]:
-    """Validate that data contains all required keys defined in schema. Returns {valid: bool}.
+    """Validate that data contains all required keys defined in schema. Returns {result: bool}.
 
     Args:
         data: The dict to validate.
         schema: Dict with a ``required`` list of key names.
 
     Returns:
-        dict with key ``valid`` — True if all required keys are present.
+        dict with key ``result`` — True if all required keys are present.
     """
     required = schema.get("required", [])
     valid = all(k in data for k in required)
-    return {"valid": valid}
+    return {"result": valid}
 
 
 @brick(tags=["data", "merge", "dict"], category="data_transformation", destructive=False)
@@ -80,16 +80,16 @@ def merge_dictionaries(base: dict[str, Any], override: dict[str, Any]) -> dict[s
 
 @brick(tags=["data", "extraction", "dict"], category="data_transformation", destructive=False)
 def extract_dict_field(data: dict[str, Any], field: str) -> dict[str, Any]:
-    """Extract a single field from a dict. Returns {value: field_value}.
+    """Extract a single field from a dict. Returns {result: field_value}.
 
     Args:
         data: Source dictionary.
         field: Key to extract.
 
     Returns:
-        dict with key ``value`` containing the field value, or None if missing.
+        dict with key ``result`` containing the field value, or None if missing.
     """
-    return {"value": data.get(field)}
+    return {"result": data.get(field)}
 
 
 @brick(tags=["data", "casting", "types"], category="data_transformation", destructive=False)

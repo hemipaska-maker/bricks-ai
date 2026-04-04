@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.38] — 2026-04-01
+
+### Changed
+- **Standardize stdlib return keys**: all stdlib bricks now return `{"result": <value>}` consistently
+  - `extract_json_from_str`: `{"data": ...}` → `{"result": ...}`
+  - `validate_json_schema`: `{"valid": ...}` → `{"result": ...}`
+  - `extract_dict_field`: `{"value": ...}` → `{"result": ...}`
+  - `count_words_chars`: `{"words": ..., "chars": ...}` → `{"result": {"words": ..., "chars": ...}}`
+  - `extract_date_parts`: `{"year": ..., ...}` → `{"result": {"year": ..., ...}}`
+- Updated blueprint YAML examples (`crm_pipeline`, `crm_hallucination`, `crm_reuse`): `${parsed.data}` → `${parsed.result}`
+
 ## [0.4.37] — 2026-04-04
 
 ### Added

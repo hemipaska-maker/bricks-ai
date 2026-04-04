@@ -49,7 +49,7 @@ def test_convert_timezone_utc_to_eastern() -> None:
 
 def test_extract_date_parts_monday() -> None:
     # 2024-01-01 is a Monday (weekday=0)
-    parts = extract_date_parts("2024-01-01")
+    parts = extract_date_parts("2024-01-01")["result"]
     assert parts["year"] == 2024 and parts["weekday"] == 0
 
 

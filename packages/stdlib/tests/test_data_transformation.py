@@ -33,12 +33,12 @@ from bricks_stdlib.data_transformation import (
 
 
 def test_extract_json_from_str_plain_json() -> None:
-    assert extract_json_from_str('{"a": 1}')["data"] == {"a": 1}
+    assert extract_json_from_str('{"a": 1}')["result"] == {"a": 1}
 
 
 def test_extract_json_from_str_with_fence() -> None:
     text = '```json\n{"x": 42}\n```'
-    assert extract_json_from_str(text)["data"] == {"x": 42}
+    assert extract_json_from_str(text)["result"] == {"x": 42}
 
 
 def test_filter_dict_list_filters_by_value() -> None:
@@ -47,11 +47,11 @@ def test_filter_dict_list_filters_by_value() -> None:
 
 
 def test_validate_json_schema_all_required_present() -> None:
-    assert validate_json_schema({"a": 1, "b": 2}, {"required": ["a", "b"]})["valid"] is True
+    assert validate_json_schema({"a": 1, "b": 2}, {"required": ["a", "b"]})["result"] is True
 
 
 def test_validate_json_schema_missing_key() -> None:
-    assert validate_json_schema({"a": 1}, {"required": ["a", "b"]})["valid"] is False
+    assert validate_json_schema({"a": 1}, {"required": ["a", "b"]})["result"] is False
 
 
 def test_merge_dictionaries_override_wins() -> None:
@@ -60,7 +60,7 @@ def test_merge_dictionaries_override_wins() -> None:
 
 
 def test_extract_dict_field_returns_value() -> None:
-    assert extract_dict_field({"key": "val"}, "key")["value"] == "val"
+    assert extract_dict_field({"key": "val"}, "key")["result"] == "val"
 
 
 def test_cast_data_types_int_cast() -> None:

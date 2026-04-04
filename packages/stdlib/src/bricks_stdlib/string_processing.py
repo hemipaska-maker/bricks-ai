@@ -199,15 +199,15 @@ def extract_emails(text: str) -> dict[str, list[str]]:
 
 @brick(tags=["string", "count", "stats"], category="string_processing", destructive=False)
 def count_words_chars(text: str) -> dict[str, int]:
-    """Count words and characters in text. Returns {words: int, chars: int}.
+    """Count words and characters in text. Returns {result: {words: int, chars: int}}.
 
     Args:
         text: Input string.
 
     Returns:
-        dict with keys ``words`` (word count) and ``chars`` (character count).
+        dict with key ``result`` containing a dict with ``words`` and ``chars`` counts.
     """
-    return {"words": len(text.split()), "chars": len(text)}
+    return {"result": {"words": len(text.split()), "chars": len(text)}}
 
 
 @brick(tags=["string", "cleaning", "punctuation"], category="string_processing", destructive=False)

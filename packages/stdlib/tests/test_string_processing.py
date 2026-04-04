@@ -94,7 +94,7 @@ def test_extract_emails_finds_addresses() -> None:
 
 
 def test_count_words_chars_correct() -> None:
-    result = count_words_chars("hello world")
+    result = count_words_chars("hello world")["result"]
     assert result["words"] == 2 and result["chars"] == 11
 
 

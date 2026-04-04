@@ -119,16 +119,17 @@ def convert_timezone(iso_datetime: str, from_tz: str, to_tz: str) -> dict[str, s
 
 @brick(tags=["date", "extraction", "parts"], category="date_time", destructive=False)
 def extract_date_parts(iso_date: str) -> dict[str, int]:
-    """Extract year, month, day, weekday from an ISO 8601 date. Returns {year, month, day, weekday}.
+    """Extract year, month, day, weekday from an ISO 8601 date. Returns {result: {year, month, day, weekday}}.
 
     Args:
         iso_date: ISO 8601 date string (YYYY-MM-DD).
 
     Returns:
-        dict with keys ``year``, ``month``, ``day``, and ``weekday`` (0=Monday).
+        dict with key ``result`` containing a dict with ``year``, ``month``, ``day``,
+        and ``weekday`` (0=Monday).
     """
     dt = datetime.strptime(iso_date, "%Y-%m-%d").date()
-    return {"year": dt.year, "month": dt.month, "day": dt.day, "weekday": dt.weekday()}
+    return {"result": {"year": dt.year, "month": dt.month, "day": dt.day, "weekday": dt.weekday()}}
 
 
 @brick(tags=["date", "business", "calendar"], category="date_time", destructive=False)
