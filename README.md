@@ -145,6 +145,32 @@ pip install -e ".[stdlib,ai]"
 
 ---
 
+## Windows Setup
+
+On Windows, `pip install bricks-ai[ai]` can fail with a long-path error because `litellm` installs files whose paths exceed the Windows default 260-character limit (`MAX_PATH`).
+
+**Symptom:**
+```
+ERROR: Could not install packages due to an OSError: [Errno 2] No such file or directory: '...\...\...'
+```
+
+**Fix (recommended):** Enable long paths via the registry or Group Policy:
+1. Open `regedit`
+2. Navigate to `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem`
+3. Set `LongPathsEnabled` to `1`
+4. Restart your terminal
+
+**Alternative:** Install in a short path (e.g. `C:\bricks\`) to stay under the 260-char limit.
+
+**Verify your setup:**
+```bash
+bricks check-env
+```
+
+This command checks your Python version, litellm installation, and (on Windows) whether long paths are enabled.
+
+---
+
 ## Community Packs
 
 Create a `bricks-{name}` package and publish it to PyPI. Users install it and it auto-registers:

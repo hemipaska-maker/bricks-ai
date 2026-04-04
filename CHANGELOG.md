@@ -7,6 +7,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.37] — 2026-04-04
+
+### Added
+- `bricks check-env` CLI command: diagnoses Python version, litellm install, and Windows MAX_PATH limits
+- README: Windows Setup section with workaround for 260-char path limit
+
 ## [0.4.36] — 2026-04-01
 
 ### Changed

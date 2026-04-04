@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 
+from bricks.cli.check_env import check_env as _check_env_fn
 from bricks.core.config import BricksConfig, ConfigLoader
 from bricks.core.discovery import BrickDiscovery
 from bricks.core.engine import BlueprintEngine
@@ -314,6 +315,12 @@ def list_bricks() -> None:
         destructive_str = " [DESTRUCTIVE]" if meta.destructive else ""
         desc_str = f" - {meta.description}" if meta.description else ""
         typer.echo(f"  {name}{tags_str}{destructive_str}{desc_str}")
+
+
+@app.command(name="check-env")
+def check_env() -> None:
+    """Diagnose the local environment (Python version, litellm, Windows path limits)."""
+    _check_env_fn()
 
 
 store_app = typer.Typer(help="Blueprint store management.")
