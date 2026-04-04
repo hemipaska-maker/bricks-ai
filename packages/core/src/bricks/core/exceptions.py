@@ -79,11 +79,7 @@ class GuardFailedError(BrickError):
         self.step_name = step_name
         self.condition = condition
         self.actual = actual
-        super().__init__(
-            f"Guard {step_name!r} failed: {message}\n"
-            f"  Condition : {condition!r}\n"
-            f"  Actual    : {actual}"
-        )
+        super().__init__(f"Guard {step_name!r} failed: {message}\n  Condition : {condition!r}\n  Actual    : {actual}")
 
 
 class OrchestratorError(BrickError):
