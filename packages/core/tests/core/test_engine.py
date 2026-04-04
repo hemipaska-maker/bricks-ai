@@ -90,7 +90,9 @@ class TestEngineRun:
         )
         with pytest.raises(BrickExecutionError) as exc_info:
             engine.run(bp)
-        assert "broken" in str(exc_info.value), f"Expected 'broken' in {str(exc_info.value)!r}"
+        error_msg = str(exc_info.value)
+        assert "broken" in error_msg, f"Expected brick name 'broken' in {error_msg!r}"
+        assert "s1" in error_msg, f"Expected step name 's1' in {error_msg!r}"
 
     def test_none_inputs_treated_as_empty(self, math_registry: BrickRegistry) -> None:
         engine = BlueprintEngine(registry=math_registry)

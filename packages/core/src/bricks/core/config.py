@@ -123,11 +123,11 @@ class ConfigLoader:
             return BricksConfig()
         return self.load_file(config_path)
 
-    def load_file(self, path: Path) -> BricksConfig:
+    def load_file(self, path: str | Path) -> BricksConfig:
         """Load config from a specific YAML file path.
 
         Args:
-            path: Path to the config file.
+            path: Path to the config file (str or :class:`~pathlib.Path`).
 
         Returns:
             A validated BricksConfig.
@@ -136,6 +136,7 @@ class ConfigLoader:
             ConfigError: If the file cannot be parsed or fails validation.
             FileNotFoundError: If the path does not exist.
         """
+        path = Path(path)
         if not path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
         try:

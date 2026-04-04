@@ -45,11 +45,11 @@ class BlueprintLoader:
         self._yaml = YAML()
         self._yaml.preserve_quotes = True
 
-    def load_file(self, path: Path) -> BlueprintDefinition:
+    def load_file(self, path: str | Path) -> BlueprintDefinition:
         """Load a BlueprintDefinition from a YAML file path.
 
         Args:
-            path: Path to the .yaml file.
+            path: Path to the .yaml file (str or :class:`~pathlib.Path`).
 
         Returns:
             A validated BlueprintDefinition.
@@ -58,6 +58,7 @@ class BlueprintLoader:
             YamlLoadError: If the file cannot be parsed or does not conform to schema.
             FileNotFoundError: If the path does not exist.
         """
+        path = Path(path)
         if not path.exists():
             raise FileNotFoundError(f"Blueprint file not found: {path}")
         try:

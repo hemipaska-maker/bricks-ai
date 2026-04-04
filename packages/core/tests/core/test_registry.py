@@ -106,3 +106,16 @@ class TestRegistryListAndHas:
             reg.register(n, lambda: None, BrickMeta(name=n))
         listed_names = [name for name, _ in reg.list_all()]
         assert listed_names == sorted(names), f"Expected {sorted(names)!r}, got {listed_names!r}"
+
+
+class TestFromStdlib:
+    def test_from_stdlib_registers_bricks(self) -> None:
+        reg = BrickRegistry.from_stdlib()
+        all_names = [name for name, _ in reg.list_all()]
+        assert len(all_names) > 0, "Expected stdlib bricks to be registered"
+        assert "extract_json_from_str" in all_names
+
+    def test_from_stdlib_returns_new_registry_each_call(self) -> None:
+        reg1 = BrickRegistry.from_stdlib()
+        reg2 = BrickRegistry.from_stdlib()
+        assert reg1 is not reg2

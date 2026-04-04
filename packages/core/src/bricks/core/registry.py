@@ -72,3 +72,22 @@ class BrickRegistry:
     def clear(self) -> None:
         """Remove all registered bricks. Primarily for testing."""
         self._bricks.clear()
+
+    @classmethod
+    def from_stdlib(cls) -> BrickRegistry:
+        """Create a registry pre-populated with all installed stdlib bricks.
+
+        Calls ``bricks.packs.discover_and_load`` to register every brick
+        from all installed ``bricks.packs`` entry points.
+
+        Returns:
+            A new :class:`BrickRegistry` with all stdlib bricks registered.
+
+        Raises:
+            BricksConfigError: If no brick packs are installed.
+        """
+        from bricks.packs import discover_and_load  # noqa: PLC0415 — avoid circular at module level
+
+        registry = cls()
+        discover_and_load(registry)
+        return registry

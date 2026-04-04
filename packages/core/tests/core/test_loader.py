@@ -91,3 +91,10 @@ class TestBlueprintLoaderFromFile:
         loader = BlueprintLoader()
         with pytest.raises(YamlLoadError):
             loader.load_file(yaml_file)
+
+    def test_load_file_accepts_str_path(self, tmp_path: Path) -> None:
+        yaml_file = tmp_path / "str_path.yaml"
+        yaml_file.write_text("name: str_test\nsteps:\n  - name: s1\n    brick: x\n")
+        loader = BlueprintLoader()
+        bp = loader.load_file(str(yaml_file))
+        assert bp.name == "str_test"

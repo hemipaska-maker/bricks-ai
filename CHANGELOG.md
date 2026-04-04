@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.40] — 2026-04-01
+
+### Added
+- **DX: `load_file` accepts `str | Path`**: `BlueprintLoader.load_file()` and `ConfigLoader.load_file()` now accept plain strings as well as `Path` objects
+- **DX: `BrickRegistry.from_stdlib()`**: classmethod that creates a registry pre-populated with all installed stdlib bricks via `discover_and_load`
+- Tests for all three DX improvements
+
 ## [0.4.39] — 2026-04-01
 
 ### Added
