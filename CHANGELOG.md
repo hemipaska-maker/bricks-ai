@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.39] — 2026-04-01
+
+### Added
+- **Guard step type**: blueprint steps can now set `type: guard` with a `condition` Python expression and optional `message`
+  - Engine evaluates guard conditions in a restricted scope (no builtins) against current step results
+  - Raises `GuardFailedError` (subclass of `BrickError`) with step name, condition, message, and actual scope snapshot
+  - `StepDefinition` model updated: new `type` field (`"brick" | "blueprint" | "guard"`), `condition`, and `message` fields
+
 ## [0.4.38] — 2026-04-01
 
 ### Changed

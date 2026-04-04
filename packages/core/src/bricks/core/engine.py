@@ -8,7 +8,7 @@ from typing import Any
 
 from bricks.core.brick import BaseBrick, BrickModel
 from bricks.core.context import ExecutionContext
-from bricks.core.exceptions import BrickExecutionError
+from bricks.core.exceptions import BrickExecutionError, GuardFailedError
 from bricks.core.models import (
     BlueprintDefinition,
     BrickMeta,
@@ -143,6 +143,7 @@ class BlueprintEngine:
                 completed,
                 depth,
                 verbosity,
+                context,
             )
 
             if step_result is not None:
@@ -170,8 +171,9 @@ class BlueprintEngine:
         completed: list[tuple[Any, dict[str, Any], BrickMeta]],
         depth: int,
         verbosity: Verbosity,
+        context: ExecutionContext,
     ) -> tuple[Any, StepResult | None]:
-        """Execute a single step (brick or sub-blueprint).
+        """Execute a single step (brick, sub-blueprint, or guard).
 
         Args:
             step: The step definition to execute.
@@ -179,13 +181,17 @@ class BlueprintEngine:
             completed: Mutable list of completed steps for teardown tracking.
             depth: Current recursion depth.
             verbosity: Execution trace detail level.
+            context: Current execution context (used by guard steps).
 
         Returns:
             Tuple of (step result value, optional StepResult for tracing).
 
         Raises:
             BrickExecutionError: If the step fails.
+            GuardFailedError: If a guard condition evaluates to False.
         """
+        if step.type == "guard":
+            return self._execute_guard_step(step, context)
         if step.brick is not None:
             return self._execute_brick_step(step, resolved_params, completed, verbosity)
         return self._execute_sub_blueprint_step(step, resolved_params, depth, verbosity)
@@ -283,3 +289,44 @@ class BlueprintEngine:
             )
 
         return result, step_result
+
+    def _execute_guard_step(
+        self,
+        step: StepDefinition,
+        context: ExecutionContext,
+    ) -> tuple[None, None]:
+        """Evaluate a guard condition against the current execution context.
+
+        The condition is evaluated with a restricted scope: all named step
+        results saved so far, plus ``__builtins__`` set to an empty dict.
+
+        Args:
+            step: The guard step definition (must have ``condition`` set).
+            context: Current execution context providing variable bindings.
+
+        Returns:
+            ``(None, None)`` when the condition passes.
+
+        Raises:
+            GuardFailedError: When the condition evaluates to a falsy value.
+        """
+        condition: str = step.condition  # type: ignore[assignment]  # validated non-None
+        scope: dict[str, Any] = dict(context.results)
+        try:
+            passed = bool(eval(condition, {"__builtins__": {}}, scope))  # noqa: S307
+        except Exception as exc:
+            raise GuardFailedError(
+                step_name=step.name,
+                condition=condition,
+                message=f"Condition raised an error: {exc}",
+                actual=str(scope)[:200],
+            ) from exc
+
+        if not passed:
+            raise GuardFailedError(
+                step_name=step.name,
+                condition=condition,
+                message=step.message,
+                actual=str(scope)[:200],
+            )
+        return None, None

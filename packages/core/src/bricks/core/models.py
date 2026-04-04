@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -22,19 +22,27 @@ class BrickMeta(BaseModel):
 class StepDefinition(BaseModel):
     """A single step within a blueprint definition (parsed from YAML).
 
-    Each step must specify exactly one of ``brick`` (a registered brick name)
-    or ``blueprint`` (a path to a child blueprint YAML file).
+    Steps of ``type="brick"`` (default) or ``type="blueprint"`` must specify
+    exactly one of ``brick`` or ``blueprint``.  Steps of ``type="guard"`` must
+    specify ``condition`` (a Python expression) and optionally ``message``.
     """
 
     name: str
+    type: Literal["brick", "blueprint", "guard"] = "brick"
     brick: str | None = None
     blueprint: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     save_as: str | None = None
+    condition: str | None = None
+    message: str = "Guard condition not met"
 
     @model_validator(mode="after")
-    def check_brick_or_blueprint(self) -> StepDefinition:
-        """Enforce exactly one of brick or blueprint is set."""
+    def check_step_fields(self) -> StepDefinition:
+        """Enforce field constraints per step type."""
+        if self.type == "guard":
+            if self.condition is None:
+                raise ValueError("Guard step must specify 'condition'")
+            return self
         if self.brick is None and self.blueprint is None:
             raise ValueError("Step must specify either 'brick' or 'blueprint'")
         if self.brick is not None and self.blueprint is not None:

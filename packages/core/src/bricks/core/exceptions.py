@@ -66,6 +66,26 @@ class YamlLoadError(BrickError):
         super().__init__(f"Failed to load YAML from {path!r}: {cause}")
 
 
+class GuardFailedError(BrickError):
+    """Raised when a guard step condition evaluates to False."""
+
+    def __init__(
+        self,
+        step_name: str,
+        condition: str,
+        message: str,
+        actual: str,
+    ) -> None:
+        self.step_name = step_name
+        self.condition = condition
+        self.actual = actual
+        super().__init__(
+            f"Guard {step_name!r} failed: {message}\n"
+            f"  Condition : {condition!r}\n"
+            f"  Actual    : {actual}"
+        )
+
+
 class OrchestratorError(BrickError):
     """Raised when RuntimeOrchestrator.execute() cannot complete a task."""
 
