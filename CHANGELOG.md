@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.41] — 2026-04-05
+
+### Added
+- **Brick Catalog generator**: `packages/stdlib/scripts/generate_catalog.py` auto-generates `docs/BRICK_CATALOG.md` from stdlib brick metadata and docstrings
+  - Inspects `__brick_meta__` and function signatures for name, description, inputs, and output format
+  - Groups 100 bricks by category with full parameter documentation
+  - Run with: `python packages/stdlib/scripts/generate_catalog.py`
+  - 19 new tests covering metadata extraction, docstring parsing, and catalog generation
+
 ## [0.4.40] — 2026-04-01
 
 ### Added
