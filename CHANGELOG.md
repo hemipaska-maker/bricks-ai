@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.42] — 2026-04-05
+
+### Added
+- **Live E2E tests expanded**: 8 new `@pytest.mark.live` tests in `test_execute_live.py`, one per stdlib category (string, math, date, data transformation, list, encoding, validation, multi-step)
+  - Each test asserts on actual output values (not just `is_valid`)
+  - All 18 live tests pass with ClaudeCodeProvider
+- **Failure path tests**: new `packages/core/tests/live/test_failure_paths.py` with 5 tests covering impossible tasks, type mismatches, empty inputs, ambiguous tasks, and error message quality
+- **Stdlib contract tests**: new `packages/stdlib/tests/test_contracts.py` parametrically verifies all 100 stdlib bricks return `{"result": ...}` — 101 passed, 1 skipped (convert_timezone requires tzdata)
+
 ## [0.4.41] — 2026-04-05
 
 ### Added
