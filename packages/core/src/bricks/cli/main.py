@@ -449,7 +449,7 @@ def demo(
     if provider_name == "claudecode":
         try:
             from bricks_provider_claudecode.provider import (  # noqa: PLC0415
-                ClaudeCodeProvider,  # type: ignore[import-untyped]
+                ClaudeCodeProvider,
             )
 
             resolved_provider = ClaudeCodeProvider()
