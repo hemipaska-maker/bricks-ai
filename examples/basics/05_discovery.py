@@ -1,9 +1,13 @@
-"""Example: automatic brick discovery from a directory.
+"""05 — Brick Discovery: auto-register bricks from a directory.
 
-This example demonstrates:
-- Using BrickDiscovery to scan a directory for @brick-decorated functions
-- Auto-registering discovered bricks in a BrickRegistry
-- Listing all registered bricks with their schemas via registry_schema
+Demonstrates:
+- Writing @brick-decorated functions in separate Python files
+- Using BrickDiscovery to scan a directory and register all found bricks
+- Listing discovered bricks via registry_schema
+
+Run::
+
+    python examples/basics/05_discovery.py
 """
 
 from __future__ import annotations
@@ -19,11 +23,10 @@ from bricks.core.schema import registry_schema
 
 def main() -> None:
     """Run the discovery example."""
-    # Create a temporary directory with brick definitions
     with tempfile.TemporaryDirectory() as tmp_dir:
         bricks_dir = Path(tmp_dir)
 
-        # Write two brick files into the temp directory
+        # Write brick definitions into temp files
         (bricks_dir / "math_bricks.py").write_text(
             textwrap.dedent("""
                 from bricks.core.brick import brick
@@ -48,37 +51,25 @@ def main() -> None:
             """).strip()
         )
 
-        # Discover all bricks from the directory
+        # Auto-discover and register all bricks from the directory
         registry = BrickRegistry()
         discovery = BrickDiscovery(registry=registry)
         found = discovery.discover_package(bricks_dir)
 
         print(f"Discovered {len(found)} bricks: {sorted(found)}")
 
-        # Print schemas for all discovered bricks
-        schemas = registry_schema(registry)
-        for schema in schemas:
+        for schema in registry_schema(registry):
             tags = ", ".join(schema["tags"]) if schema["tags"] else "none"
-            print(f"  {schema['name']} [{tags}] -- {schema['description']}")
-            for param, info in schema["parameters"].items():
-                required = "required" if info["required"] else "optional"
-                print(f"    param: {param} ({info['type']}, {required})")
-
-        assert len(found) == 3, f"Expected 3 bricks, got {len(found)}"  # noqa: S101
-        assert registry.has("add"), "Expected 'add' to be registered"  # noqa: S101
-        assert registry.has("multiply"), "Expected 'multiply' to be registered"  # noqa: S101
-        assert registry.has("to_upper"), "Expected 'to_upper' to be registered"  # noqa: S101
+            print(f"  {schema['name']} [{tags}] — {schema['description']}")
 
         # Verify bricks are callable
         add_fn, _ = registry.get("add")
-        result = add_fn(a=3.0, b=4.0)
-        assert result == 7.0, f"Expected add(3, 4) == 7.0, got {result}"  # noqa: S101
+        assert add_fn(a=3.0, b=4.0) == 7.0  # noqa: S101
 
         to_upper_fn, _ = registry.get("to_upper")
-        upper = to_upper_fn(text="hello")
-        assert upper == "HELLO", f"Expected 'HELLO', got {upper}"  # noqa: S101
+        assert to_upper_fn(text="hello") == "HELLO"  # noqa: S101
 
-        print("\nAll assertions passed")
+        print("OK")
 
 
 if __name__ == "__main__":

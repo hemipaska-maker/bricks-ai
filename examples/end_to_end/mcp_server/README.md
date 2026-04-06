@@ -1,4 +1,6 @@
-# Using Bricks as an MCP Server
+# Bricks as an MCP Server
+
+Expose the Bricks engine to Claude Desktop (or any MCP-compatible client) as a single `execute_task` tool.
 
 ## Installation
 
@@ -22,11 +24,13 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
+See [mcp_config.json](mcp_config.json) for a ready-to-copy snippet.
+
 ## Advanced
 
 ```bash
 # Use a custom config file
-bricks serve --config agent.yaml
+bricks serve --config examples/config/agent.yaml
 
 # Use a different model
 bricks serve --model gpt-4o-mini
@@ -34,14 +38,14 @@ bricks serve --model gpt-4o-mini
 
 ## Tool: `execute_task`
 
-The server exposes a single tool:
+The server exposes one tool:
 
 | Field    | Type   | Required | Description                                      |
 |----------|--------|----------|--------------------------------------------------|
 | `task`   | string | yes      | Natural language description of what to compute. |
 | `inputs` | object | no       | Input values for `${inputs.key_name}` references.|
 
-Example call:
+### Example call
 
 ```json
 {
@@ -55,7 +59,7 @@ Example call:
 }
 ```
 
-Example response:
+### Example response
 
 ```json
 {

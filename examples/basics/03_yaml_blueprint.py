@@ -1,10 +1,14 @@
-"""Example: loading and running a YAML blueprint file.
+"""03 — YAML Blueprint: load a blueprint from a YAML string, validate, and run.
 
-This example demonstrates:
-- Registering @brick-decorated functions
-- Loading a blueprint from a YAML string
-- Executing it with the BlueprintEngine
-- Reading the output map
+Demonstrates:
+- Defining a blueprint in YAML with inputs, steps, and outputs_map
+- Loading it with BlueprintLoader
+- Validating it with BlueprintValidator
+- Executing with BlueprintEngine
+
+Run::
+
+    python examples/basics/03_yaml_blueprint.py
 """
 
 from __future__ import annotations
@@ -17,39 +21,37 @@ from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
 from bricks.core.validation import BlueprintValidator
 
-# -- 1. Define bricks ----------------------------------------------------------
+# 1. Define and register bricks -----------------------------------------------
 
 
-@brick(tags=["math"], description="Multiply two numbers together", destructive=False)
+@brick(tags=["math"], description="Multiply two numbers")
 def multiply(a: float, b: float) -> float:
-    """Multiply a by b."""
+    """Return a * b."""
     return a * b
 
 
 @brick(tags=["math"], description="Round a float to N decimal places")
 def round_value(value: float, decimals: int = 2) -> float:
-    """Round value to the given number of decimal places."""
+    """Return value rounded to decimals places."""
     return round(value, decimals)
 
 
-@brick(tags=["io"], description="Format a float as a readable string")
+@brick(tags=["io"], description="Format a float as a labelled string")
 def format_result(value: float, label: str = "Result") -> str:
-    """Format a numeric result as a labelled string."""
+    """Return '{label}: {value}'."""
     return f"{label}: {value}"
 
-
-# -- 2. Register bricks --------------------------------------------------------
 
 registry = BrickRegistry()
 for _fn in (multiply, round_value, format_result):
     _bf = cast(BrickFunction, _fn)
     registry.register(_bf.__brick_meta__.name, _bf, _bf.__brick_meta__)
 
-# -- 3. Define blueprint in YAML -----------------------------------------------
+# 2. Blueprint YAML -----------------------------------------------------------
 
 BLUEPRINT_YAML = """
 name: calculate_area
-description: "Calculate the area of a rectangle, round it, and format it."
+description: "Compute rectangle area, round it, and format for display."
 inputs:
   width: "float"
   height: "float"
@@ -80,11 +82,11 @@ outputs_map:
   display: "${display_string}"
 """
 
-# -- 4. Load, validate, and run ------------------------------------------------
+# 3. Load, validate, execute --------------------------------------------------
 
 
 def main() -> None:
-    """Run the yaml_blueprint example."""
+    """Run the YAML blueprint example."""
     loader = BlueprintLoader()
     blueprint = loader.load_string(BLUEPRINT_YAML)
 
@@ -95,13 +97,11 @@ def main() -> None:
     engine = BlueprintEngine(registry=registry)
     outputs = engine.run(blueprint, inputs={"width": 7.5, "height": 4.2}).outputs
 
-    print("Execution complete")
     print(f"  area    = {outputs['area']}")
     print(f"  display = {outputs['display']}")
-
     assert outputs["area"] == 31.5  # noqa: S101
     assert outputs["display"] == "Area (m\xb2): 31.5"  # noqa: S101
-    print("All assertions passed")
+    print("OK")
 
 
 if __name__ == "__main__":

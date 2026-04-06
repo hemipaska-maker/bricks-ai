@@ -1,11 +1,13 @@
-"""Sub-blueprint composition example.
+"""04 — Nested Blueprints: a parent blueprint calls a child blueprint as a step.
 
-Demonstrates a parent blueprint calling a child blueprint as a step.
+Demonstrates:
+- Writing child and parent blueprints in YAML
+- Using a ``blueprint:`` step (not a ``brick:`` step) in the parent
+- Saving the child blueprint to a temp file so the parent can reference it
 
-Blueprint hierarchy:
-  parent_blueprint
-    └── sub_step  →  child_blueprint (computes area)
-    └── format_step  →  format_result brick (formats the output)
+Run::
+
+    python examples/basics/04_nested_blueprints.py
 """
 
 from __future__ import annotations
@@ -15,32 +17,32 @@ from pathlib import Path
 
 from bricks.core import BlueprintEngine, BlueprintLoader, BrickRegistry, brick
 
-# ── Bricks ────────────────────────────────────────────────────────────────────
+# 1. Bricks used by the child blueprint ---------------------------------------
 
 
 @brick(tags=["math"], description="Multiply two numbers")
 def multiply(a: float, b: float) -> dict[str, float]:
-    """Multiply two numbers."""
+    """Return {result: a * b}."""
     return {"result": a * b}
 
 
 @brick(tags=["math"], description="Round a float to N decimal places")
 def round_value(value: float, decimals: int = 2) -> dict[str, float]:
-    """Round value to the given number of decimal places."""
+    """Return {result: rounded}."""
     return {"result": round(value, decimals)}
 
 
 @brick(tags=["format"], description="Format a label+value pair for display")
 def format_result(label: str, value: float) -> dict[str, str]:
-    """Format a numeric result for display."""
+    """Return {display: 'label: value'}."""
     return {"display": f"{label}: {value}"}
 
 
-# ── Blueprint YAML strings ─────────────────────────────────────────────────────
+# 2. Blueprint YAML strings ---------------------------------------------------
 
-CHILD_BLUEPRINT_YAML = """
+CHILD_YAML = """
 name: compute_area
-description: "Compute and round room area from width and height."
+description: "Compute and round room area."
 inputs:
   width: float
   height: float
@@ -61,9 +63,9 @@ outputs_map:
   area: "${area_rounded.result}"
 """
 
-PARENT_BLUEPRINT_YAML_TEMPLATE = """
+PARENT_YAML_TEMPLATE = """
 name: room_area_display
-description: "Compute room area via sub-blueprint and format for display."
+description: "Compute area via sub-blueprint and format for display."
 inputs:
   width: float
   height: float
@@ -77,7 +79,7 @@ steps:
   - name: display
     brick: format_result
     params:
-      label: "Room area (m²)"
+      label: "Room area (m\u00b2)"
       value: "${{area_result.area}}"
     save_as: formatted
 outputs_map:
@@ -87,7 +89,7 @@ outputs_map:
 
 
 def main() -> None:
-    """Run the sub-blueprint composition demo."""
+    """Run the nested-blueprint demo."""
     registry = BrickRegistry()
     for fn in (multiply, round_value, format_result):
         registry.register(fn.__brick_meta__.name, fn, fn.__brick_meta__)
@@ -95,22 +97,18 @@ def main() -> None:
     loader = BlueprintLoader()
     engine = BlueprintEngine(registry=registry, loader=loader)
 
-    # Write child blueprint to a temp file so the parent can reference it
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
-        tmp.write(CHILD_BLUEPRINT_YAML)
+        tmp.write(CHILD_YAML)
         child_path = Path(tmp.name)
 
     try:
-        parent_yaml = PARENT_BLUEPRINT_YAML_TEMPLATE.format(child_path=child_path.as_posix())
+        parent_yaml = PARENT_YAML_TEMPLATE.format(child_path=child_path.as_posix())
         parent_bp = loader.load_string(parent_yaml)
-
-        inputs = {"width": 7.5, "height": 4.2}
-        outputs = engine.run(parent_bp, inputs=inputs).outputs
-
-        print(f"Blueprint: {parent_bp.name!r}")
-        print(f"Inputs:    width={inputs['width']}, height={inputs['height']}")
-        print(f"Area:      {outputs['area']} m²")
-        print(f"Display:   {outputs['display']}")
+        outputs = engine.run(parent_bp, inputs={"width": 7.5, "height": 4.2}).outputs
+        print(f"Area:    {outputs['area']} m\u00b2")
+        print(f"Display: {outputs['display']}")
+        assert outputs["area"] == 31.5  # noqa: S101
+        print("OK")
     finally:
         child_path.unlink(missing_ok=True)
 
