@@ -29,6 +29,7 @@ from bricks.orchestrator.runtime import RuntimeOrchestrator
 
 if TYPE_CHECKING:
     from bricks.llm.base import LLMProvider
+    from bricks.store.blueprint_store import BlueprintStore
 
 _DEFAULT_MODEL: str = "claude-haiku-4-5-20251001"
 
@@ -145,6 +146,8 @@ class Bricks:
         model: str | None = None,
         api_key: str = "",
         provider: LLMProvider | None = None,
+        store_backend: str = "memory",
+        store_path: str = "",
     ) -> Bricks:
         """Zero-config entry point — no config file needed.
 
@@ -154,6 +157,10 @@ class Bricks:
             api_key: Explicit API key. Leave empty to read from environment.
             provider: Custom LLM provider. When supplied, ``model`` and
                 ``api_key`` are ignored for LLM calls.
+            store_backend: Blueprint store backend — ``"memory"`` (session-scoped,
+                default) or ``"file"`` (persistent across restarts).
+            store_path: Directory for the file backend. Ignored for memory backend.
+                Tilde expansion is applied automatically.
 
         Returns:
             A ready-to-use :class:`Bricks` instance backed by all stdlib bricks.
@@ -164,11 +171,14 @@ class Bricks:
         import os  # noqa: PLC0415
 
         from bricks.boot.config import SystemConfig  # noqa: PLC0415
+        from bricks.core.config import StoreConfig  # noqa: PLC0415
         from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
 
         resolved_model = model or os.environ.get("BRICKS_MODEL", "claude-haiku-4-5")
         resolved_provider = provider or LiteLLMProvider(model=resolved_model, api_key=api_key)
-        config = SystemConfig(name="default", model=resolved_model, api_key=api_key)
+        resolved_path = str(Path(store_path).expanduser()) if store_path else store_path
+        store_config = StoreConfig(enabled=True, backend=store_backend, path=resolved_path)
+        config = SystemConfig(name="default", model=resolved_model, api_key=api_key, store=store_config)
         reg = _build_default_registry()
         return cls(RuntimeOrchestrator(config, reg, provider=resolved_provider))
 
@@ -178,6 +188,7 @@ class Bricks:
         self,
         task: str,
         inputs: dict[str, Any] | None = None,
+        verbose: bool = False,
     ) -> dict[str, Any]:
         """Execute a natural-language task end-to-end.
 
@@ -187,6 +198,8 @@ class Bricks:
             task: Natural language description of what to compute.
             inputs: Optional dict of input values for ``${inputs.X}``
                 references in the generated blueprint.
+            verbose: When True, include blueprint YAML, step trace, model, and
+                timing in the result.
 
         Returns:
             dict with keys:
@@ -195,8 +208,32 @@ class Bricks:
             - ``cache_hit`` — True if the blueprint was served from store
             - ``api_calls`` — number of LLM calls made (0 on cache hit)
             - ``tokens_used`` — total tokens consumed
+            - ``input_tokens`` — LLM input tokens consumed
+            - ``output_tokens`` — LLM output tokens consumed
 
         Raises:
             OrchestratorError: If composition or execution fails.
         """
-        return self._orchestrator.execute(task, inputs)
+        return self._orchestrator.execute(task, inputs, verbose=verbose)
+
+    # ── read-only property accessors ────────────────────────────────────────
+
+    @property
+    def registry(self) -> BrickRegistry:
+        """Return the brick registry backing this instance.
+
+        Returns:
+            The :class:`~bricks.core.registry.BrickRegistry` used for
+            brick selection, composition, and execution.
+        """
+        return self._orchestrator._registry
+
+    @property
+    def blueprint_store(self) -> BlueprintStore | None:
+        """Return the blueprint store, or None if no store is configured.
+
+        Returns:
+            The active :class:`~bricks.store.blueprint_store.BlueprintStore`,
+            or ``None`` when the store is disabled.
+        """
+        return self._orchestrator._composer._store

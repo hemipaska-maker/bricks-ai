@@ -65,7 +65,7 @@ class ClaudeCodeProvider(LLMProvider):
 
             enc = tiktoken.get_encoding("cl100k_base")
             return len(enc.encode(text))
-        except ImportError:
+        except Exception:  # ImportError, OSError, network errors, etc.
             return len(text) // 4
 
     def complete(self, prompt: str, system: str = "") -> CompletionResult:

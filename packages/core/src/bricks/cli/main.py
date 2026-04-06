@@ -500,7 +500,7 @@ def serve(
         engine = Bricks.from_config(config)
         typer.echo(f"Loaded config: {config}", err=True)
     else:
-        engine = Bricks.default(model=model)
+        engine = Bricks.default(model=model, store_backend="file", store_path="~/.bricks/blueprints")
         typer.echo(f"Using model: {model}", err=True)
     typer.echo("Server ready. Waiting for MCP client...", err=True)
 

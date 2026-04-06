@@ -7,6 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.45] — 2026-04-07
+
+### Added
+- **`Bricks.default()` store kwargs**: `store_backend` and `store_path` kwargs to control blueprint persistence; `bricks serve` now defaults to file store (`~/.bricks/blueprints`) so cache hits work across server restarts
+- **Verbose execute**: `Bricks.execute(verbose=True)` (and `execute_task`, `RuntimeOrchestrator.execute`) returns `blueprint_yaml`, `blueprint_name`, `model`, `compose_duration_seconds`, `execution_duration_ms`, `steps` trace
+- **Token split**: all execute paths now return `input_tokens` and `output_tokens` alongside `tokens_used`
+- **MCP resources**: `bricks://catalog` (all bricks + schemas) and `bricks://blueprints` (cached blueprints)
+- **MCP prompts**: `process_csv`, `validate_data`, `filter_and_aggregate` prompt templates
+- **Structured MCP errors**: typed JSON error responses with `error_type`, `message`, `details`, `retryable` flag
+- **MCP async**: `call_tool()` uses `asyncio.to_thread()` so concurrent calls no longer block
+- **MCP logging**: `logging.getLogger("bricks.mcp")` throughout — INFO for calls/results/resources/prompts, ERROR for failures
+
+### Fixed
+- `ClaudeCodeProvider._estimate_tokens()` now catches all exceptions (not just `ImportError`) — no more crash from tiktoken network failures in sandboxed environments
+
 ## [0.4.44] — 2026-04-06
 
 ### Added

@@ -100,7 +100,7 @@ def test_execute_returns_orchestrator_result(tmp_path: Path) -> None:
         engine = Bricks.from_config(yaml_file)
         result = engine.execute("sum values", inputs={"values": [1, 2, 3]})
 
-        mock_orch.execute.assert_called_once_with("sum values", {"values": [1, 2, 3]})
+        mock_orch.execute.assert_called_once_with("sum values", {"values": [1, 2, 3]}, verbose=False)
         assert result == expected
 
 

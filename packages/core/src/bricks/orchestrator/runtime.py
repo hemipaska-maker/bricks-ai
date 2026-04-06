@@ -13,6 +13,7 @@ from bricks.boot.config import SystemConfig
 from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import OrchestratorError
 from bricks.core.loader import BlueprintLoader
+from bricks.core.models import Verbosity
 from bricks.core.registry import BrickRegistry
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.llm.base import LLMProvider
@@ -97,7 +98,12 @@ class RuntimeOrchestrator:
         self._engine = BlueprintEngine(registry)
         self._loader = BlueprintLoader()
 
-    def execute(self, task_text: str, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute(
+        self,
+        task_text: str,
+        inputs: dict[str, Any] | None = None,
+        verbose: bool = False,
+    ) -> dict[str, Any]:
         """Execute a task end-to-end and return the outputs.
 
         Flow:
@@ -110,6 +116,8 @@ class RuntimeOrchestrator:
             task_text: Natural language task description.
             inputs: Input values for ``${inputs.X}`` references in the blueprint.
                     Defaults to an empty dict.
+            verbose: When True, include blueprint YAML, step trace, model, and
+                     timing in the result.
 
         Returns:
             A dict with keys:
@@ -118,6 +126,10 @@ class RuntimeOrchestrator:
             - ``cache_hit``: ``True`` when the blueprint came from the store
             - ``api_calls``: number of LLM calls made (0 on cache hit)
             - ``tokens_used``: total tokens consumed
+            - ``input_tokens``: LLM input tokens consumed
+            - ``output_tokens``: LLM output tokens consumed
+            - (verbose only) ``blueprint_yaml``, ``blueprint_name``, ``model``,
+              ``compose_duration_seconds``, ``execution_duration_ms``, ``steps``
 
         Raises:
             OrchestratorError: If composition fails (YAML invalid after retries)
@@ -139,12 +151,32 @@ class RuntimeOrchestrator:
             # Auto-map user input keys to blueprint variable names
             blueprint_input_vars = list(blueprint.inputs.keys()) if blueprint.inputs else []
             mapped = InputMapper().map(inputs or {}, blueprint_input_vars)
-            execution = self._engine.run(blueprint, mapped)
+            verbosity = Verbosity.FULL if verbose else Verbosity.MINIMAL
+            execution = self._engine.run(blueprint, mapped, verbosity=verbosity)
         except Exception as exc:
             raise OrchestratorError(f"Blueprint execution failed for task {task_text!r}: {exc}") from exc
-        return {
+        result: dict[str, Any] = {
             "outputs": execution.outputs,
             "cache_hit": compose_result.cache_hit,
             "api_calls": compose_result.api_calls,
             "tokens_used": compose_result.total_tokens,
+            "input_tokens": compose_result.total_input_tokens,
+            "output_tokens": compose_result.total_output_tokens,
         }
+        if verbose:
+            result["blueprint_yaml"] = compose_result.blueprint_yaml
+            result["blueprint_name"] = execution.blueprint_name
+            result["model"] = compose_result.model
+            result["compose_duration_seconds"] = compose_result.duration_seconds
+            result["execution_duration_ms"] = execution.total_duration_ms
+            result["steps"] = [
+                {
+                    "step": s.step_name,
+                    "brick": s.brick_name,
+                    "inputs": s.inputs,
+                    "outputs": s.outputs,
+                    "duration_ms": s.duration_ms,
+                }
+                for s in execution.steps
+            ]
+        return result

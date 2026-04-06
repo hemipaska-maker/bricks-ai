@@ -17,6 +17,7 @@ def execute_task(
     orchestrator: RuntimeOrchestrator,
     task: str,
     inputs: dict[str, Any] | None = None,
+    verbose: bool = False,
 ) -> dict[str, Any]:
     """Execute a task using the configured RuntimeOrchestrator.
 
@@ -29,6 +30,8 @@ def execute_task(
         task: Natural language description of the task to perform.
         inputs: Input values for ``${inputs.X}`` references in the composed
                 blueprint. Pass the agent's input data here.
+        verbose: When True, include blueprint YAML, step trace, model, and
+                 timing metadata in the response.
 
     Returns:
         A dict with keys:
@@ -37,8 +40,10 @@ def execute_task(
         - ``cache_hit``: True when blueprint was served from cache (0 tokens)
         - ``api_calls``: number of LLM calls made
         - ``tokens_used``: total LLM tokens consumed
+        - ``input_tokens``: LLM input tokens consumed
+        - ``output_tokens``: LLM output tokens consumed
     """
-    return orchestrator.execute(task, inputs or {})
+    return orchestrator.execute(task, inputs or {}, verbose=verbose)
 
 
 #: JSON schema for registering execute_task as an MCP tool.
@@ -61,6 +66,14 @@ EXECUTE_TASK_SCHEMA: dict[str, Any] = {
                     "Input values for the pipeline. Keys are referenced as ${inputs.key_name} inside the blueprint."
                 ),
                 "additionalProperties": True,
+            },
+            "verbose": {
+                "type": "boolean",
+                "description": (
+                    "When true, include the composed YAML blueprint, step-by-step execution trace, "
+                    "and timing metadata in the response."
+                ),
+                "default": False,
             },
         },
         "required": ["task"],
