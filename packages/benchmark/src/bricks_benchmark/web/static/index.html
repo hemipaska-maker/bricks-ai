@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bricks Benchmark</title>
+  <style>
+    :root {
+      --bg: #FAF9F7;
+      --surface: #FFFFFF;
+      --border: #E8E4DF;
+      --text: #1A1915;
+      --text-muted: #9B9590;
+      --primary: #D97706;
+      --primary-hover: #B45309;
+      --green: #059669;
+      --red: #DC2626;
+      --purple: #7C3AED;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-logo { font-weight: 700; font-size: 18px; color: var(--primary); letter-spacing: -0.5px; }
+    .topbar-logo span { color: var(--text-muted); font-weight: 400; }
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .step-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+      background: var(--border);
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .step-dot.active { background: var(--primary); color: #fff; }
+    .step-dot.done { background: var(--green); color: #fff; }
+    .step-line { width: 32px; height: 2px; background: var(--border); border-radius: 2px; }
+    /* ── Layout ── */
+    .main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--card-shadow);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .card .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+    /* ── Dataset cards ── */
+    .dataset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .dataset-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .dataset-card:hover { border-color: var(--primary); }
+    .dataset-card.selected { border-color: var(--primary); background: #FEF3C7; }
+    .dataset-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .dataset-card .ds-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    .ds-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+    .ds-tag { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+    .ds-preview-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer; margin-top: 10px;
+      color: var(--text-muted);
+    }
+    .ds-preview-btn:hover { background: var(--bg); }
+    .ds-preview { display: none; margin-top: 10px; overflow-x: auto; }
+    .ds-preview.open { display: block; }
+    .mini-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+    .mini-table th, .mini-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; white-space: nowrap; }
+    .mini-table th { background: var(--bg); color: var(--text-muted); font-weight: 600; }
+    /* ── Custom data ── */
+    .custom-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      transition: border-color 0.15s;
+      cursor: pointer;
+    }
+    .custom-zone.selected { border-color: var(--primary); background: #FEF3C7; }
+    .custom-zone.has-data { text-align: left; cursor: default; }
+    .custom-textarea {
+      width: 100%; min-height: 120px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--bg);
+      color: var(--text);
+      resize: vertical;
+      margin-top: 10px;
+    }
+    .custom-textarea:focus { outline: none; border-color: var(--primary); }
+    /* ── Task textarea ── */
+    .task-textarea {
+      width: 100%; min-height: 100px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      resize: vertical;
+    }
+    .task-textarea:focus { outline: none; border-color: var(--primary); }
+    /* ── Optional settings ── */
+    .settings-toggle {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 14px;
+      display: flex; align-items: center; gap: 6px; padding: 4px 0;
+    }
+    .settings-toggle:hover { color: var(--text); }
+    .settings-body { display: none; margin-top: 16px; }
+    .settings-body.open { display: block; }
+    .settings-label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .settings-section { margin-bottom: 16px; }
+    /* ── Brick chips ── */
+    .brick-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow-y: auto; }
+    .brick-chip {
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 3px 10px; font-size: 12px; cursor: pointer;
+      background: var(--bg); color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .brick-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .brick-chip.selected { background: var(--primary); color: #fff; border-color: var(--primary); }
+    /* ── Model pills ── */
+    .model-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .model-pill {
+      border: 2px solid var(--border); border-radius: 20px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer;
+      background: var(--surface); color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .model-pill:hover { border-color: var(--primary); }
+    .model-pill.selected { border-color: var(--primary); color: var(--primary); background: #FEF3C7; }
+    /* ── Preset select ── */
+    .preset-select {
+      font-size: 14px; border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer;
+      width: 100%;
+    }
+    .preset-select:focus { outline: none; border-color: var(--primary); }
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+    .btn {
+      padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 8px;
+      border: none; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+    .btn-outline { background: none; border: 2px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .error-msg { color: var(--red); font-size: 13px; padding: 4px 0; }
+    /* ── Step 2 ── */
+    #step2 { text-align: center; padding: 48px 0; }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.9s linear infinite; margin: 0 auto 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-steps { list-style: none; text-align: left; max-width: 340px; margin: 24px auto; }
+    .progress-steps li { padding: 8px 0; font-size: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
+    .progress-steps li.done { color: var(--green); }
+    .progress-steps li.active { color: var(--text); }
+    .step-icon { font-size: 16px; width: 20px; text-align: center; }
+    /* ── Step 3 ── */
+    .winner-banner {
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+      border: 1px solid var(--green);
+    }
+    .winner-banner.tie { background: linear-gradient(135deg, #EFF6FF 0%, #F0F9FF 100%); border-color: #60A5FA; }
+    .winner-banner.no-expected { background: var(--surface); border-color: var(--border); }
+    .winner-trophy { font-size: 36px; margin-bottom: 8px; }
+    .winner-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .winner-sub { color: var(--text-muted); font-size: 15px; margin-bottom: 12px; }
+    .savings-big { font-size: 32px; font-weight: 800; color: var(--purple); }
+    .engine-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .engine-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      background: var(--surface);
+    }
+    .engine-card.correct { border-color: var(--green); }
+    .engine-card.wrong { border-color: var(--red); }
+    .engine-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .engine-card .method { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; font-style: italic; }
+    .engine-stat { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--bg); }
+    .engine-stat:last-child { border: none; }
+    .stat-label { color: var(--text-muted); }
+    .stat-val { font-weight: 600; font-family: 'SF Mono', monospace; font-size: 12px; }
+    .correct-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+    .correct-badge.yes { background: #D1FAE5; color: var(--green); }
+    .correct-badge.no { background: #FEE2E2; color: var(--red); }
+    .correct-badge.na { background: var(--bg); color: var(--text-muted); }
+    .explain-card { margin-bottom: 20px; }
+    .savings-strip {
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 100%);
+      color: #fff;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .savings-strip .pct { font-size: 36px; font-weight: 800; }
+    .savings-strip .detail { font-size: 14px; opacity: 0.8; margin-top: 4px; }
+    .savings-strip .desc { font-size: 13px; opacity: 0.7; max-width: 340px; }
+    .comparison-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+    .comparison-table th { background: var(--bg); padding: 8px 12px; text-align: left; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border); }
+    .comparison-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: 'SF Mono', 'Fira Code', monospace; }
+    .comparison-table tr:last-child td { border: none; }
+    .match { color: var(--green); }
+    .mismatch { color: var(--red); }
+    .blueprint-block {
+      background: #1A1915;
+      border-radius: var(--radius);
+      padding: 20px;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #E5E5E0;
+    }
+    .yaml-key { color: #F59E0B; }
+    .yaml-val { color: #86EFAC; }
+    .yaml-comment { color: #6B7280; }
+    .footer-actions { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 8px; }
+    /* ── Helpers ── */
+    .hidden { display: none !important; }
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+    .section-header { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .or-divider { text-align: center; color: var(--text-muted); font-size: 13px; margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<nav class="topbar">
+  <div class="topbar-logo">⚡ Bricks <span>Benchmark</span></div>
+  <div class="step-indicator">
+    <div class="step-dot active" id="dot1">1</div>
+    <div class="step-line"></div>
+    <div class="step-dot" id="dot2">2</div>
+    <div class="step-line"></div>
+    <div class="step-dot" id="dot3">3</div>
+  </div>
+</nav>
+
+<!-- STEP 1: SETUP -->
+<div class="main" id="step1">
+  <div class="card">
+    <h2>What would you like to benchmark?</h2>
+    <p class="subtitle">Choose a dataset, describe your task, and compare BricksEngine vs LLM.</p>
+
+    <!-- Presets -->
+    <div class="settings-section">
+      <div class="section-header">Quick Start — Load a Preset</div>
+      <select class="preset-select" id="presetSelect">
+        <option value="">Select a preset scenario…</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Section A: Data -->
+    <div class="section-header">Section A — Choose Your Data</div>
+    <div class="dataset-grid" id="datasetGrid">
+      <div style="color:var(--text-muted);font-size:13px;">Loading datasets…</div>
+    </div>
+
+    <div class="or-divider">— or paste your own —</div>
+
+    <div class="custom-zone" id="customZone">
+      <div id="customZonePrompt">
+        <div style="font-size:24px;margin-bottom:8px;">📋</div>
+        <div style="font-weight:600;margin-bottom:4px;">Paste JSON data</div>
+        <div style="font-size:13px;color:var(--text-muted);">Click to expand and paste your own JSON array or object</div>
+      </div>
+      <div id="customZoneInput" class="hidden">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Your JSON data:</div>
+        <textarea class="custom-textarea" id="customDataInput" placeholder='[{"id": 1, "name": "Alice", ...}, ...]'></textarea>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Section B: Task -->
+    <div class="section-header">Section B — Describe Your Task</div>
+    <textarea class="task-textarea" id="taskInput" placeholder="Describe what you want to compute from the data…"></textarea>
+
+    <div class="divider"></div>
+
+    <!-- Section C: Optional settings -->
+    <button class="settings-toggle" id="settingsToggle">
+      <span id="settingsArrow">▶</span> Optional Settings (expected outputs, brick hints, model)
+    </button>
+    <div class="settings-body" id="settingsBody">
+      <div class="settings-section">
+        <div class="settings-label">Expected Outputs (JSON)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Know the correct answers? Enter them to check accuracy.</p>
+        <textarea class="custom-textarea" id="expectedInput" style="min-height:80px;" placeholder='{"active_count": 9, "total_revenue": 1524.0}'></textarea>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Brick Hints</div>
+        <div class="brick-chips" id="brickChips">
+          <div style="color:var(--text-muted);font-size:13px;">Loading bricks…</div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Model</div>
+        <div class="model-pills" id="modelPills">
+          <div class="model-pill selected" data-model="claudecode">Claude Code</div>
+          <div class="model-pill" data-model="claude-haiku-4-5-20251001">Haiku 4.5</div>
+          <div class="model-pill" data-model="gpt-4o-mini">GPT-4o Mini</div>
+          <div class="model-pill" data-model="ollama/llama3">Llama3 (local)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="setupError" class="error-msg hidden"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">Run Benchmark →</button>
+      <button class="btn btn-outline" id="saveYamlBtn">Save as YAML</button>
+      <button class="btn btn-outline" id="clearBtn">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: RUNNING -->
+<div class="main hidden" id="step2">
+  <div style="text-align:center;padding:60px 0;">
+    <div class="spinner"></div>
+    <h2 style="font-size:22px;margin-bottom:8px;">Running your benchmark…</h2>
+    <p style="color:var(--text-muted);font-size:14px;">Both engines are processing the same data with the same model.</p>
+    <ul class="progress-steps" id="progressSteps">
+      <li data-step="0"><span class="step-icon">○</span> Parsing input data</li>
+      <li data-step="1"><span class="step-icon">○</span> BricksEngine — composing blueprint</li>
+      <li data-step="2"><span class="step-icon">○</span> BricksEngine — executing pipeline</li>
+      <li data-step="3"><span class="step-icon">○</span> RawLLMEngine — sending prompt</li>
+      <li data-step="4"><span class="step-icon">○</span> Comparing results</li>
+    </ul>
+  </div>
+</div>
+
+<!-- STEP 3: RESULTS -->
+<div class="main hidden" id="step3">
+
+  <!-- Winner banner -->
+  <div id="winnerBanner" class="winner-banner">
+    <div class="winner-trophy" id="winnerTrophy">🏆</div>
+    <div class="winner-title" id="winnerTitle">BricksEngine wins</div>
+    <div class="winner-sub" id="winnerSub">100% accurate with 74% fewer tokens</div>
+    <div class="savings-big" id="savingsBig">3.9x more efficient</div>
+  </div>
+
+  <!-- Engine cards -->
+  <div class="engine-cards">
+    <div class="engine-card" id="bricksCard">
+      <h3>⚡ BricksEngine</h3>
+      <div class="method">YAML Blueprint → Deterministic execution</div>
+      <div class="engine-stat"><span class="stat-label">Tokens in</span><span class="stat-val" id="b-tokens-in">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Tokens out</span><span class="stat-val" id="b-tokens-out">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Duration</span><span class="stat-val" id="b-duration">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Model</span><span class="stat-val" id="b-model">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Error</span><span class="stat-val" id="b-error" style="color:var(--red);">—</span></div>
+      <span class="correct-badge na" id="b-correct-badge">N/A</span>
+    </div>
+    <div class="engine-card" id="llmCard">
+      <h3>🤖 RawLLMEngine</h3>
+      <div class="method">Full data in prompt → LLM computes everything</div>
+      <div class="engine-stat"><span class="stat-label">Tokens in</span><span class="stat-val" id="l-tokens-in">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Tokens out</span><span class="stat-val" id="l-tokens-out">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Duration</span><span class="stat-val" id="l-duration">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Model</span><span class="stat-val" id="l-model">—</span></div>
+      <div class="engine-stat"><span class="stat-label">Error</span><span class="stat-val" id="l-error" style="color:var(--red);">—</span></div>
+      <span class="correct-badge na" id="l-correct-badge">N/A</span>
+    </div>
+  </div>
+
+  <!-- What happened -->
+  <div class="card explain-card">
+    <h2>What Happened?</h2>
+    <div id="explainText" style="font-size:14px;line-height:1.7;margin-top:12px;"></div>
+  </div>
+
+  <!-- Token savings strip -->
+  <div class="savings-strip">
+    <div>
+      <div class="pct" id="savingsPct">—</div>
+      <div class="detail" id="savingsDetail">— vs — tokens</div>
+    </div>
+    <div class="desc">Bricks used the LLM only for blueprint composition, not data processing. Raw LLM sent all your data in every prompt.</div>
+  </div>
+
+  <!-- Output comparison -->
+  <div class="card hidden" id="comparisonCard">
+    <h2>Output Comparison</h2>
+    <table class="comparison-table">
+      <thead><tr><th>Key</th><th>Expected</th><th>BricksEngine</th><th>RawLLMEngine</th></tr></thead>
+      <tbody id="comparisonBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Blueprint -->
+  <div class="card" id="blueprintCard">
+    <h2>Generated Blueprint</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin:8px 0 16px;">The YAML blueprint composed by BricksEngine — data was NOT sent to the LLM during execution.</p>
+    <div class="blueprint-block" id="blueprintBlock"></div>
+  </div>
+
+  <!-- Footer actions -->
+  <div class="footer-actions">
+    <button class="btn btn-outline" id="newBenchmarkBtn">← New Benchmark</button>
+    <button class="btn btn-outline" id="exportBtn">Export Results</button>
+    <button class="btn btn-outline" id="runAgainBtn">Run Again with Different Data →</button>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  datasets: [],
+  bricks: [],
+  presets: [],
+  selectedDatasetId: null,
+  customData: null,
+  selectedBricks: new Set(),
+  selectedModel: 'claudecode',
+  lastResults: null,
+};
+
+const PLACEHOLDERS = {
+  'crm-customers': 'Example: Filter to active customers, count them, sum their monthly_revenue, compute average revenue…',
+  'support-tickets': 'Example: Find all high-priority open tickets, count them by category (billing, technical, general)…',
+  'orders-customers': 'Example: Join orders to customers, filter completed orders, sum revenue by customer plan type…',
+};
+
+// ── Step navigation ────────────────────────────────────────────────────────
+function showStep(n) {
+  document.getElementById('step1').classList.toggle('hidden', n !== 1);
+  document.getElementById('step2').classList.toggle('hidden', n !== 2);
+  document.getElementById('step3').classList.toggle('hidden', n !== 3);
+  [1, 2, 3].forEach(i => {
+    const dot = document.getElementById('dot' + i);
+    dot.className = 'step-dot' + (i === n ? ' active' : i < n ? ' done' : '');
+  });
+}
+
+// ── Load datasets ──────────────────────────────────────────────────────────
+async function loadDatasets() {
+  try {
+    const res = await fetch('/api/datasets');
+    state.datasets = await res.json();
+    renderDatasets();
+  } catch (e) {
+    document.getElementById('datasetGrid').innerHTML = '<div style="color:var(--red);font-size:13px;">Failed to load datasets</div>';
+  }
+}
+
+function renderDatasets() {
+  const grid = document.getElementById('datasetGrid');
+  grid.innerHTML = state.datasets.map(ds => `
+    <div class="dataset-card" data-id="${ds.id}" onclick="selectDataset('${ds.id}')">
+      <h3>${ds.name}</h3>
+      <div class="ds-desc">${ds.description}</div>
+      <div class="ds-meta">
+        <span class="ds-tag">${ds.row_count} rows</span>
+        ${ds.fields.slice(0, 3).map(f => `<span class="ds-tag">${f}</span>`).join('')}
+      </div>
+      <button class="ds-preview-btn" onclick="togglePreview(event,'${ds.id}')">Preview ▾</button>
+      <div class="ds-preview" id="preview-${ds.id}">
+        ${renderMiniTable(ds.preview)}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMiniTable(rows) {
+  if (!rows || rows.length === 0) return '<em>No preview</em>';
+  const keys = Object.keys(rows[0]).slice(0, 5);
+  const thead = `<tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>`;
+  const tbody = rows.map(r => `<tr>${keys.map(k => `<td>${r[k] ?? ''}</td>`).join('')}</tr>`).join('');
+  return `<table class="mini-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+function togglePreview(e, id) {
+  e.stopPropagation();
+  const el = document.getElementById('preview-' + id);
+  el.classList.toggle('open');
+  e.target.textContent = el.classList.contains('open') ? 'Preview ▴' : 'Preview ▾';
+}
+
+function selectDataset(id) {
+  state.selectedDatasetId = id;
+  state.customData = null;
+  document.querySelectorAll('.dataset-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector(`.dataset-card[data-id="${id}"]`).classList.add('selected');
+  document.getElementById('customZone').classList.remove('selected');
+  document.getElementById('customDataInput').value = '';
+  document.getElementById('customZoneInput').classList.add('hidden');
+  document.getElementById('customZonePrompt').classList.remove('hidden');
+  updateTaskPlaceholder(id);
+}
+
+function updateTaskPlaceholder(id) {
+  const ph = PLACEHOLDERS[id] || 'Describe what you want to compute from this data…';
+  document.getElementById('taskInput').placeholder = ph;
+}
+
+// ── Custom data ────────────────────────────────────────────────────────────
+document.getElementById('customZone').addEventListener('click', function(e) {
+  if (e.target.closest('#customZoneInput')) return;
+  document.getElementById('customZoneInput').classList.remove('hidden');
+  document.getElementById('customZonePrompt').classList.add('hidden');
+});
+
+document.getElementById('customDataInput').addEventListener('input', function() {
+  const v = this.value.trim();
+  if (v) {
+    state.customData = v;
+    state.selectedDatasetId = null;
+    document.querySelectorAll('.dataset-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('customZone').classList.add('selected');
+    document.getElementById('taskInput').placeholder = 'Describe what you want to compute from this data…';
+  } else {
+    state.customData = null;
+    document.getElementById('customZone').classList.remove('selected');
+  }
+});
+
+// ── Load bricks ────────────────────────────────────────────────────────────
+async function loadBricks() {
+  try {
+    const res = await fetch('/api/bricks');
+    state.bricks = await res.json();
+    renderBrickChips();
+  } catch (e) { /* ignore */ }
+}
+
+function renderBrickChips() {
+  const container = document.getElementById('brickChips');
+  container.innerHTML = state.bricks.map(b => `
+    <div class="brick-chip" data-name="${b.name}" onclick="toggleBrick('${b.name}')" title="${b.description}">${b.name}</div>
+  `).join('');
+}
+
+function toggleBrick(name) {
+  if (state.selectedBricks.has(name)) {
+    state.selectedBricks.delete(name);
+  } else {
+    state.selectedBricks.add(name);
+  }
+  document.querySelector(`.brick-chip[data-name="${name}"]`).classList.toggle('selected', state.selectedBricks.has(name));
+}
+
+// ── Load presets ────────────────────────────────────────────────────────────
+async function loadPresets() {
+  try {
+    const res = await fetch('/api/presets');
+    state.presets = await res.json();
+    renderPresets();
+  } catch (e) { /* ignore */ }
+}
+
+function renderPresets() {
+  const sel = document.getElementById('presetSelect');
+  state.presets.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('presetSelect').addEventListener('change', function() {
+  const preset = state.presets.find(p => p.name === this.value);
+  if (!preset) return;
+  if (preset.dataset_id) selectDataset(preset.dataset_id);
+  if (preset.task_text) document.getElementById('taskInput').value = preset.task_text;
+  if (preset.expected_outputs) {
+    document.getElementById('settingsBody').classList.add('open');
+    document.getElementById('settingsArrow').textContent = '▼';
+    document.getElementById('expectedInput').value = JSON.stringify(preset.expected_outputs, null, 2);
+  }
+});
+
+// ── Model pills ─────────────────────────────────────────────────────────────
+document.getElementById('modelPills').addEventListener('click', function(e) {
+  const pill = e.target.closest('.model-pill');
+  if (!pill) return;
+  document.querySelectorAll('.model-pill').forEach(p => p.classList.remove('selected'));
+  pill.classList.add('selected');
+  state.selectedModel = pill.dataset.model;
+});
+
+// ── Settings toggle ──────────────────────────────────────────────────────────
+document.getElementById('settingsToggle').addEventListener('click', function() {
+  const body = document.getElementById('settingsBody');
+  const arrow = document.getElementById('settingsArrow');
+  body.classList.toggle('open');
+  arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
+});
+
+// ── Clear ────────────────────────────────────────────────────────────────────
+document.getElementById('clearBtn').addEventListener('click', function() {
+  state.selectedDatasetId = null;
+  state.customData = null;
+  state.selectedBricks.clear();
+  document.querySelectorAll('.dataset-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('customZone').classList.remove('selected');
+  document.getElementById('customDataInput').value = '';
+  document.getElementById('customZoneInput').classList.add('hidden');
+  document.getElementById('customZonePrompt').classList.remove('hidden');
+  document.getElementById('taskInput').value = '';
+  document.getElementById('expectedInput').value = '';
+  document.getElementById('presetSelect').value = '';
+  document.querySelectorAll('.brick-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('setupError').classList.add('hidden');
+  document.getElementById('taskInput').placeholder = 'Describe what you want to compute from the data…';
+});
+
+// ── Save as YAML (stub) ──────────────────────────────────────────────────────
+document.getElementById('saveYamlBtn').addEventListener('click', function() {
+  alert('Save as YAML will be available in a future update (Mission 068).');
+});
+
+// ── Run benchmark ────────────────────────────────────────────────────────────
+document.getElementById('runBtn').addEventListener('click', runBenchmark);
+
+async function runBenchmark() {
+  const errEl = document.getElementById('setupError');
+  errEl.classList.add('hidden');
+
+  const taskText = document.getElementById('taskInput').value.trim();
+  if (!taskText) {
+    errEl.textContent = 'Please describe your task.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  let rawData = '';
+  if (state.selectedDatasetId) {
+    const ds = state.datasets.find(d => d.id === state.selectedDatasetId);
+    rawData = ds ? ds.full_data : '';
+  } else if (state.customData) {
+    rawData = state.customData;
+  } else {
+    errEl.textContent = 'Please select a dataset or paste your own data.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  let expectedOutputs = null;
+  const expRaw = document.getElementById('expectedInput').value.trim();
+  if (expRaw) {
+    try { expectedOutputs = JSON.parse(expRaw); }
+    catch { expectedOutputs = null; }
+  }
+
+  const requiredBricks = state.selectedBricks.size > 0 ? [...state.selectedBricks] : null;
+
+  showStep(2);
+  animateProgress();
+
+  const body = {
+    task_text: taskText,
+    raw_data: rawData,
+    expected_outputs: expectedOutputs,
+    required_bricks: requiredBricks,
+    model: state.selectedModel,
+  };
+
+  try {
+    const res = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Server error');
+    }
+    const results = await res.json();
+    state.lastResults = results;
+    completeProgress(results);
+  } catch (e) {
+    showStep(1);
+    errEl.textContent = 'Benchmark failed: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+// ── Progress animation ──────────────────────────────────────────────────────
+let progressTimer = null;
+function animateProgress() {
+  const steps = document.querySelectorAll('#progressSteps li');
+  steps.forEach(s => {
+    s.className = '';
+    s.querySelector('.step-icon').textContent = '○';
+  });
+  let i = 0;
+  function tick() {
+    if (i < steps.length) {
+      if (i > 0) {
+        steps[i - 1].className = 'done';
+        steps[i - 1].querySelector('.step-icon').textContent = '✅';
+      }
+      steps[i].className = 'active';
+      steps[i].querySelector('.step-icon').textContent = '⏳';
+      i++;
+      progressTimer = setTimeout(tick, 200);
+    }
+  }
+  tick();
+}
+
+function completeProgress(results) {
+  clearTimeout(progressTimer);
+  const steps = document.querySelectorAll('#progressSteps li');
+  steps.forEach(s => {
+    s.className = 'done';
+    s.querySelector('.step-icon').textContent = '✅';
+  });
+  setTimeout(() => renderResults(results), 300);
+}
+
+// ── Render results ──────────────────────────────────────────────────────────
+function renderResults(r) {
+  const b = r.bricks_result;
+  const l = r.llm_result;
+  const hasExpected = b.correct !== null;
+
+  // Winner banner
+  const banner = document.getElementById('winnerBanner');
+  const trophy = document.getElementById('winnerTrophy');
+  const title = document.getElementById('winnerTitle');
+  const sub = document.getElementById('winnerSub');
+  const big = document.getElementById('savingsBig');
+
+  if (!hasExpected) {
+    banner.className = 'winner-banner no-expected';
+    trophy.textContent = '📊';
+    title.textContent = 'Both engines completed';
+    sub.textContent = 'No expected outputs provided — run again with expected values to check accuracy.';
+    big.textContent = r.savings_ratio.toFixed(1) + 'x token ratio';
+  } else if (b.correct && !l.correct) {
+    banner.className = 'winner-banner';
+    trophy.textContent = '🏆';
+    title.textContent = 'BricksEngine wins';
+    sub.textContent = `100% accurate with ${r.savings_percent.toFixed(0)}% fewer tokens`;
+    big.textContent = r.savings_ratio.toFixed(1) + 'x more efficient';
+  } else if (!b.correct && l.correct) {
+    banner.className = 'winner-banner tie';
+    trophy.textContent = '🤖';
+    title.textContent = 'RawLLMEngine wins this round';
+    sub.textContent = 'LLM got the correct answer; Bricks composition may need refinement.';
+    big.textContent = r.savings_ratio.toFixed(1) + 'x token ratio';
+  } else if (b.correct && l.correct) {
+    banner.className = 'winner-banner tie';
+    trophy.textContent = '🤝';
+    title.textContent = 'Tie — both correct';
+    sub.textContent = `Bricks used ${r.savings_percent.toFixed(0)}% fewer tokens for the same result`;
+    big.textContent = r.savings_ratio.toFixed(1) + 'x more efficient';
+  } else {
+    banner.className = 'winner-banner no-expected';
+    trophy.textContent = '⚠️';
+    title.textContent = 'Neither engine got it right';
+    sub.textContent = 'Both engines returned incorrect outputs. Consider refining the task.';
+    big.textContent = r.savings_ratio.toFixed(1) + 'x token ratio';
+  }
+
+  // Engine cards
+  const bCard = document.getElementById('bricksCard');
+  const lCard = document.getElementById('llmCard');
+  bCard.className = 'engine-card' + (hasExpected ? (b.correct ? ' correct' : ' wrong') : '');
+  lCard.className = 'engine-card' + (hasExpected ? (l.correct ? ' correct' : ' wrong') : '');
+
+  document.getElementById('b-tokens-in').textContent = b.tokens_in.toLocaleString();
+  document.getElementById('b-tokens-out').textContent = b.tokens_out.toLocaleString();
+  document.getElementById('b-duration').textContent = b.duration_seconds.toFixed(1) + 's';
+  document.getElementById('b-model').textContent = b.model || '—';
+  document.getElementById('b-error').textContent = b.error || 'none';
+  document.getElementById('l-tokens-in').textContent = l.tokens_in.toLocaleString();
+  document.getElementById('l-tokens-out').textContent = l.tokens_out.toLocaleString();
+  document.getElementById('l-duration').textContent = l.duration_seconds.toFixed(1) + 's';
+  document.getElementById('l-model').textContent = l.model || '—';
+  document.getElementById('l-error').textContent = l.error || 'none';
+
+  const bBadge = document.getElementById('b-correct-badge');
+  const lBadge = document.getElementById('l-correct-badge');
+  if (!hasExpected) {
+    bBadge.className = 'correct-badge na'; bBadge.textContent = 'N/A';
+    lBadge.className = 'correct-badge na'; lBadge.textContent = 'N/A';
+  } else {
+    bBadge.className = 'correct-badge ' + (b.correct ? 'yes' : 'no');
+    bBadge.textContent = b.correct ? '✓ Correct' : '✗ Wrong';
+    lBadge.className = 'correct-badge ' + (l.correct ? 'yes' : 'no');
+    lBadge.textContent = l.correct ? '✓ Correct' : '✗ Wrong';
+  }
+
+  // Explain
+  const bricks_tok = b.tokens_in + b.tokens_out;
+  const llm_tok = l.tokens_in + l.tokens_out;
+  const explainEl = document.getElementById('explainText');
+  let explain = `<p><strong>BricksEngine</strong> composed a YAML blueprint from your task description — the LLM only saw brick function signatures, <em>not</em> your data. The blueprint was then executed deterministically. `;
+  if (b.error) explain += `<span style="color:var(--red)">It failed with: ${b.error}</span>`;
+  else explain += `It used <strong>${bricks_tok.toLocaleString()} tokens</strong> total.`;
+  explain += `</p><br>`;
+  explain += `<p><strong>RawLLMEngine</strong> sent your <em>entire dataset</em> directly in the prompt and asked the LLM to compute the answer. `;
+  if (l.error) explain += `<span style="color:var(--red)">It failed with: ${l.error}</span>`;
+  else if (!l.correct && hasExpected) explain += `It used <strong>${llm_tok.toLocaleString()} tokens</strong> but returned incorrect values. LLMs often struggle with precise filtering and aggregation over structured data.`;
+  else explain += `It used <strong>${llm_tok.toLocaleString()} tokens</strong>.`;
+  explain += `</p>`;
+  explainEl.innerHTML = explain;
+
+  // Savings strip
+  document.getElementById('savingsPct').textContent = r.savings_percent.toFixed(0) + '% savings';
+  document.getElementById('savingsDetail').textContent = `${bricks_tok.toLocaleString()} vs ${llm_tok.toLocaleString()} tokens`;
+
+  // Comparison table
+  const compCard = document.getElementById('comparisonCard');
+  if (hasExpected && b.correct !== null) {
+    const expected = JSON.parse(document.getElementById('expectedInput').value || '{}');
+    const keys = Object.keys(expected);
+    if (keys.length > 0) {
+      compCard.classList.remove('hidden');
+      const tbody = document.getElementById('comparisonBody');
+      tbody.innerHTML = keys.map(k => {
+        const exp = expected[k];
+        const bv = b.outputs[k];
+        const lv = l.outputs[k];
+        const bMatch = bv !== undefined && Math.abs(Number(bv) - Number(exp)) < 0.01;
+        const lMatch = lv !== undefined && Math.abs(Number(lv) - Number(exp)) < 0.01;
+        return `<tr>
+          <td>${k}</td>
+          <td>${exp}</td>
+          <td class="${bMatch ? 'match' : 'mismatch'}">${bv !== undefined ? bv : '—'} ${bMatch ? '✓' : '✗'}</td>
+          <td class="${lMatch ? 'match' : 'mismatch'}">${lv !== undefined ? lv : '—'} ${lMatch ? '✓' : '✗'}</td>
+        </tr>`;
+      }).join('');
+    }
+  } else {
+    compCard.classList.add('hidden');
+  }
+
+  // Blueprint
+  const blueprintEl = document.getElementById('blueprintBlock');
+  const blueprintCard = document.getElementById('blueprintCard');
+  if (b.raw_response) {
+    blueprintCard.classList.remove('hidden');
+    blueprintEl.innerHTML = highlightYaml(escapeHtml(b.raw_response));
+  } else {
+    blueprintCard.classList.add('hidden');
+  }
+
+  showStep(3);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlightYaml(s) {
+  return s.split('\n').map(line => {
+    if (line.trim().startsWith('#')) return `<span class="yaml-comment">${line}</span>`;
+    const colonIdx = line.indexOf(':');
+    if (colonIdx > 0) {
+      const key = line.slice(0, colonIdx + 1);
+      const val = line.slice(colonIdx + 1);
+      return `<span class="yaml-key">${key}</span><span class="yaml-val">${val}</span>`;
+    }
+    return line;
+  }).join('\n');
+}
+
+// ── Footer actions ────────────────────────────────────────────────────────────
+document.getElementById('newBenchmarkBtn').addEventListener('click', function() {
+  document.getElementById('clearBtn').click();
+  showStep(1);
+});
+
+document.getElementById('runAgainBtn').addEventListener('click', function() {
+  state.selectedDatasetId = null;
+  state.customData = null;
+  document.querySelectorAll('.dataset-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('customZone').classList.remove('selected');
+  document.getElementById('customDataInput').value = '';
+  document.getElementById('customZoneInput').classList.add('hidden');
+  document.getElementById('customZonePrompt').classList.remove('hidden');
+  showStep(1);
+});
+
+document.getElementById('exportBtn').addEventListener('click', function() {
+  if (!state.lastResults) return;
+  const blob = new Blob([JSON.stringify(state.lastResults, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'benchmark_results.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadDatasets();
+loadBricks();
+loadPresets();
+</script>
+</body>
+</html>
