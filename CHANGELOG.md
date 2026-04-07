@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0] — 2026-04-07
+
+### Added
+- **Python DSL** with 4 primitives: `step.X()`, `for_each()`, `branch()`, `@flow` decorator
+- **`FlowDefinition`** with `.to_blueprint()`, `.to_yaml()`, `.to_dag()`, `.execute()` methods
+- **`PythonDSLValidator`** — AST-based whitelist safety gate for LLM-generated DSL code
+- **`DAGExecutionEngine`** — wraps `BlueprintEngine` and auto-registers built-in bricks
+- **Built-in bricks**: `__for_each__` and `__branch__` for DSL control-flow execution
+- **`BrickRegistry.list_public()`** — excludes `__`-prefixed built-ins from listings
+- DSL examples: `examples/basics/07_python_dsl.py`, `examples/end_to_end/crm_pipeline_dsl.py`
+- Benchmark suite: `benchmarks/dsl_vs_yaml.py` (5/5 tasks pass)
+- `ComposeResult.dsl_code` field; MCP verbose response includes generated DSL
+
+### Changed
+- **`BlueprintComposer`** now generates Python DSL instead of YAML (clean break)
+- `compact_brick_signatures()` uses `list_public()` — built-ins excluded from LLM prompts
+- MCP `bricks://catalog` uses `list_public()` — built-ins excluded from catalog
+- `DAG.to_blueprint()` now sets `save_as` on every step (required for cross-step references)
+- README: Python DSL section with 3 worked examples
+
+### Internal
+- New modules: `dsl.py`, `dag.py`, `dag_builder.py`, `validator_dsl.py`, `builtins.py`
+- `ExecutionTracer`, `StepProxy`, `Node` dataclass — DSL tracing primitives
+- Built-in bricks registered as `functools.partial` bound to registry (no global state)
+
+---
+
 ## [0.4.52] — 2026-04-07
 
 ### Added
