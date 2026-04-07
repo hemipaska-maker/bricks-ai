@@ -1,12 +1,12 @@
-"""AI blueprint composer: single-call YAML generation from natural language.
+"""AI blueprint composer: single-call Python DSL generation from natural language.
 
-No tool_use, no multi-turn conversation. The LLM outputs Blueprint YAML as
-plain text, which we validate and execute locally.
+No tool_use, no multi-turn conversation. The LLM outputs Python DSL code as
+plain text, which we validate with an AST whitelist and execute in a
+restricted namespace to produce a FlowDefinition.
 """
 
 from __future__ import annotations
 
-import inspect as _inspect
 import logging
 import time
 from datetime import datetime, timezone
@@ -14,13 +14,12 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
+from bricks.core.dsl import FlowDefinition, branch, flow, for_each, step
 from bricks.core.exceptions import BlueprintValidationError, BrickError, DuplicateBlueprintError
-from bricks.core.loader import BlueprintLoader
 from bricks.core.registry import BrickRegistry
-from bricks.core.schema import compact_brick_signatures, output_key_table, output_keys, parse_description_keys
+from bricks.core.schema import compact_brick_signatures
 from bricks.core.selector import AllBricksSelector, BrickSelector
-from bricks.core.utils import strip_code_fence
-from bricks.core.validation import BlueprintValidator
+from bricks.core.validator_dsl import validate_dsl
 from bricks.llm.base import LLMProvider
 
 if TYPE_CHECKING:
@@ -43,6 +42,10 @@ class ComposerError(BrickError):
         self.cause = cause
 
 
+class CompositionError(ComposerError):
+    """Raised when LLM-generated DSL code is invalid or cannot be executed."""
+
+
 class CallDetail(BaseModel):
     """Detail for a single API call within a compose attempt."""
 
@@ -63,6 +66,7 @@ class ComposeResult(BaseModel):
 
     task: str
     blueprint_yaml: str = ""
+    dsl_code: str = ""
     is_valid: bool = False
     validation_errors: list[str] = Field(default_factory=list)
     calls: list[CallDetail] = Field(default_factory=list)
@@ -76,206 +80,75 @@ class ComposeResult(BaseModel):
     cache_hit: bool = False
 
 
-# System prompt — under 300 tokens without signatures/output_keys/example.
-_COMPOSE_SYSTEM = """\
-You are a Blueprint composer. Given a task and available bricks, output ONLY \
-a valid Blueprint YAML block. No explanation, no markdown fences, just raw YAML.
+# System prompt — instructs the LLM to produce Python DSL instead of YAML.
+DSL_PROMPT_TEMPLATE = """\
+You are a Blueprint composer for the Bricks framework. Generate ONLY valid Python code using the DSL.
 
 Available bricks:
-{signatures}
+{brick_signatures}
 
-{output_keys}
-
-Blueprint format:
-name: blueprint_name
-inputs:
-  param_name: value
-steps:
-  - name: step_name
-    brick: brick_name
-    params:
-      key: "${{inputs.param_name}}"
-      key2: "${{prior_step.field}}"
-      key3: 42.0
-    save_as: result_name
-outputs_map:
-  output_key: "${{result_name.field}}"
-
-Reference syntax:
-- ${{inputs.X}} for task inputs declared in the inputs section
-- ${{save_as_name.field}} for prior step outputs
-- Literal values (numbers, strings) allowed
+Available primitives:
+- step.brick_name(param=value) → captures a brick invocation
+- for_each(items, do=lambda item: step.brick(...), on_error="fail"|"collect") → maps a step over a list
+- branch(condition="brick_name", if_true=lambda: step.X(...), if_false=lambda: step.Y(...)) → conditional routing
 
 Rules:
-- Only use brick names from the list above.
-- Declare all task parameters in the inputs section. Use ${{inputs.X}} to reference them in steps.
-- Every step referenced later needs save_as.
-- Step names must be unique snake_case.
-- outputs_map values must use ${{inputs.X}} or ${{save_as.field}} syntax.
-- Output keys are listed above. Use EXACTLY those keys in ${{step.key}} references.
-- Use a descriptive, unique blueprint name (the name: field).
+1. Write a single function decorated with @flow
+2. Function name should describe the task (e.g., def clean_and_process)
+3. NO imports — step, for_each, branch, flow are pre-provided
+4. NO if/for/while/class/try — use branch() and for_each() instead
+5. Only use step.brick_name() for brick calls — brick names must match the available bricks list above
+6. Parameters must be keyword-only: step.clean(text=data) NOT step.clean(data)
+7. You can assign step results to variables and pass them to other steps
+8. Return the final step result
+9. on_error="fail" (default) stops on first error. on_error="collect" continues and gathers errors.
+10. branch condition must be a brick name string that returns boolean
 
-{example}\
+Task: {task}
+{input_context}
+Output ONLY the Python code. No markdown fences. No explanation.\
 """
 
 _RETRY_PROMPT = """\
 Original task:
 {task}
 
-The following Blueprint YAML has validation errors:
+The following DSL code has validation errors:
 
-{yaml}
+{code}
 
 Errors:
 {errors}
 
-Output ONLY the corrected YAML. Nothing else.\
+Output ONLY the corrected Python code. Nothing else.\
 """
-
-
-def _build_example(registry: BrickRegistry) -> str:
-    """Auto-generate a 2-step worked example from the first two bricks in the registry.
-
-    Shows exact ``${save_as.output_key}`` syntax so the LLM sees a concrete
-    reference chain. Uses literal params for step 1, a cross-step reference
-    for step 2.
-
-    Args:
-        registry: Registry of available bricks (sorted alphabetically).
-
-    Returns:
-        A YAML example block prefixed with ``Example (2-step chain):``.
-    """
-    bricks = sorted(registry.list_all(), key=lambda x: x[0])
-    if len(bricks) < 2:
-        return ""
-
-    name1, meta1 = bricks[0]
-    name2, meta2 = bricks[1]
-    callable1, _ = registry.get(name1)
-    callable2, _ = registry.get(name2)
-
-    keys1 = output_keys(callable1) or parse_description_keys(meta1.description)
-    keys2 = output_keys(callable2) or parse_description_keys(meta2.description)
-    out_key1 = keys1[0] if keys1 else "result"
-    out_key2 = keys2[0] if keys2 else "result"
-
-    # Build input declarations and param references for step 1
-    input_decls, input_refs = _build_input_params(callable1)
-    params2 = _build_ref_params(callable2, "step1", out_key1)
-
-    lines = [
-        "Example (2-step chain):",
-        "name: example",
-        "inputs:",
-        *[f"  {line}" for line in input_decls],
-        "steps:",
-        "  - name: step1",
-        f"    brick: {name1}",
-        "    params:",
-        *[f"      {line}" for line in input_refs],
-        "    save_as: step1",
-        "  - name: step2",
-        f"    brick: {name2}",
-        "    params:",
-        *[f"      {line}" for line in params2],
-        "    save_as: step2",
-        "outputs_map:",
-        f'  output: "${{step2.{out_key2}}}"',
-    ]
-    return "\n".join(lines)
-
-
-def _build_input_params(callable_: Any) -> tuple[list[str], list[str]]:
-    """Build input declarations and ``${inputs.X}`` references for a worked example.
-
-    Args:
-        callable_: A brick callable.
-
-    Returns:
-        Tuple of (input_declarations, param_references). Declarations go in the
-        ``inputs:`` section, references go in step ``params:``.
-    """
-    try:
-        sig = _inspect.signature(callable_)
-        decls: list[str] = []
-        refs: list[str] = []
-        for pname, param in sig.parameters.items():
-            if pname in ("self", "inputs", "metadata"):
-                continue
-            ann = param.annotation
-            if ann is float or ann is int:
-                decls.append(f"{pname}: 1.0")
-            else:
-                decls.append(f'{pname}: "example"')
-            refs.append(f'{pname}: "${{inputs.{pname}}}"')
-        return decls, refs
-    except (ValueError, TypeError):
-        return ["x: 1.0"], ['x: "${inputs.x}"']
-
-
-def _build_ref_params(callable_: Any, ref_step: str, ref_key: str) -> list[str]:
-    """Build param lines with a cross-step reference for a worked example.
-
-    Args:
-        callable_: A brick callable.
-        ref_step: The save_as name to reference.
-        ref_key: The output key to reference.
-
-    Returns:
-        List of ``key: value`` strings, first numeric param uses a reference.
-    """
-    try:
-        sig = _inspect.signature(callable_)
-        lines: list[str] = []
-        used_ref = False
-        for pname, param in sig.parameters.items():
-            if pname in ("self", "inputs", "metadata"):
-                continue
-            ann = param.annotation
-            if (ann is float or ann is int) and not used_ref:
-                lines.append(f'{pname}: "${{{ref_step}.{ref_key}}}"')
-                used_ref = True
-            elif ann is float or ann is int:
-                lines.append(f"{pname}: 1.0")
-            else:
-                lines.append(f'{pname}: "example"')
-        return lines
-    except (ValueError, TypeError):
-        return [f'{ref_step}: "${{{ref_step}.{ref_key}}}"']
-
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 _MAX_TOKENS = 2048
 _MAX_API_CALLS = 2
 
 
-def _extract_blueprint_name(yaml_text: str) -> str:
-    """Extract the ``name:`` value from Blueprint YAML text.
-
-    Scans for the first ``name:`` line without loading the full YAML document,
-    so it works even on partially-valid YAML.
+def _build_input_context(input_keys: list[str] | None) -> str:
+    """Build an input hint line for the prompt.
 
     Args:
-        yaml_text: Raw YAML string from the LLM.
+        input_keys: Optional list of known input key names.
 
     Returns:
-        The blueprint name, or ``"unknown"`` if not found.
+        A one-line hint string, or empty string if no keys given.
     """
-    for line in yaml_text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("name:"):
-            parts = stripped.split(":", 1)
-            if len(parts) == 2:
-                return parts[1].strip().strip('"').strip("'") or "unknown"
-    return "unknown"
+    if not input_keys:
+        return ""
+    keys_str = ", ".join(input_keys)
+    return f"The function receives these parameters: {keys_str}.\n"
 
 
 class BlueprintComposer:
-    """Composes Blueprint YAML from a natural language task using a single LLM call.
+    """Composes Blueprint DSL from a natural language task using a single LLM call.
 
-    No tool_use, no multi-turn conversation. The LLM outputs YAML as text,
-    which we validate and execute locally.
+    No tool_use, no multi-turn conversation. The LLM outputs Python DSL code,
+    which is validated with an AST whitelist and executed in a restricted
+    namespace to produce a FlowDefinition and BlueprintDefinition.
 
     If the first attempt fails validation, makes ONE retry with a fresh
     prompt containing the errors. Max 2 API calls total.
@@ -304,7 +177,6 @@ class BlueprintComposer:
         """
         self._provider = provider
         self._selector = selector or AllBricksSelector()
-        self._loader = BlueprintLoader()
         self._store = store
 
     def compose(
@@ -313,27 +185,25 @@ class BlueprintComposer:
         registry: BrickRegistry,
         input_keys: list[str] | None = None,
     ) -> ComposeResult:
-        """Compose a Blueprint YAML for a task.
+        """Compose a Blueprint from a natural language task using Python DSL.
 
         Flow:
         0. If store is configured, check for a cached blueprint by fingerprint.
            On hit: return immediately with ``cache_hit=True`` and zero tokens.
         1. selector.select(task, registry) → small pool
         2. Build system prompt with compact brick signatures from pool
-        3. Single API call: task → YAML text
-        4. Parse YAML → validate → return
+        3. Single API call: task → DSL code
+        4. Validate DSL with AST whitelist; if valid, exec and extract FlowDefinition
         5. If validation fails, ONE retry with error message (fresh call)
-        6. If result is valid, auto-save to store (name collision silently adds fingerprint).
+        6. If result is valid, auto-save to store.
 
         Args:
             task: Natural language task description.
             registry: BrickRegistry with available bricks.
-            input_keys: Optional list of user-supplied input key names. When
-                provided, hints the LLM to use exactly these variable names
-                in the blueprint ``inputs`` section.
+            input_keys: Optional list of user-supplied input key names.
 
         Returns:
-            ComposeResult with blueprint YAML, validation status, and token usage.
+            ComposeResult with DSL code, blueprint YAML, validation status, and token usage.
 
         Raises:
             ComposerError: If the API call itself fails (network error, etc.).
@@ -358,40 +228,39 @@ class BlueprintComposer:
 
         t0 = time.monotonic()
         pool = self._selector.select(task, registry)
-        logger.info("Composing blueprint for task (%d chars), %d bricks in pool", len(task), len(pool.list_all()))
-        signatures = compact_brick_signatures(pool)
-        keys_table = output_key_table(pool)
-        example = _build_example(pool)
-        system = _COMPOSE_SYSTEM.format(
-            signatures=signatures,
-            output_keys=keys_table,
-            example=example,
+        logger.info(
+            "Composing blueprint for task (%d chars), %d bricks in pool",
+            len(task),
+            len(pool.list_all()),
         )
-        validator = BlueprintValidator(registry=pool)
+
+        signatures = compact_brick_signatures(pool)
+        system = DSL_PROMPT_TEMPLATE.format(
+            brick_signatures=signatures,
+            task=task,
+            input_context=_build_input_context(input_keys),
+        )
 
         calls: list[CallDetail] = []
 
-        # Build user message, appending input key hint if provided
+        # Build user message
         user_message = task
         if input_keys:
             keys_str = ", ".join(input_keys)
-            user_message = (
-                f"{task}\nThe user's inputs have these keys: [{keys_str}]. "
-                f"Use ${{inputs.KEY}} to reference them exactly."
-            )
+            user_message = f"{task}\nThe function receives these parameters: {keys_str}."
 
         # First call
-        detail = self._compose_call(1, system, user_message, validator)
+        detail = self._compose_call(1, system, user_message)
         calls.append(detail)
 
-        # Retry on failure (fresh call, no history)
+        # Retry on failure
         if not detail.is_valid and len(calls) < _MAX_API_CALLS:
             retry_prompt = _RETRY_PROMPT.format(
                 task=task,
-                yaml=detail.yaml_text,
+                code=detail.yaml_text,
                 errors="\n".join(f"- {e}" for e in detail.validation_errors),
             )
-            detail = self._compose_call(2, system, retry_prompt, validator)
+            detail = self._compose_call(2, system, retry_prompt)
             calls.append(detail)
 
         last = calls[-1]
@@ -399,9 +268,17 @@ class BlueprintComposer:
         total_output = sum(c.output_tokens for c in calls)
         elapsed = time.monotonic() - t0
 
+        blueprint_yaml = ""
+        dsl_code = ""
+        if last.is_valid:
+            flow_def = self._parse_dsl_response(last.yaml_text)
+            blueprint_yaml = flow_def.to_yaml()
+            dsl_code = self._strip_fences(last.yaml_text)
+
         result = ComposeResult(
             task=task,
-            blueprint_yaml=last.yaml_text,
+            blueprint_yaml=blueprint_yaml,
+            dsl_code=dsl_code,
             is_valid=last.is_valid,
             validation_errors=last.validation_errors,
             calls=calls,
@@ -422,12 +299,12 @@ class BlueprintComposer:
         )
 
         # Auto-save validated blueprint to store
-        if result.is_valid and self._store is not None:
-            self._auto_save(task, result.blueprint_yaml)
+        if result.is_valid and self._store is not None and flow_def is not None:
+            self._auto_save(task, flow_def.name, blueprint_yaml)
 
         return result
 
-    def _auto_save(self, task: str, blueprint_yaml: str) -> None:
+    def _auto_save(self, task: str, blueprint_name: str, blueprint_yaml: str) -> None:
         """Auto-save a validated blueprint to the store.
 
         On name collision, adds the task fingerprint to the existing entry
@@ -435,6 +312,7 @@ class BlueprintComposer:
 
         Args:
             task: The original task text (used to compute the fingerprint).
+            blueprint_name: Name from the FlowDefinition.
             blueprint_yaml: The validated blueprint YAML to store.
         """
         from bricks.store.models import StoredBlueprint, task_fingerprint  # noqa: PLC0415
@@ -443,13 +321,12 @@ class BlueprintComposer:
             return
 
         fp = task_fingerprint(task)
-        bp_name = _extract_blueprint_name(blueprint_yaml)
         now = datetime.now(timezone.utc)
 
         try:
             self._store.save(
                 StoredBlueprint(
-                    name=bp_name,
+                    name=blueprint_name,
                     yaml=blueprint_yaml,
                     fingerprints=[fp],
                     created_at=now,
@@ -457,32 +334,29 @@ class BlueprintComposer:
                 )
             )
         except DuplicateBlueprintError:
-            # Name already in store — add fingerprint to existing entry
-            existing = self._store.get_by_name(bp_name)
+            existing = self._store.get_by_name(blueprint_name)
             if existing is not None and fp not in existing.fingerprints:
                 existing.fingerprints.append(fp)
-                self._store.delete(bp_name)
+                self._store.delete(blueprint_name)
                 self._store.save(existing)
         except Exception:  # noqa: S110
-            pass  # Never let store errors propagate to callers
+            pass
 
     def _compose_call(
         self,
         call_number: int,
         system: str,
         user_message: str,
-        validator: BlueprintValidator,
     ) -> CallDetail:
-        """Make one API call, validate, and return a CallDetail.
+        """Make one API call, validate the DSL, and return a CallDetail.
 
         Args:
             call_number: 1 for first attempt, 2 for retry.
             system: System prompt.
             user_message: User message (task or retry prompt).
-            validator: BlueprintValidator to check the result.
 
         Returns:
-            CallDetail with per-call tokens, YAML, and validation status.
+            CallDetail with per-call tokens, raw code, and validation status.
         """
         logger.info(
             "Compose call #%d: system=%d chars, user=%d chars",
@@ -490,22 +364,19 @@ class BlueprintComposer:
             len(system),
             len(user_message),
         )
-        logger.debug("System prompt:\n%s", system)
-        logger.debug("User message:\n%s", user_message)
 
         call_t0 = time.monotonic()
-        yaml_text, in_tok, out_tok = self._make_api_call(system, user_message)
-        is_valid, errors = self._validate_yaml(yaml_text, validator)
+        raw_text, in_tok, out_tok = self._make_api_call(system, user_message)
+        is_valid, errors = self._validate_dsl_text(raw_text)
         call_elapsed = time.monotonic() - call_t0
 
         logger.info(
-            "Compose call #%d: valid=%s, yaml=%d chars, %.1fs",
+            "Compose call #%d: valid=%s, code=%d chars, %.1fs",
             call_number,
             is_valid,
-            len(yaml_text),
+            len(raw_text),
             call_elapsed,
         )
-        logger.debug("Generated YAML:\n%s", yaml_text)
         if not is_valid:
             logger.warning("Compose call #%d validation failed: %s", call_number, errors)
 
@@ -517,20 +388,20 @@ class BlueprintComposer:
             output_tokens=out_tok,
             total_tokens=in_tok + out_tok,
             duration_seconds=call_elapsed,
-            yaml_text=yaml_text,
+            yaml_text=raw_text,
             is_valid=is_valid,
             validation_errors=errors,
         )
 
     def _make_api_call(self, system: str, user_message: str) -> tuple[str, int, int]:
-        """Make a single LLM call and return (yaml_text, input_tokens, output_tokens).
+        """Make a single LLM call and return (raw_text, input_tokens, output_tokens).
 
         Args:
             system: System prompt.
-            user_message: User message (task or retry prompt).
+            user_message: User message.
 
         Returns:
-            Tuple of (extracted YAML text, input tokens, output tokens).
+            Tuple of (raw text from LLM, input tokens, output tokens).
 
         Raises:
             ComposerError: If the API call fails or returns no text.
@@ -544,20 +415,94 @@ class BlueprintComposer:
         except Exception as exc:
             logger.error("API call failed: %s", exc, exc_info=True)
             raise ComposerError(f"API call failed: {exc}", cause=exc) from exc
-        return strip_code_fence(completion.text), completion.input_tokens, completion.output_tokens
+        return completion.text, completion.input_tokens, completion.output_tokens
 
-    def _validate_yaml(self, yaml_text: str, validator: BlueprintValidator) -> tuple[bool, list[str]]:
-        """Parse and validate a YAML string.
+    def _validate_dsl_text(self, code: str) -> tuple[bool, list[str]]:
+        """Run AST whitelist validation on raw DSL text (strips fences first).
 
         Args:
-            yaml_text: Raw YAML string from the LLM.
-            validator: BlueprintValidator to check against.
+            code: Raw LLM output, possibly with markdown fences.
 
         Returns:
             Tuple of (is_valid, list_of_error_strings).
         """
+        cleaned = self._strip_fences(code)
+        result = validate_dsl(cleaned)
+        return result.valid, result.errors
+
+    def _parse_dsl_response(self, raw_code: str) -> FlowDefinition:
+        """Parse and validate LLM-generated Python DSL code.
+
+        Steps:
+        1. Strip markdown fences if present
+        2. Validate with PythonDSLValidator
+        3. Execute in restricted namespace
+        4. Return the FlowDefinition
+
+        Args:
+            raw_code: Raw LLM output string.
+
+        Returns:
+            FlowDefinition produced by the @flow decorator.
+
+        Raises:
+            CompositionError: If AST validation fails or no FlowDefinition is produced.
+        """
+        code = self._strip_fences(raw_code)
+
+        validation = validate_dsl(code)
+        if not validation.valid:
+            raise CompositionError(f"LLM generated invalid DSL code. Errors: {validation.errors}\nCode:\n{code}")
+
+        namespace: dict[str, Any] = {
+            "step": step,
+            "for_each": for_each,
+            "branch": branch,
+            "flow": flow,
+        }
+        exec(code, namespace)  # noqa: S102 — safe: AST-validated above
+
+        flow_def = next(
+            (v for v in namespace.values() if isinstance(v, FlowDefinition)),
+            None,
+        )
+        if flow_def is None:
+            raise CompositionError(f"LLM code did not produce a FlowDefinition.\nCode:\n{code}")
+
+        return flow_def
+
+    @staticmethod
+    def _strip_fences(code: str) -> str:
+        """Remove markdown code fences from LLM output.
+
+        Args:
+            code: Raw text that may be wrapped in ```python ... ``` or ``` ... ```.
+
+        Returns:
+            Code with fence lines removed and surrounding whitespace stripped.
+        """
+        code = code.strip()
+        if code.startswith("```"):
+            lines = code.split("\n")
+            lines = [line for line in lines if not line.strip().startswith("```")]
+            code = "\n".join(lines)
+        return code.strip()
+
+    def _validate_yaml(self, yaml_text: str, validator: Any) -> tuple[bool, list[str]]:
+        """Legacy YAML validation — kept for internal use only.
+
+        Args:
+            yaml_text: Raw YAML string.
+            validator: BlueprintValidator instance.
+
+        Returns:
+            Tuple of (is_valid, error_strings).
+        """
+        from bricks.core.loader import BlueprintLoader  # noqa: PLC0415
+
+        loader = BlueprintLoader()
         try:
-            bp = self._loader.load_string(yaml_text)
+            bp = loader.load_string(yaml_text)
             validator.validate(bp)
             return True, []
         except BlueprintValidationError as exc:
