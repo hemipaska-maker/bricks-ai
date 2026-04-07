@@ -54,6 +54,7 @@ from bricks.core.schema import (
 from bricks.core.selector import AllBricksSelector, BrickSelector
 from bricks.core.utils import blueprint_to_yaml
 from bricks.core.validation import BlueprintValidator
+from bricks.core.validator_dsl import PythonDSLValidator, ValidationResult, validate_dsl
 from bricks.selector import BrickQuery, TieredBrickSelector
 
 # Deprecated aliases — use bricks.compat for warnings, these are kept
@@ -100,6 +101,7 @@ __all__ = [
     "FlowDefinition",
     "Node",
     "OrchestratorError",
+    "PythonDSLValidator",
     "ReferenceResolver",
     "RegistryConfig",
     "SelectorConfig",
@@ -109,6 +111,7 @@ __all__ = [
     "StoreConfig",
     "TieredBrickSelector",
     "TieredCatalog",
+    "ValidationResult",
     "VariableResolutionError",
     "Verbosity",
     "YamlLoadError",
@@ -126,4 +129,5 @@ __all__ = [
     "registry_schema",
     "signature_params",
     "step",
+    "validate_dsl",
 ]
