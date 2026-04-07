@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.49] — 2026-04-07
+
+### Added
+- **`@flow` decorator**: traces a Python function once at decoration time and returns a `FlowDefinition`
+- **`FlowDefinition`**: holds the traced DAG; exposes `.to_dag()`, `.to_blueprint()`, `.to_yaml()`, `.execute()`
+- **Public exports**: `flow` and `FlowDefinition` exported from `bricks` and `bricks.core`
+
+---
+
 ## [0.4.48] — 2026-04-07
 
 ### Added

@@ -16,7 +16,7 @@ from bricks.core.context import ExecutionContext
 from bricks.core.dag import DAG
 from bricks.core.dag_builder import DAGBuilder
 from bricks.core.discovery import BrickDiscovery
-from bricks.core.dsl import ExecutionTracer, Node, StepProxy, branch, for_each, step
+from bricks.core.dsl import ExecutionTracer, FlowDefinition, Node, StepProxy, branch, flow, for_each, step
 from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import (
     BlueprintValidationError,
@@ -97,6 +97,7 @@ __all__ = [
     "ExecutionContext",
     "ExecutionResult",
     "ExecutionTracer",
+    "FlowDefinition",
     "Node",
     "OrchestratorError",
     "ReferenceResolver",
@@ -117,6 +118,7 @@ __all__ = [
     "brick",
     "brick_schema",
     "catalog_schema",
+    "flow",
     "for_each",
     "output_key_table",
     "output_keys",

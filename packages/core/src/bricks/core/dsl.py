@@ -10,25 +10,39 @@ Provides the core building blocks for the Python-first DSL:
 - :func:`for_each` — maps a step over a list of items.
 - :func:`branch` — conditional routing based on a brick's boolean output.
 - :class:`ExecutionTracer` — records all Node objects created during a trace
-  phase (used by the ``@flow`` decorator in Mission 060).
+  phase (used by the ``@flow`` decorator).
+- :class:`FlowDefinition` — result of the ``@flow`` decorator; holds a DAG and
+  exposes ``.to_blueprint()``, ``.to_yaml()``, ``.to_dag()``, and
+  ``.execute()`` methods.
+- :func:`flow` — decorator that traces a function once at decoration time and
+  returns a :class:`FlowDefinition`.
 
-Nothing executes in this module. It is a pure data model.
+Nothing executes in this module beyond the trace phase inside :func:`flow`.
 
 Example::
 
-    from bricks import step, for_each, branch
+    from bricks import flow, step, for_each
 
-    clean_node = step.clean_text(text="hello world")
-    filtered = step.filter_dict_list(items=clean_node, key="status", value="active")
-    loop = for_each(items=filtered, do=lambda item: step.process(data=item))
+    @flow
+    def my_pipeline(data):
+        \"\"\"Clean and save data.\"\"\"
+        cleaned = step.clean(text=data)
+        return step.save(data=cleaned)
+
+    bp = my_pipeline.to_blueprint()
 """
 
 from __future__ import annotations
 
+import inspect
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from bricks.core.dag import DAG
+    from bricks.core.models import BlueprintDefinition, ExecutionResult
 
 
 @dataclass
@@ -252,3 +266,127 @@ def branch(
 #:     from bricks import step
 #:     node = step.my_brick(param="value")
 step: StepProxy = StepProxy()
+
+
+class FlowDefinition:
+    """A traced flow — the result of decorating a function with :func:`flow`.
+
+    Holds the DAG produced by tracing the decorated function and exposes
+    conversion and execution methods.
+
+    Attributes:
+        name: Function name used as the blueprint name.
+        description: Function docstring used as the blueprint description.
+        dag: The resolved :class:`~bricks.core.dag.DAG`.
+    """
+
+    def __init__(self, name: str, description: str, dag: DAG) -> None:
+        """Initialise with a name, description, and pre-built DAG.
+
+        Args:
+            name: Blueprint / flow name.
+            description: Human-readable description.
+            dag: The resolved DAG from the trace phase.
+        """
+        self.name = name
+        self.description = description
+        self.dag = dag
+
+    def to_dag(self) -> DAG:
+        """Return the raw DAG.
+
+        Returns:
+            The :class:`~bricks.core.dag.DAG` built from the traced nodes.
+        """
+        return self.dag
+
+    def to_blueprint(self) -> BlueprintDefinition:
+        """Convert to a :class:`~bricks.core.models.BlueprintDefinition`.
+
+        Returns:
+            A blueprint ready for the existing
+            :class:`~bricks.core.engine.BlueprintEngine`.
+        """
+        return self.dag.to_blueprint(name=self.name, description=self.description)
+
+    def to_yaml(self) -> str:
+        """Serialize to a YAML string.
+
+        Returns:
+            YAML representation of the blueprint.
+        """
+        from bricks.core.utils import blueprint_to_yaml  # noqa: PLC0415
+
+        return blueprint_to_yaml(self.to_blueprint())
+
+    def execute(
+        self,
+        inputs: dict[str, Any] | None = None,
+        engine: Any = None,
+    ) -> ExecutionResult:
+        """Execute the flow through :class:`~bricks.core.engine.BlueprintEngine`.
+
+        Args:
+            inputs: Runtime input values for ``${inputs.X}`` references.
+            engine: A :class:`~bricks.core.engine.BlueprintEngine` instance.
+                When ``None``, a default engine with an empty registry is
+                created (suitable for flows that only use built-in bricks).
+
+        Returns:
+            :class:`~bricks.core.models.ExecutionResult` from the engine.
+        """
+        from bricks.core.engine import BlueprintEngine  # noqa: PLC0415
+        from bricks.core.registry import BrickRegistry  # noqa: PLC0415
+
+        bp = self.to_blueprint()
+        resolved_engine: BlueprintEngine = engine if engine is not None else BlueprintEngine(BrickRegistry())
+        return resolved_engine.run(bp, inputs or {})
+
+
+def flow(func: Callable[..., Any]) -> FlowDefinition:
+    """Decorator that traces a function once and returns a :class:`FlowDefinition`.
+
+    The decorated function is called **once at decoration time** with ``None``
+    substituted for all parameters. The body should only call ``step.*``,
+    :func:`for_each`, and :func:`branch` — all of which return
+    :class:`Node` objects.  Actual values are irrelevant during tracing;
+    only the graph structure is captured.
+
+    Args:
+        func: The pipeline function to trace. Its parameters become mock
+            ``None`` values during the trace phase.
+
+    Returns:
+        A :class:`FlowDefinition` with the traced DAG.
+
+    Example::
+
+        from bricks import flow, step
+
+        @flow
+        def clean_pipeline(text):
+            \"\"\"Clean raw text.\"\"\"
+            return step.clean(text=text)
+
+        bp = clean_pipeline.to_blueprint()
+    """
+    from bricks.core.dag_builder import DAGBuilder  # noqa: PLC0415
+
+    sig = inspect.signature(func)
+    mock_args = dict.fromkeys(sig.parameters)
+
+    _tracer.start()
+    try:
+        return_value = func(**mock_args)
+    finally:
+        _tracer.stop()
+
+    traced_nodes = _tracer.get_nodes()
+    root = return_value if isinstance(return_value, Node) else None
+    dag = DAGBuilder().build(traced_nodes, root=root)
+
+    return FlowDefinition(
+        name=func.__name__,
+        description=func.__doc__ or "",
+        dag=dag,
+    )
