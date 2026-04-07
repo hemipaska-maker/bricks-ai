@@ -14,6 +14,7 @@ from bricks.core.config import (
 )
 from bricks.core.context import ExecutionContext
 from bricks.core.discovery import BrickDiscovery
+from bricks.core.dsl import Node, StepProxy, step
 from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import (
     BlueprintValidationError,
@@ -91,11 +92,13 @@ __all__ = [
     "DuplicateBrickError",
     "ExecutionContext",
     "ExecutionResult",
+    "Node",
     "OrchestratorError",
     "ReferenceResolver",
     "RegistryConfig",
     "SelectorConfig",
     "StepDefinition",
+    "StepProxy",
     "StepResult",
     "StoreConfig",
     "TieredBrickSelector",
@@ -113,4 +116,5 @@ __all__ = [
     "parse_description_keys",
     "registry_schema",
     "signature_params",
+    "step",
 ]

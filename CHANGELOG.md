@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.46] — 2026-04-07
+
+### Added
+- **Python DSL data model**: `Node` dataclass (universal DAG node for brick, for_each, branch) and `StepProxy` (`step.brick_name(**kwargs)` → `Node`) in `bricks.core.dsl`
+- **Public DSL exports**: `Node` and `step` available from top-level `from bricks import Node, step`; also exported from `bricks.core`
+
+---
+
 ## [0.4.45] — 2026-04-07
 
 ### Added
