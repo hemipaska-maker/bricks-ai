@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.48] — 2026-04-07
+
+### Added
+- **DAG class**: `bricks.core.dag.DAG` — directed acyclic graph of DSL nodes with topological sort and `to_blueprint()` conversion
+- **DAGBuilder class**: `bricks.core.dag_builder.DAGBuilder` — resolves Node-in-params and for_each items dependencies into edges
+- **`DAG.to_blueprint()`**: converts a DAG to `BlueprintDefinition`; Node refs → `${step.result}`, for_each → `__for_each__`, branch → `__branch__`
+- **Public exports**: `DAG` and `DAGBuilder` now exported from `bricks` and `bricks.core`
+
+---
+
 ## [0.4.47] — 2026-04-07
 
 ### Added

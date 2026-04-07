@@ -13,6 +13,8 @@ from bricks.core.config import (
     StoreConfig,
 )
 from bricks.core.context import ExecutionContext
+from bricks.core.dag import DAG
+from bricks.core.dag_builder import DAGBuilder
 from bricks.core.discovery import BrickDiscovery
 from bricks.core.dsl import ExecutionTracer, Node, StepProxy, branch, for_each, step
 from bricks.core.engine import BlueprintEngine
@@ -66,6 +68,7 @@ sequence_schema = blueprint_schema
 sequence_to_yaml = blueprint_to_yaml
 
 __all__ = [
+    "DAG",
     "AiConfig",
     "AllBricksSelector",
     "BaseBrick",
@@ -88,6 +91,7 @@ __all__ = [
     "CatalogConfig",
     "ConfigError",
     "ConfigLoader",
+    "DAGBuilder",
     "DuplicateBlueprintError",
     "DuplicateBrickError",
     "ExecutionContext",
