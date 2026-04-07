@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.2] — 2026-04-07
+
+### Added
+- **Benchmark GUI** — single-page HTML frontend at `http://localhost:8742` (no CDN, vanilla JS)
+- 3-step flow: Setup (dataset picker, task editor, optional settings) → Running (animated progress) → Results (winner banner, side-by-side cards, savings strip, blueprint YAML viewer)
+- Preset quick-load dropdown auto-fills dataset + task + expected outputs
+- Brick chip picker populated from `/api/bricks`; model pill buttons for LLM selection
+- Export Results (JSON download) and Run Again buttons in results footer
+
 ## [0.5.1] — 2026-04-07
 
 ### Added
