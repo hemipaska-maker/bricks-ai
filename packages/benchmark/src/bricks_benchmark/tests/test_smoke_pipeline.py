@@ -120,3 +120,37 @@ def count_pipeline(raw_text):
         mock_flow_def.execute.assert_called_once()
         engine._loader.load_string.assert_not_called()
         assert result.outputs == {"active_count": 5}
+
+    def test_direct_flow_execution_with_real_bricks(self) -> None:
+        """Full pipeline: pre-written DSL → FlowDefinition → execute with real registry.
+
+        No LLM. No mocked engine. Uses inline bricks and a dict-return flow to
+        verify the multi-output path introduced in Mission 072. Asserts that both
+        output keys are remapped correctly and hold real computed values.
+        """
+        dsl_code = """\
+@flow
+def multi_pipeline(raw_text):
+    char_count = step.count_chars(text=raw_text)
+    repeated = step.repeat_text(text=raw_text, times=2)
+    return {"char_count": char_count, "doubled": repeated}
+"""
+        composer = BlueprintComposer.__new__(BlueprintComposer)
+        composer._provider = MagicMock()
+        from bricks.core.selector import AllBricksSelector
+
+        composer._selector = AllBricksSelector()
+        composer._store = None
+
+        flow_def = composer._parse_dsl_response(dsl_code)
+        assert isinstance(flow_def, FlowDefinition)
+
+        registry = _make_registry()
+        engine = BlueprintEngine(registry=registry)
+
+        result = flow_def.execute(inputs={"raw_text": "hello"}, engine=engine)
+
+        assert "char_count" in result, f"Expected 'char_count' in outputs, got: {result}"
+        assert "doubled" in result, f"Expected 'doubled' in outputs, got: {result}"
+        assert result["char_count"] == 5, f"Expected 5, got: {result['char_count']}"
+        assert result["doubled"] == "hellohello", f"Expected 'hellohello', got: {result['doubled']}"

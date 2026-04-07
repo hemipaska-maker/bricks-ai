@@ -69,7 +69,7 @@ class ComposeResult(BaseModel):
     task: str
     blueprint_yaml: str = ""
     dsl_code: str = ""
-    flow_def: FlowDefinition | None = None
+    flow_def: FlowDefinition | None = Field(default=None, exclude=True)
     is_valid: bool = False
     validation_errors: list[str] = Field(default_factory=list)
     calls: list[CallDetail] = Field(default_factory=list)

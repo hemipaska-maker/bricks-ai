@@ -354,3 +354,31 @@ def my_flow():
     result = validate_dsl(code)
     assert isinstance(result, ValidationResult)
     assert result.valid
+
+
+# ---------------------------------------------------------------------------
+# @flow(...) call syntax (Mission 072 Fix 2)
+# ---------------------------------------------------------------------------
+
+
+def test_validator_accepts_flow_with_kwargs() -> None:
+    """@flow(outputs_map={...}) passes validator — must not raise 'decorated with @flow' error."""
+    code = """
+@flow(outputs_map={"active_count": "step_1.result"})
+def my_flow(data):
+    return step.process(data=data)
+"""
+    result = validate_dsl(code)
+    assert result.valid, f"Expected valid, got errors: {result.errors}"
+    assert not any("decorated with @flow" in e for e in result.errors)
+
+
+def test_validator_accepts_bare_flow() -> None:
+    """Regression guard: bare @flow still passes after adding @flow(...) support."""
+    code = """
+@flow
+def my_flow(data):
+    return step.process(data=data)
+"""
+    result = validate_dsl(code)
+    assert result.valid, f"Bare @flow must still be valid, got: {result.errors}"

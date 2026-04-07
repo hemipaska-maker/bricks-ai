@@ -7,6 +7,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.6] — 2026-04-07
+
+### Fixed
+- `ComposeResult.flow_def`: changed to `Field(exclude=True)` so `model_dump()` never tries to serialize the non-Pydantic `FlowDefinition` object
+- `validator_dsl.py`: accept `@flow(outputs_map={...})` call syntax alongside bare `@flow` — previously raised a false "not decorated with @flow" error
+- `FlowDefinition.execute()`: accept `inputs=` dict alongside `**kwargs`, merging both; enables `execute(inputs={"raw_api_response": data}, engine=engine)` pattern
+
+### Added
+- `@flow` decorator: detect `dict[str, Node]` return value — stores `output_nodes` on `FlowDefinition` and raises `TypeError` for non-Node values
+- `FlowDefinition.execute()` multi-output path: when re-traced return is `dict[str, Node]`, builds `outputs_map` from topologically-sorted node IDs so multi-output flows produce all declared outputs
+- End-to-end smoke test `test_direct_flow_execution_with_real_bricks` verifying dict-return multi-output DSL with real registry
+
 ## [0.5.5] — 2026-04-08
 
 ### Added

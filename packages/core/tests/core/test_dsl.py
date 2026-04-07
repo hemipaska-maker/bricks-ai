@@ -199,6 +199,75 @@ class TestFlowDefinitionExecute:
         assert isinstance(result, dict)
 
 
+class TestFlowDictReturn:
+    """Tests for @flow dict-return multi-output support (Mission 072 Fix 3)."""
+
+    def test_flow_dict_return_creates_output_nodes(self) -> None:
+        """@flow returning dict[str, Node] stores output_nodes on FlowDefinition."""
+        from bricks.core.dsl import flow as dsl_flow
+
+        @dsl_flow
+        def multi_flow(data: None) -> None:
+            a = step.brick_a(x=data)
+            b = step.brick_b(y=data)
+            return {"out_a": a, "out_b": b}  # type: ignore[return-value]
+
+        assert multi_flow.output_nodes is not None
+        assert set(multi_flow.output_nodes.keys()) == {"out_a", "out_b"}
+        assert all(isinstance(v, Node) for v in multi_flow.output_nodes.values())
+
+    def test_flow_dict_return_execute_remaps_outputs(self) -> None:
+        """execute() with dict-return flow remaps outputs to declared output keys."""
+        from typing import cast
+
+        from bricks.core.brick import BrickFunction, brick
+        from bricks.core.dsl import flow as dsl_flow
+        from bricks.core.engine import BlueprintEngine
+        from bricks.core.registry import BrickRegistry
+
+        registry = BrickRegistry()
+
+        @brick(description="Upper case. Returns {result: upper}.")
+        def upper_case(text: str) -> dict:  # type: ignore[type-arg]
+            """Upper case."""
+            return {"result": text.upper()}
+
+        @brick(description="Count chars. Returns {result: count}.")
+        def count_chars(text: str) -> dict:  # type: ignore[type-arg]
+            """Count chars."""
+            return {"result": len(text)}
+
+        for fn in (upper_case, count_chars):
+            typed = cast(BrickFunction, fn)
+            registry.register(typed.__brick_meta__.name, typed, typed.__brick_meta__)
+
+        @dsl_flow
+        def multi_flow(raw_text: None) -> None:
+            """Multi-output flow."""
+            upper = step.upper_case(text=raw_text)
+            count = step.count_chars(text=raw_text)
+            return {"uppercased": upper, "char_count": count}  # type: ignore[return-value]
+
+        engine = BlueprintEngine(registry=registry)
+        result = multi_flow.execute(engine=engine, raw_text="hello")
+
+        assert "uppercased" in result, f"Expected 'uppercased' in {result}"
+        assert "char_count" in result, f"Expected 'char_count' in {result}"
+        assert result["uppercased"] == "HELLO"
+        assert result["char_count"] == 5
+
+    def test_flow_dict_return_invalid_raises(self) -> None:
+        """@flow returning dict with non-Node values raises TypeError at decoration time."""
+        import pytest
+        from bricks.core.dsl import flow as dsl_flow
+
+        with pytest.raises(TypeError, match="Non-Node values"):
+
+            @dsl_flow
+            def bad_flow(data: None) -> None:
+                return {"a": "not_a_node"}  # type: ignore[return-value]
+
+
 class TestImports:
     """Tests that public exports work as documented."""
 

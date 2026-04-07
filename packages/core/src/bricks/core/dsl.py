@@ -288,6 +288,9 @@ class FlowDefinition:
         name: Function name used as the blueprint name.
         description: Function docstring used as the blueprint description.
         dag: The resolved :class:`~bricks.core.dag.DAG`.
+        output_nodes: For multi-output flows that return a ``dict[str, Node]``,
+            maps output key names to the terminal :class:`Node` objects captured
+            during the structural trace.  ``None`` for single-output flows.
     """
 
     def __init__(
@@ -296,6 +299,7 @@ class FlowDefinition:
         description: str,
         dag: DAG,
         fn: Callable[..., Any] | None = None,
+        output_nodes: dict[str, Node] | None = None,
     ) -> None:
         """Initialise with a name, description, and pre-built DAG.
 
@@ -306,11 +310,14 @@ class FlowDefinition:
             fn: The original undecorated flow function. When provided,
                 :meth:`execute` re-traces it with real inputs instead of using
                 the ``None``-param DAG captured at decoration time.
+            output_nodes: Optional mapping of output key → terminal Node for
+                multi-output flows that return ``dict[str, Node]``.
         """
         self.name = name
         self.description = description
         self.dag = dag
         self._fn = fn
+        self.output_nodes = output_nodes
 
     def to_dag(self) -> DAG:
         """Return the raw DAG.
@@ -339,21 +346,36 @@ class FlowDefinition:
 
         return blueprint_to_yaml(self.to_blueprint())
 
-    def execute(self, engine: Any = None, **kwargs: Any) -> dict[str, Any]:
+    def execute(
+        self,
+        inputs: dict[str, Any] | None = None,
+        engine: Any = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Execute the flow with real inputs by re-tracing and running the DAG.
 
-        Re-traces ``_fn`` with actual ``kwargs`` so step params hold real values
-        (not the ``None`` placeholders baked in at ``@flow`` decoration time).
-        Builds a fresh DAG and runs it through the provided engine.
+        Re-traces ``_fn`` with actual runtime values so step params hold real
+        data (not the ``None`` placeholders from the ``@flow`` structural
+        trace). Builds a fresh DAG and runs it through the provided engine.
+
+        Accepts runtime inputs as either a dict (``inputs={"key": value}``) or
+        keyword arguments (``key=value``). Both forms are merged, with keyword
+        arguments taking precedence.
+
+        For multi-output flows (those returning ``dict[str, Node]``), the
+        result dict is keyed by the declared output names. For single-output
+        flows, the result has a single ``"result"`` key.
 
         Args:
+            inputs: Optional dict of runtime inputs mapping parameter names to
+                values (e.g. ``{"raw_api_response": "..."}``)
             engine: Optional :class:`~bricks.core.engine.BlueprintEngine`
                 instance. When ``None``, a default engine with an empty
                 :class:`~bricks.core.registry.BrickRegistry` is created —
                 suitable for unit tests only. Production callers must supply
                 their registry-backed engine so that brick lookups succeed.
-            **kwargs: Runtime inputs matching the flow function's parameter
-                names (e.g. ``raw_api_response="..."``)
+            **kwargs: Additional runtime inputs as keyword arguments. Merged
+                with ``inputs``; keyword arguments take precedence on conflict.
 
         Returns:
             Dict of execution outputs from the engine run.
@@ -362,16 +384,35 @@ class FlowDefinition:
         from bricks.core.engine import BlueprintEngine  # noqa: PLC0415
         from bricks.core.registry import BrickRegistry  # noqa: PLC0415
 
-        if self._fn is not None and kwargs:
+        merged: dict[str, Any] = {**(inputs or {}), **kwargs}
+
+        if self._fn is not None and merged:
             _tracer.start()
             try:
-                return_value = self._fn(**kwargs)
+                return_value = self._fn(**merged)
             finally:
                 _tracer.stop()
             traced_nodes = _tracer.get_nodes()
-            root = return_value if isinstance(return_value, Node) else None
-            dag = DAGBuilder().build(traced_nodes, root=root)
-            bp = dag.to_blueprint(name=self.name, description=self.description)
+
+            if isinstance(return_value, dict) and all(isinstance(v, Node) for v in return_value.values()):
+                # Multi-output flow: build outputs_map from declared output keys
+                dag = DAGBuilder().build(traced_nodes, root=None)
+                ordered = dag.topological_sort()
+                node_id_to_step = {
+                    nid: f"step_{i + 1}_{dag.nodes[nid].brick_name or dag.nodes[nid].type}"
+                    for i, nid in enumerate(ordered)
+                }
+                outputs_map = {
+                    key: f"${{{node_id_to_step[node.id]}.result}}"
+                    for key, node in return_value.items()
+                    if node.id in node_id_to_step
+                }
+                bp = dag.to_blueprint(name=self.name, description=self.description)
+                bp = bp.model_copy(update={"outputs_map": outputs_map})
+            else:
+                root = return_value if isinstance(return_value, Node) else None
+                dag = DAGBuilder().build(traced_nodes, root=root)
+                bp = dag.to_blueprint(name=self.name, description=self.description)
         else:
             bp = self.to_blueprint()
 
@@ -419,7 +460,17 @@ def flow(func: Callable[..., Any]) -> FlowDefinition:
         _tracer.stop()
 
     traced_nodes = _tracer.get_nodes()
-    root = return_value if isinstance(return_value, Node) else None
+
+    output_nodes: dict[str, Node] | None = None
+    if isinstance(return_value, dict):
+        if not all(isinstance(v, Node) for v in return_value.values()):
+            bad = {k: type(v).__name__ for k, v in return_value.items() if not isinstance(v, Node)}
+            raise TypeError(f"@flow dict return must map str keys to Node values. Non-Node values: {bad}")
+        output_nodes = dict(return_value)
+        root = None
+    else:
+        root = return_value if isinstance(return_value, Node) else None
+
     dag = DAGBuilder().build(traced_nodes, root=root)
 
     return FlowDefinition(
@@ -427,4 +478,5 @@ def flow(func: Callable[..., Any]) -> FlowDefinition:
         description=func.__doc__ or "",
         dag=dag,
         fn=func,
+        output_nodes=output_nodes,
     )

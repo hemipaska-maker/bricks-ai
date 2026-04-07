@@ -159,7 +159,11 @@ class PythonDSLValidator:
             return
 
         func = top_level_defs[0]
-        has_flow = any(isinstance(d, ast.Name) and d.id == "flow" for d in func.decorator_list)
+        has_flow = any(
+            (isinstance(d, ast.Name) and d.id == "flow")
+            or (isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "flow")
+            for d in func.decorator_list
+        )
         if not has_flow:
             result.valid = False
             result.errors.append("Function must be decorated with @flow.")

@@ -295,3 +295,39 @@ class TestComposeResultFlowDef:
         result = composer.compose("task", math_registry)
         assert result.is_valid is False
         assert result.flow_def is None
+
+    def test_compose_result_flow_def_excluded_from_model_dump(self, math_registry: BrickRegistry) -> None:
+        """ComposeResult.model_dump() must NOT include flow_def (exclude=True required).
+
+        Without exclude=True, model_dump() on a ComposeResult with a live
+        FlowDefinition raises a serialization error.
+        """
+        from bricks.core.dsl import FlowDefinition
+
+        composer = _make_composer(math_registry)
+        composer._provider.complete.return_value = CompletionResult(text=_VALID_DSL)
+        result = composer.compose("Add 3 + 4", math_registry)
+
+        # flow_def must be set (sanity check)
+        assert isinstance(result.flow_def, FlowDefinition)
+
+        # model_dump() must succeed AND not include flow_def
+        dumped = result.model_dump()
+        assert "flow_def" not in dumped, "flow_def must be excluded from model_dump()"
+
+    def test_compose_result_flow_def_is_populated_after_valid_compose(self, math_registry: BrickRegistry) -> None:
+        """compose() with a valid DSL string populates flow_def with a FlowDefinition.
+
+        This is an integration test using a test double that returns pre-written
+        DSL — no LLM call is made.
+        """
+        from bricks.core.dsl import FlowDefinition
+
+        composer = _make_composer(math_registry)
+        composer._provider.complete.return_value = CompletionResult(text=_VALID_DSL)
+        result = composer.compose("Add numbers", math_registry)
+
+        assert result.is_valid is True
+        assert result.flow_def is not None
+        assert isinstance(result.flow_def, FlowDefinition)
+        assert result.flow_def.name  # must have a name derived from function name
