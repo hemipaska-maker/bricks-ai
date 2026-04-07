@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from bricks.core.dag import DAG
-    from bricks.core.models import BlueprintDefinition, ExecutionResult
+    from bricks.core.models import BlueprintDefinition
 
 
 @dataclass
@@ -290,17 +290,27 @@ class FlowDefinition:
         dag: The resolved :class:`~bricks.core.dag.DAG`.
     """
 
-    def __init__(self, name: str, description: str, dag: DAG) -> None:
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        dag: DAG,
+        fn: Callable[..., Any] | None = None,
+    ) -> None:
         """Initialise with a name, description, and pre-built DAG.
 
         Args:
             name: Blueprint / flow name.
             description: Human-readable description.
             dag: The resolved DAG from the trace phase.
+            fn: The original undecorated flow function. When provided,
+                :meth:`execute` re-traces it with real inputs instead of using
+                the ``None``-param DAG captured at decoration time.
         """
         self.name = name
         self.description = description
         self.dag = dag
+        self._fn = fn
 
     def to_dag(self) -> DAG:
         """Return the raw DAG.
@@ -329,28 +339,45 @@ class FlowDefinition:
 
         return blueprint_to_yaml(self.to_blueprint())
 
-    def execute(
-        self,
-        inputs: dict[str, Any] | None = None,
-        engine: Any = None,
-    ) -> ExecutionResult:
-        """Execute the flow through :class:`~bricks.core.engine.BlueprintEngine`.
+    def execute(self, engine: Any = None, **kwargs: Any) -> dict[str, Any]:
+        """Execute the flow with real inputs by re-tracing and running the DAG.
+
+        Re-traces ``_fn`` with actual ``kwargs`` so step params hold real values
+        (not the ``None`` placeholders baked in at ``@flow`` decoration time).
+        Builds a fresh DAG and runs it through the provided engine.
 
         Args:
-            inputs: Runtime input values for ``${inputs.X}`` references.
-            engine: A :class:`~bricks.core.engine.BlueprintEngine` instance.
-                When ``None``, a default engine with an empty registry is
-                created (suitable for flows that only use built-in bricks).
+            engine: Optional :class:`~bricks.core.engine.BlueprintEngine`
+                instance. When ``None``, a default engine with an empty
+                :class:`~bricks.core.registry.BrickRegistry` is created —
+                suitable for unit tests only. Production callers must supply
+                their registry-backed engine so that brick lookups succeed.
+            **kwargs: Runtime inputs matching the flow function's parameter
+                names (e.g. ``raw_api_response="..."``)
 
         Returns:
-            :class:`~bricks.core.models.ExecutionResult` from the engine.
+            Dict of execution outputs from the engine run.
         """
+        from bricks.core.dag_builder import DAGBuilder  # noqa: PLC0415
         from bricks.core.engine import BlueprintEngine  # noqa: PLC0415
         from bricks.core.registry import BrickRegistry  # noqa: PLC0415
 
-        bp = self.to_blueprint()
+        if self._fn is not None and kwargs:
+            _tracer.start()
+            try:
+                return_value = self._fn(**kwargs)
+            finally:
+                _tracer.stop()
+            traced_nodes = _tracer.get_nodes()
+            root = return_value if isinstance(return_value, Node) else None
+            dag = DAGBuilder().build(traced_nodes, root=root)
+            bp = dag.to_blueprint(name=self.name, description=self.description)
+        else:
+            bp = self.to_blueprint()
+
         resolved_engine: BlueprintEngine = engine if engine is not None else BlueprintEngine(BrickRegistry())
-        return resolved_engine.run(bp, inputs or {})
+        result = resolved_engine.run(bp, inputs={})
+        return dict(result.outputs)
 
 
 def flow(func: Callable[..., Any]) -> FlowDefinition:
@@ -399,4 +426,5 @@ def flow(func: Callable[..., Any]) -> FlowDefinition:
         name=func.__name__,
         description=func.__doc__ or "",
         dag=dag,
+        fn=func,
     )

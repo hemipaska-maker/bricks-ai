@@ -148,3 +148,62 @@ class TestRawLLMEngine:
         provider = self._make_provider("{}")
         engine = RawLLMEngine(provider=provider)
         assert engine.__class__.__name__ == "RawLLMEngine"
+
+
+class TestBricksEngineSolveDirectExecution:
+    """Tests that BricksEngine.solve() uses flow_def.execute() when available."""
+
+    def test_uses_direct_execution_when_flow_def_available(self) -> None:
+        """solve() calls flow_def.execute() and skips BlueprintLoader when flow_def is set."""
+        from bricks_benchmark.showcase.engine import BricksEngine
+
+        mock_flow_def = MagicMock()
+        mock_flow_def.execute.return_value = {"active_count": 3}
+
+        mock_compose_result = MagicMock()
+        mock_compose_result.is_valid = True
+        mock_compose_result.flow_def = mock_flow_def
+        mock_compose_result.blueprint_yaml = "yaml: placeholder"
+        mock_compose_result.total_input_tokens = 10
+        mock_compose_result.total_output_tokens = 5
+        mock_compose_result.model = "test-model"
+
+        engine = BricksEngine.__new__(BricksEngine)
+        engine._composer = MagicMock()
+        engine._composer.compose.return_value = mock_compose_result
+        engine._engine = MagicMock()
+        engine._loader = MagicMock()
+        engine._registry = MagicMock()
+
+        result = engine.solve("task", "raw data")
+
+        mock_flow_def.execute.assert_called_once()
+        engine._loader.load_string.assert_not_called()
+        assert result.outputs == {"active_count": 3}
+
+    def test_falls_back_to_yaml_when_flow_def_is_none(self) -> None:
+        """solve() falls back to BlueprintLoader when flow_def is None."""
+        from bricks.core.models import ExecutionResult
+
+        from bricks_benchmark.showcase.engine import BricksEngine
+
+        mock_compose_result = MagicMock()
+        mock_compose_result.is_valid = True
+        mock_compose_result.flow_def = None
+        mock_compose_result.blueprint_yaml = "yaml: placeholder"
+        mock_compose_result.total_input_tokens = 10
+        mock_compose_result.total_output_tokens = 5
+        mock_compose_result.model = "test-model"
+
+        engine = BricksEngine.__new__(BricksEngine)
+        engine._composer = MagicMock()
+        engine._composer.compose.return_value = mock_compose_result
+        engine._engine = MagicMock()
+        engine._engine.run.return_value = ExecutionResult(outputs={"x": 1}, steps=[])
+        engine._loader = MagicMock()
+        engine._registry = MagicMock()
+
+        result = engine.solve("task", "raw data")
+
+        engine._loader.load_string.assert_called_once_with("yaml: placeholder")
+        assert result.outputs == {"x": 1}

@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.4] — 2026-04-07
+
+### Fixed
+- **YAML roundtrip bug** — `@flow` traces with `None` args (structural trace), so `to_yaml()` baked `null` into all step params; bricks received `None` instead of real runtime data causing `expected string or bytes-like object` failures
+- `FlowDefinition.execute(engine, **kwargs)` now re-traces `_fn` with real inputs, building a fresh DAG with actual param values, bypassing the YAML roundtrip entirely
+
+### Added
+- `FlowDefinition._fn` — original flow function stored at `@flow` decoration time for re-use during execution
+- `ComposeResult.flow_def: FlowDefinition | None` — live `FlowDefinition` object carried through composition result
+- `BricksEngine.solve()` direct execution path: uses `flow_def.execute()` when available; falls back to YAML loader for cached/legacy results
+
 ## [0.5.3] — 2026-04-07
 
 ### Added

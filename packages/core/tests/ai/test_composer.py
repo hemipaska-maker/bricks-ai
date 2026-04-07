@@ -260,3 +260,38 @@ class TestComposePopulatesPrompts:
         retry_call = result.calls[1]
         assert "Original task:" in retry_call.user_prompt
         assert "Add numbers" in retry_call.user_prompt
+
+
+# ── flow_def preservation ──────────────────────────────────────────────────
+
+
+class TestComposeResultFlowDef:
+    """Tests that ComposeResult.flow_def is correctly populated."""
+
+    def test_compose_result_preserves_flow_def(self, math_registry: BrickRegistry) -> None:
+        """compose() populates flow_def with a FlowDefinition when DSL is valid."""
+        from bricks.core.dsl import FlowDefinition
+
+        composer = _make_composer(math_registry)
+        composer._provider.complete.return_value = CompletionResult(text=_VALID_DSL)
+        result = composer.compose("Add 3 + 4", math_registry)
+        assert result.flow_def is not None
+        assert isinstance(result.flow_def, FlowDefinition)
+
+    def test_compose_result_blueprint_yaml_still_populated(self, math_registry: BrickRegistry) -> None:
+        """compose() still populates blueprint_yaml (no regression for web GUI)."""
+        composer = _make_composer(math_registry)
+        composer._provider.complete.return_value = CompletionResult(text=_VALID_DSL)
+        result = composer.compose("Add 3 + 4", math_registry)
+        assert result.blueprint_yaml != ""
+
+    def test_compose_result_flow_def_none_on_invalid_dsl(self, math_registry: BrickRegistry) -> None:
+        """compose() sets flow_def to None when DSL is invalid."""
+        composer = _make_composer(math_registry)
+        composer._provider.complete.side_effect = [
+            CompletionResult(text=_INVALID_DSL),
+            CompletionResult(text=_INVALID_DSL),
+        ]
+        result = composer.compose("task", math_registry)
+        assert result.is_valid is False
+        assert result.flow_def is None

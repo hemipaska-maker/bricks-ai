@@ -158,6 +158,47 @@ class TestNode:
         assert len(edges_flat) == 1
 
 
+class TestFlowDefinitionExecute:
+    """Tests for FlowDefinition.execute() with real-input re-tracing."""
+
+    def test_execute_with_kwargs_calls_engine_with_real_params(self) -> None:
+        """execute() re-traces _fn with real inputs so step params hold real values."""
+        from unittest.mock import MagicMock
+
+        from bricks.core.dsl import flow as dsl_flow
+        from bricks.core.models import ExecutionResult
+
+        @dsl_flow
+        def my_flow(text: None) -> None:
+            """Test flow."""
+            return step.my_brick(text=text)
+
+        mock_engine = MagicMock()
+        mock_engine.run.return_value = ExecutionResult(outputs={"result": "done"}, steps=[])
+        result = my_flow.execute(engine=mock_engine, text="hello")
+        assert result == {"result": "done"}
+        # Verify the blueprint passed to engine has real param value
+        call_bp = mock_engine.run.call_args[0][0]
+        assert call_bp.steps[0].params.get("text") == "hello"
+
+    def test_execute_returns_dict(self) -> None:
+        """execute() always returns a dict."""
+        from unittest.mock import MagicMock
+
+        from bricks.core.dsl import flow as dsl_flow
+        from bricks.core.models import ExecutionResult
+
+        @dsl_flow
+        def simple_flow(data: None) -> None:
+            """Test flow."""
+            return step.process(data=data)
+
+        mock_engine = MagicMock()
+        mock_engine.run.return_value = ExecutionResult(outputs={"x": 1}, steps=[])
+        result = simple_flow.execute(engine=mock_engine, data="test")
+        assert isinstance(result, dict)
+
+
 class TestImports:
     """Tests that public exports work as documented."""
 

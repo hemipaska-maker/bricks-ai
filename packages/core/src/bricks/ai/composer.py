@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from bricks.core.dsl import FlowDefinition, branch, flow, for_each, step
 from bricks.core.exceptions import BlueprintValidationError, BrickError, DuplicateBlueprintError
@@ -64,9 +64,12 @@ class CallDetail(BaseModel):
 class ComposeResult(BaseModel):
     """Result of a Blueprint composition attempt."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     task: str
     blueprint_yaml: str = ""
     dsl_code: str = ""
+    flow_def: FlowDefinition | None = None
     is_valid: bool = False
     validation_errors: list[str] = Field(default_factory=list)
     calls: list[CallDetail] = Field(default_factory=list)
@@ -270,6 +273,7 @@ class BlueprintComposer:
 
         blueprint_yaml = ""
         dsl_code = ""
+        flow_def: FlowDefinition | None = None
         if last.is_valid:
             flow_def = self._parse_dsl_response(last.yaml_text)
             blueprint_yaml = flow_def.to_yaml()
@@ -279,6 +283,7 @@ class BlueprintComposer:
             task=task,
             blueprint_yaml=blueprint_yaml,
             dsl_code=dsl_code,
+            flow_def=flow_def,
             is_valid=last.is_valid,
             validation_errors=last.validation_errors,
             calls=calls,

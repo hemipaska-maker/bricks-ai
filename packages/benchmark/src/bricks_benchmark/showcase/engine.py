@@ -154,11 +154,14 @@ class BricksEngine(Engine):
             )
 
         try:
-            bp_def = self._loader.load_string(compose_result.blueprint_yaml)
-            exec_result = self._engine.run(bp_def, inputs={"raw_api_response": raw_data})
-            logger.debug("[BricksEngine] Execution outputs: %s", exec_result.outputs)
+            if compose_result.flow_def is not None:
+                exec_outputs = compose_result.flow_def.execute(engine=self._engine, raw_api_response=raw_data)
+            else:
+                bp_def = self._loader.load_string(compose_result.blueprint_yaml)
+                exec_outputs = self._engine.run(bp_def, inputs={"raw_api_response": raw_data}).outputs
+            logger.debug("[BricksEngine] Execution outputs: %s", exec_outputs)
             return EngineResult(
-                outputs=exec_result.outputs,
+                outputs=exec_outputs,
                 tokens_in=compose_result.total_input_tokens,
                 tokens_out=compose_result.total_output_tokens,
                 duration_seconds=time.monotonic() - t0,
