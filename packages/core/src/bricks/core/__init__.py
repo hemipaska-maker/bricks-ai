@@ -14,7 +14,7 @@ from bricks.core.config import (
 )
 from bricks.core.context import ExecutionContext
 from bricks.core.discovery import BrickDiscovery
-from bricks.core.dsl import Node, StepProxy, step
+from bricks.core.dsl import ExecutionTracer, Node, StepProxy, branch, for_each, step
 from bricks.core.engine import BlueprintEngine
 from bricks.core.exceptions import (
     BlueprintValidationError,
@@ -92,6 +92,7 @@ __all__ = [
     "DuplicateBrickError",
     "ExecutionContext",
     "ExecutionResult",
+    "ExecutionTracer",
     "Node",
     "OrchestratorError",
     "ReferenceResolver",
@@ -108,9 +109,11 @@ __all__ = [
     "YamlLoadError",
     "blueprint_schema",
     "blueprint_to_yaml",
+    "branch",
     "brick",
     "brick_schema",
     "catalog_schema",
+    "for_each",
     "output_key_table",
     "output_keys",
     "parse_description_keys",

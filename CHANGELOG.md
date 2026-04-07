@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.47] — 2026-04-07
+
+### Added
+- **DSL primitives**: `for_each(items, do, on_error)` and `branch(condition, if_true, if_false)` control-flow functions in `bricks.core.dsl`
+- **ExecutionTracer**: module-level `_tracer` singleton that records all Nodes created when active; all primitives (`step.*`, `for_each`, `branch`) auto-record to it
+- **Public exports**: `for_each` and `branch` now exported from `bricks` and `bricks.core`; `ExecutionTracer` from `bricks.core`
+
+---
+
 ## [0.4.46] — 2026-04-07
 
 ### Added
