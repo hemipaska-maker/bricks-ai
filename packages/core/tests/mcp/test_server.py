@@ -76,6 +76,7 @@ def _make_bricks_engine() -> MagicMock:
     engine = MagicMock()
     meta = BrickMeta(name="add_numbers", description="Add two numbers", tags=["math"])
     engine.registry.list_all.return_value = [("add_numbers", meta)]
+    engine.registry.list_public.return_value = [("add_numbers", meta)]
     engine.blueprint_store = MemoryBlueprintStore()
     engine.execute.return_value = {
         "outputs": {},
@@ -357,6 +358,7 @@ class TestErrorHandling:
     def _engine_raises(self, exc: Exception) -> MagicMock:
         engine = MagicMock()
         engine.registry.list_all.return_value = []
+        engine.registry.list_public.return_value = []
         engine.blueprint_store = None
         engine.execute.side_effect = exc
         return engine
@@ -407,6 +409,7 @@ class TestErrorHandling:
 
         engine = MagicMock()
         engine.registry.list_all.return_value = []
+        engine.registry.list_public.return_value = []
         engine.blueprint_store = None
         handlers = _capture_handlers(engine)
         with pytest.raises(ValueError, match="Unknown tool"):

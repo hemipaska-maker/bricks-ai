@@ -109,6 +109,42 @@ print(result["tokens_used"])  # 0 on cache hit
 
 ---
 
+## Python DSL
+
+Write pipelines as Python instead of YAML. The `@flow` decorator traces the function once and builds a DAG:
+
+```python
+from bricks import step, for_each, branch, flow
+
+# 1. Simple step chain
+@flow
+def clean_pipeline(data):
+    cleaned = step.clean(text=data)
+    return step.summarize(text=cleaned)
+
+blueprint = clean_pipeline.to_blueprint()  # → BlueprintDefinition
+yaml_str  = clean_pipeline.to_yaml()       # → YAML string
+
+# 2. for_each — map a brick over every item in a list
+@flow
+def batch_clean(items):
+    return for_each(items, do=lambda x: step.clean(text=x), on_error="collect")
+
+# 3. branch — conditional routing
+@flow
+def route_record(record):
+    return branch(
+        condition="is_valid",
+        if_true=lambda:  step.enrich(data=record),
+        if_false=lambda: step.log_invalid(data=record),
+    )
+```
+
+The LLM composer now generates Python DSL code instead of YAML.
+Generated DSL is validated with an AST whitelist before execution.
+
+---
+
 ## MCP Setup
 
 Use Bricks as an MCP server in Claude Desktop or any MCP-compatible host:

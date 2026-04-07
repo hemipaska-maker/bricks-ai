@@ -165,6 +165,7 @@ class RuntimeOrchestrator:
         }
         if verbose:
             result["blueprint_yaml"] = compose_result.blueprint_yaml
+            result["dsl_code"] = compose_result.dsl_code
             result["blueprint_name"] = execution.blueprint_name
             result["model"] = compose_result.model
             result["compose_duration_seconds"] = compose_result.duration_seconds

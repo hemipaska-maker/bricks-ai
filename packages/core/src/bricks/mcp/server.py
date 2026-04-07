@@ -41,6 +41,7 @@ async def run_mcp_server(engine: Any) -> None:
     from mcp.server.stdio import stdio_server  # noqa: PLC0415
     from pydantic.networks import AnyUrl  # noqa: PLC0415
 
+    from bricks.ai.composer import CompositionError  # noqa: PLC0415
     from bricks.core.exceptions import (  # noqa: PLC0415
         BlueprintValidationError,
         BrickExecutionError,
@@ -147,6 +148,16 @@ async def run_mcp_server(engine: Any) -> None:
                 "retryable": False,
             }
             return [types.TextContent(type="text", text=json.dumps(error))]
+        except CompositionError as exc:
+            logger.error("execute_task CompositionError: %s", exc)
+            error = {
+                "error": True,
+                "error_type": "dsl_validation_failed",
+                "message": str(exc),
+                "details": {"dsl_errors": getattr(exc, "errors", [])},
+                "retryable": True,
+            }
+            return [types.TextContent(type="text", text=json.dumps(error))]
         except OrchestratorError as exc:
             logger.error("execute_task OrchestratorError: %s", exc)
             error = {
@@ -207,7 +218,7 @@ async def run_mcp_server(engine: Any) -> None:
                     "tags": m.tags,
                     "category": m.category,
                 }
-                for n, m in engine.registry.list_all()
+                for n, m in engine.registry.list_public()
             ]
             return [ReadResourceContents(content=json.dumps(catalog, indent=2), mime_type="application/json")]
         if uri_str == "bricks://blueprints":
