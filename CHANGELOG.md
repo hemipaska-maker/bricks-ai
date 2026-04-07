@@ -7,6 +7,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.51] — 2026-04-07
+
+### Changed
+- **`BlueprintComposer` rewrite**: LLM now generates Python DSL instead of YAML (clean break, no fallback)
+- **New pipeline**: DSL text → AST whitelist validation → restricted `exec()` → `FlowDefinition` → `BlueprintDefinition`
+- **`ComposeResult.dsl_code`**: new field holding the validated Python DSL code
+- **`ComposeResult.blueprint_yaml`**: still populated (via `FlowDefinition.to_yaml()`) for backward compatibility
+- **`CompositionError`**: new exception raised when DSL validation/execution fails
+- Markdown code fences stripped automatically from LLM output
+
+---
+
 ## [0.4.50] — 2026-04-07
 
 ### Added
