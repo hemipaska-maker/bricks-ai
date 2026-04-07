@@ -1,0 +1,21 @@
+name: Custom Inline Example
+description: Minimal working example using inline data — safe to edit and share
+task_text: |
+  Parse the JSON product data. Filter to products with stock > 0.
+  Count the number of available products (available_count) and
+  calculate the total value of available inventory (total_value =
+  sum of price * stock for each available product).
+data:
+  - {id: 1, name: Keyboard, price: 79.99, stock: 12}
+  - {id: 2, name: Mouse, price: 29.99, stock: 0}
+  - {id: 3, name: Monitor, price: 299.99, stock: 5}
+  - {id: 4, name: Headset, price: 49.99, stock: 8}
+  - {id: 5, name: Webcam, price: 89.99, stock: 0}
+expected_outputs:
+  available_count: 3
+  total_value: 2459.82
+required_bricks:
+  - extract_json_from_str
+  - filter_dict_list
+  - calculate_aggregates
+model: claudecode

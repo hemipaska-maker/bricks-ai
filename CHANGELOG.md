@@ -7,6 +7,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.3] — 2026-04-07
+
+### Added
+- **Portable YAML scenario format** — `ScenarioDefinition` dataclass with three data sources: inline `data`, `data_file`, or `dataset_id`
+- `web/scenario_format.py` — `ScenarioDefinition` dataclass
+- `web/scenario_loader.py` — `load_scenario`, `export_scenario`, `scenario_to_benchmark_request`; clear `ValueError` messages on invalid input
+- **`--custom` CLI flag** — `python -m bricks_benchmark.showcase.run --live --custom scenario.yaml` runs both engines on any YAML scenario
+- 4 preset YAML files: `crm_pipeline`, `ticket_pipeline`, `cross_dataset_join`, `custom_example`
+- `examples/` directory with `basic_custom.yaml`, `file_reference.yaml`, `no_expected.yaml`, `sample_data.json`
+- `packages/benchmark/README.md` — CLI, web GUI, custom scenarios, API reference, architecture
+- mypy override for `yaml` (PyYAML) in root `pyproject.toml`
+
 ## [0.5.2] — 2026-04-07
 
 ### Added

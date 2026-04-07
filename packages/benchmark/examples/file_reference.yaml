@@ -1,0 +1,12 @@
+name: File Reference Example
+description: Scenario that loads data from an external JSON file instead of inline
+task_text: |
+  Parse the JSON inventory data. Filter to products with quantity > 0 (in-stock).
+  Count in-stock products by category: hardware_count and software_count.
+  Also calculate total inventory value for hardware items
+  (hardware_value = sum of quantity * unit_price for hardware products).
+data_file: sample_data.json
+expected_outputs:
+  hardware_count: 2
+  software_count: 3
+model: claudecode

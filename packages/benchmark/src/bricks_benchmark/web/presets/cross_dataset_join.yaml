@@ -1,0 +1,18 @@
+name: Orders Customer Join
+description: Join orders to customers, compute completed revenue per plan tier
+dataset_id: orders-customers
+task_text: |
+  Parse the JSON data containing two tables: "orders" (order_id, customer_id,
+  amount, status, order_date) and "customers" (id, name, email, plan).
+  Join orders to customers on customer_id = id. Filter to completed orders only.
+  Calculate total completed order amount per customer plan tier:
+  basic_revenue (sum of completed order amounts for basic plan customers),
+  pro_revenue (for pro plan), enterprise_revenue (for enterprise plan),
+  and total_completed (total completed orders count).
+expected_outputs:
+  total_completed: 24
+required_bricks:
+  - extract_json_from_str
+  - filter_dict_list
+  - calculate_aggregates
+model: claudecode

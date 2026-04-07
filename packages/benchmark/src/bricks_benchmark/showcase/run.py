@@ -215,6 +215,68 @@ def _setup_logger(run_dir: Path) -> logging.Logger:
     return logging.getLogger("bricks")
 
 
+# ── custom scenario runner ───────────────────────────────────────────────────
+
+
+def _run_custom_scenario(yaml_path: str, model: str = DEFAULT_MODEL) -> None:
+    """Load a YAML scenario file and run both engines on it, printing results.
+
+    Args:
+        yaml_path: Path to the scenario YAML file.
+        model: LLM model string to use for both engines.
+    """
+    from bricks_benchmark.showcase.engine import BricksEngine, RawLLMEngine
+    from bricks_benchmark.showcase.scenario_runner import _print_side_by_side, run_scenario
+    from bricks_benchmark.web.scenario_loader import _resolve_raw_data, load_scenario
+
+    path = Path(yaml_path)
+    if not path.exists():
+        print(f"Error: scenario file not found: {yaml_path}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        scenario = load_scenario(path)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        raw_data = _resolve_raw_data(scenario, base_dir=path.parent)
+    except ValueError as exc:
+        print(f"Error resolving data: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\nScenario: {scenario.name}")
+    print(f"  {scenario.description}")
+    print(f"  Model: {model}")
+    print()
+
+    provider = _build_provider(model)
+    bricks_engine = BricksEngine(provider=provider)
+    llm_engine = RawLLMEngine(provider=provider)
+
+    # Adapt scenario to BenchmarkTask protocol (dataclass with required fields)
+    from dataclasses import dataclass
+
+    @dataclass
+    class _ScenarioTask:
+        task_text: str
+        raw_api_response: str
+        expected_outputs: dict[str, Any]
+        required_bricks: list[str]
+
+    task = _ScenarioTask(
+        task_text=scenario.task_text,
+        raw_api_response=raw_data,
+        expected_outputs=scenario.expected_outputs or {},
+        required_bricks=scenario.required_bricks or [],
+    )
+
+    bricks_result = run_scenario(bricks_engine, task)
+    llm_result = run_scenario(llm_engine, task)
+    _print_side_by_side(scenario.name, bricks_result, llm_result, 0)
+
+
 # ── CLI ─────────────────────────────────────────────────────────────────────
 
 
@@ -265,6 +327,17 @@ def main() -> None:
         default=False,
         help="Required. Make real LLM calls. Requires an API key (or --model claudecode).",
     )
+    parser.add_argument(
+        "--custom",
+        type=str,
+        default=None,
+        metavar="YAML_FILE",
+        help=(
+            "Path to a custom scenario YAML file. "
+            "Runs both engines on the scenario and prints a side-by-side comparison. "
+            "Example: --custom examples/basic_custom.yaml"
+        ),
+    )
     args = parser.parse_args()
 
     if not args.live:
@@ -279,6 +352,10 @@ def main() -> None:
         print("API key is read from env (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.),")
         print("or use --model claudecode for zero-cost runs inside a Claude Code session.")
         sys.exit(1)
+
+    if args.custom:
+        _run_custom_scenario(args.custom, model=args.model)
+        return
 
     raw_scenarios = args.scenarios or ["all"]
     scenarios = expand_scenarios(raw_scenarios)
