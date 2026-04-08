@@ -267,12 +267,13 @@ def for_each(
         _dsl_module._tracer = outer_tracer
 
     inner_nodes = inner_tracer.get_nodes()
-    if not inner_nodes or not inner_nodes[0].brick_name:
+    if not inner_nodes:
         raise ValueError(
             "for_each: could not extract brick name from do= callable. "
             "Ensure the lambda calls exactly one step.brick_name(...)."
         )
-    do_brick: str = inner_nodes[0].brick_name
+    first = inner_nodes[0]
+    do_brick: str = first.brick_name or f"__{first.type}__"
 
     node = Node(type="for_each", items=items, do=do_brick, on_error=on_error)
     _tracer.record(node)
