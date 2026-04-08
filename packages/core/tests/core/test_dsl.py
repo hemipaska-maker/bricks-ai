@@ -391,3 +391,83 @@ class TestImports:
 
         assert isinstance(bricks_step, BricksStepProxy)
         assert BricksNode is Node
+
+
+# ── for_each lambda extraction tests (Mission 076) ──────────────────────
+
+
+class TestForEachLambdaExtraction:
+    """Tests for for_each() brick name extraction from lambda."""
+
+    def test_for_each_extracts_brick_name(self) -> None:
+        """for_each stores brick name string (not callable) on the Node."""
+        from bricks.core.dsl import for_each
+
+        data = step.load(path="data.json")
+        node = for_each(items=data, do=lambda item: step.process(data=item))
+        assert isinstance(node.do, str), f"Expected string, got {type(node.do)}"
+        assert node.do == "process"
+
+    def test_for_each_extracts_with_output_chaining(self) -> None:
+        """for_each extraction works when lambda uses .output."""
+        from bricks.core.dsl import for_each
+
+        data = step.load(path="data.json")
+        node = for_each(items=data, do=lambda item: step.transform(data=item.output))
+        assert node.do == "transform"
+
+    def test_for_each_extraction_failure_raises(self) -> None:
+        """for_each raises ValueError when lambda doesn't call any brick step."""
+        import pytest
+        from bricks.core.dsl import for_each
+
+        data = step.load(path="data.json")
+        with pytest.raises(ValueError, match="could not extract brick name"):
+            for_each(items=data, do=lambda item: item)  # type: ignore[arg-type]
+
+    def test_for_each_preserves_outer_trace(self) -> None:
+        """Outer trace nodes are preserved after for_each extraction."""
+        from bricks.core.dsl import _tracer, for_each
+
+        _tracer.start()
+        a = step.step_a(x="value")
+        _ = for_each(items=a, do=lambda item: step.step_b(data=item))
+        step.step_c(y="other")
+        _tracer.stop()
+        nodes = _tracer.get_nodes()
+        brick_names = [n.brick_name for n in nodes if n.brick_name]
+        assert "step_a" in brick_names
+        assert "step_c" in brick_names
+
+    def test_nested_node_param_resolves_via_resolve_param(self) -> None:
+        """_resolve_param correctly resolves Nodes nested in lists and dicts."""
+        from bricks.core.dag import _resolve_param
+
+        a = step.brick_a(x="val")
+        b = step.brick_b(y="val")
+        mapping = {a.id: "step_1_brick_a", b.id: "step_2_brick_b"}
+
+        # List containing Nodes
+        result = _resolve_param([a, "literal", b], mapping)
+        assert result == ["${step_1_brick_a.result}", "literal", "${step_2_brick_b.result}"]
+
+        # Dict containing Nodes
+        result2 = _resolve_param({"first": a, "second": b, "const": 42}, mapping)
+        assert result2 == {"first": "${step_1_brick_a.result}", "second": "${step_2_brick_b.result}", "const": 42}
+
+    def test_to_blueprint_multi_output_outputs_map(self) -> None:
+        """FlowDefinition.to_blueprint() injects outputs_map for dict-return flows."""
+        from bricks.core.dsl import flow as dsl_flow
+
+        @dsl_flow
+        def multi_flow(data: None) -> None:
+            a = step.brick_a(x=data)
+            b = step.brick_b(y=data)
+            return {"out_a": a, "out_b": b}  # type: ignore[return-value]
+
+        bp = multi_flow.to_blueprint()
+        assert "out_a" in bp.outputs_map, f"Missing 'out_a' in {bp.outputs_map}"
+        assert "out_b" in bp.outputs_map, f"Missing 'out_b' in {bp.outputs_map}"
+        # Values should be ${step_N.result} strings
+        for key, val in bp.outputs_map.items():
+            assert val.startswith("${"), f"Expected ${...} reference for {key}, got {val}"

@@ -216,12 +216,16 @@ def run_crm_reuse(
 
     # -- Bricks: reuse 19x ------------------------------------------------
     bricks_reuse_correct = 0
-    if first_bricks.correct or blueprint_yaml:
+    if first_bricks.correct or blueprint_yaml or first_bricks.flow_def:
         for i in range(1, seeds):
             seed = 42 + i
             task = generate_crm_task(seed)
-            if isinstance(bricks_engine, BricksEngine) and blueprint_yaml:
-                reuse_result = bricks_engine.solve_reuse(blueprint_yaml, task.raw_api_response)
+            if isinstance(bricks_engine, BricksEngine) and (blueprint_yaml or first_bricks.flow_def):
+                reuse_result = bricks_engine.solve_reuse(
+                    blueprint_yaml,
+                    task.raw_api_response,
+                    flow_def=first_bricks.flow_def,
+                )
                 correct = check_correctness(reuse_result.outputs, task.expected_outputs)
             else:
                 correct = False

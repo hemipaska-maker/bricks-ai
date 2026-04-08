@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.8] — 2026-04-08
+
+### Fixed
+- **8 DSL pipeline bugs** found during full benchmark debug session:
+  1. Recursive `_resolve_param()` resolves Node objects nested inside lists/dicts in step params — prevents `ruamel.yaml` crash
+  2. `for_each()` extracts brick name from lambda via tracer-swap technique — eliminates `Brick not found: '<lambda>'`
+  3. Simplified `do_name` handling in `dag.py` — removes dead callable-check path
+  4. `to_blueprint()` generates `outputs_map` for `for_each` root nodes (not just `brick` type)
+  5. `FlowDefinition.to_blueprint()` injects `outputs_map` from `output_nodes` for dict-return flows — fixes `to_yaml()` crash
+  6. `register_builtins()` called in `BricksEngine` — registers `__for_each__`/`__branch__` DSL bricks
+  7. `solve_reuse()` accepts `flow_def` and prefers direct execution over YAML roundtrip — fixes CRM-reuse 0% → 100% pass rate
+  8. Web API `/api/run` wraps `raw_data` in markdown JSON fences (with double-fence guard)
+- System prompt rules 11–12: instruct LLM to use exact brick parameter names in `for_each` lambdas
+
 ## [0.5.7] — 2026-04-08
 
 ### Fixed

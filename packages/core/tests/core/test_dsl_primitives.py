@@ -227,6 +227,6 @@ class TestExecutionTracer:
         node = for_each(items=items_node, do=do_fn)
         assert node.type == "for_each"
         assert node.items is items_node
-        inner = node.do(42)  # type: ignore[misc]
-        assert inner.type == "branch"
-        assert inner.condition == "check_condition"
+        # After lambda extraction, do is the brick name string (not the callable)
+        assert isinstance(node.do, str)
+        assert node.do == "__branch__"

@@ -253,3 +253,69 @@ class TestDAGAccessors:
         deps = dag.get_dependencies(b.id)
         assert len(deps) == 1
         assert deps[0] is a
+
+
+# ── _resolve_param tests ──────────────────────────────────────────────────
+
+
+class TestResolveParam:
+    """Tests for _resolve_param recursive Node resolution."""
+
+    def test_resolve_param_direct_node(self) -> None:
+        """Direct Node is resolved to ${step_name.result} string."""
+        from bricks.core.dag import _resolve_param
+
+        node = Node(type="brick", brick_name="foo")
+        mapping = {node.id: "step_1_foo"}
+        assert _resolve_param(node, mapping) == "${step_1_foo.result}"
+
+    def test_resolve_param_nested_list(self) -> None:
+        """Nodes inside a list are resolved."""
+        from bricks.core.dag import _resolve_param
+
+        a = Node(type="brick", brick_name="a")
+        b = Node(type="brick", brick_name="b")
+        mapping = {a.id: "step_1_a", b.id: "step_2_b"}
+        result = _resolve_param([a, "literal", b], mapping)
+        assert result == ["${step_1_a.result}", "literal", "${step_2_b.result}"]
+
+    def test_resolve_param_nested_dict(self) -> None:
+        """Nodes inside a dict are resolved."""
+        from bricks.core.dag import _resolve_param
+
+        node = Node(type="brick", brick_name="x")
+        mapping = {node.id: "step_1_x"}
+        result = _resolve_param({"key": node, "scalar": 42}, mapping)
+        assert result == {"key": "${step_1_x.result}", "scalar": 42}
+
+    def test_resolve_param_unknown_node_passthrough(self) -> None:
+        """Node not in mapping is returned as-is (defensive fallback)."""
+        from bricks.core.dag import _resolve_param
+
+        node = Node(type="brick", brick_name="orphan")
+        result = _resolve_param(node, {})
+        assert result is node
+
+    def test_resolve_param_scalar_passthrough(self) -> None:
+        """Scalar values pass through unchanged."""
+        from bricks.core.dag import _resolve_param
+
+        assert _resolve_param("hello", {}) == "hello"
+        assert _resolve_param(42, {}) == 42
+        assert _resolve_param(None, {}) is None
+
+    def test_for_each_root_generates_outputs_map(self) -> None:
+        """DAG whose root is a for_each node produces non-empty outputs_map."""
+        _tracer.start()
+        data = step.load(path="data.json")
+        result = for_each(items=data, do=lambda item: step.process(data=item))
+        _tracer.stop()
+        dag = _build(_tracer.get_nodes(), root=result)
+        bp = dag.to_blueprint()
+        assert bp.outputs_map, "for_each root should produce non-empty outputs_map"
+        assert "result" in bp.outputs_map
+
+    def setup_method(self) -> None:
+        """Reset tracer before each test."""
+        _tracer.stop()
+        _tracer.nodes.clear()

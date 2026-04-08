@@ -6,7 +6,7 @@ from bricks.core.dag_builder import DAGBuilder
 from bricks.core.dsl import Node, branch, flow, for_each, step
 from bricks.core.engine import DAGExecutionEngine
 
-__version__ = "0.5.7"
+__version__ = "0.5.8"
 
 __all__ = [
     "DAG",
