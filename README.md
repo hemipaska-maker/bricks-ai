@@ -20,7 +20,7 @@ export ANTHROPIC_API_KEY=sk-ant-...       # or any supported LLM — see below
 python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
 ```
 
-Here's what you'll see — real results from v0.4.31, tested across three Claude models:
+Here's what you'll see — real results tested across three Claude models:
 
 | | BricksEngine | Raw LLM |
 |---|---|---|
@@ -63,11 +63,12 @@ python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model c
 ## How It Works
 
 ```
-Your task → LLM composes YAML blueprint → Bricks validates → Bricks executes deterministically
+Your task → LLM generates Python DSL → Bricks validates (AST) → Bricks executes deterministically
 ```
 
 1. You describe what you want in plain English
-2. The LLM picks from 100 pre-tested bricks and writes a YAML blueprint
+2. The LLM picks from 100 pre-tested bricks and writes a Python DSL pipeline
+   (validated with an AST whitelist before execution)
 3. Bricks validates the blueprint (types, connections, missing inputs) before anything runs
 4. Bricks executes it deterministically — same blueprint, any data, identical results
 5. The blueprint is saved. Next time, zero LLM calls needed.
@@ -163,7 +164,13 @@ Use Bricks as an MCP server in Claude Desktop or any MCP-compatible host:
 }
 ```
 
-Save this to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows). Then Claude can call `execute_task` to run any task through Bricks.
+Save this to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
+
+The MCP server exposes:
+- **Tool:** `execute_task` — run any task through Bricks with optional `verbose` mode for step-by-step tracing
+- **Resources:** `bricks://catalog` (all available bricks) and `bricks://blueprints` (cached blueprints)
+- **Prompts:** templates for common tasks
+- **Persistent store:** blueprints cache to `~/.bricks/blueprints` by default, surviving server restarts
 
 ---
 
@@ -281,12 +288,26 @@ The CRM-pipeline benchmark generates 50 fake customer records and asks: "How man
 
 ---
 
-## Benchmark Scenarios
+## Try It Instantly — Interactive Demo
 
-Run the full benchmark suite to see all three scenarios:
+No API key needed. See Bricks in action right in your terminal:
 
 ```bash
-python -m bricks_benchmark.showcase.run --live   # runs all CRM scenarios
+bricks demo
+```
+
+Three acts: compose a blueprint, execute it on CRM data, compare Bricks vs raw LLM. Run `bricks demo --act 1` for just the first act.
+
+---
+
+## Benchmark Scenarios
+
+Run the full benchmark suite:
+
+```bash
+python -m bricks_benchmark.showcase.run --live                         # all scenarios
+python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline # single scenario
+python -m bricks_benchmark.showcase.run --live --scenario TICKET-pipeline  # support tickets
 ```
 
 | Scenario | What it proves | Bricks | Raw LLM |
@@ -294,5 +315,6 @@ python -m bricks_benchmark.showcase.run --live   # runs all CRM scenarios
 | **CRM-pipeline** | Determinism beats reasoning | ✅ Correct | ❌ Wrong (hallucination or format failure) |
 | **CRM-hallucination** | Consistency at scale (10 runs) | 10/10 (100%) | 6/10 (60%) |
 | **CRM-reuse** | Zero cost after first run (20 runs) | 20/20, 3,327 tokens | 12/20, 75,880 tokens |
+| **TICKET-pipeline** | Generalizes to new domains | ✅ Correct | ❌ Struggles with PII + filtering |
 
-Results from v0.4.31, tested with ClaudeCode, Claude Haiku, and Claude Sonnet.
+Tested with ClaudeCode, Claude Haiku, and Claude Sonnet.

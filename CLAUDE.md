@@ -4,8 +4,50 @@
 
 Bricks is a deterministic execution engine where typed Python building blocks (Bricks) are composed into auditable YAML blueprints -- by engineers directly or by AI through natural language conversation -- with full validation before execution.
 
+## Safety Rules
+
+**CRITICAL — read these before doing ANYTHING:**
+
+1. **NEVER create, delete, or move files outside the Code/ directory.** Your workspace is Code/ only. Research files and project docs are NOT yours to touch. **Exception:** you may update the `## Results` section of mission files in `../.missions/` after completing a mission — nothing else in those files.
+2. **NEVER run destructive commands.** The following are strictly banned:
+   - `rm -rf` (on any directory)
+   - `git clean -fdx` or `git clean -f`
+   - `git checkout .` or `git restore .` (on entire repo)
+   - `git reset --hard`
+   - Any command that deletes directories recursively
+3. **CLI allow-list.** You may ONLY run these commands:
+   - **git:** `git status`, `git checkout`, `git add`, `git commit`, `git push`, `git tag`, `git log`, `git diff`, `git branch`, `git fetch`, `git rebase`
+   - **git BANNED:** `git merge` (use `gh pr merge` instead), `git push origin main` (merge via PR only)
+   - **GitHub CLI:** `gh run list`, `gh run watch`, `gh run view`, `gh pr create`, `gh pr merge`, `gh pr list`, `gh pr view`, `gh issue`
+   - **General:** `cd`, `ls`, `cat`, `head`, `tail`, `grep`, `find`
+   - **Python:** `pip install`, `python -m pytest`, `python -m mypy`, `python -c`
+   - **Lint:** `ruff check`, `ruff format`
+   - If a command is not on this list, **do not run it** without asking the user first.
+4. **CI verification is MANDATORY.** After every push (to main OR any branch), you MUST verify the GitHub Actions pipeline passes:
+   ```bash
+   gh run list --branch <branch> --limit 1
+   gh run watch --exit-status
+   ```
+   **BLOCKING:** Do NOT merge, do NOT proceed to the next mission, do NOT update the Results section until CI is green. If CI fails: read the logs with `gh run view <run-id> --log-failed`, fix the issue, push again, and re-verify. Repeat until green. **A mission is not done until CI passes.**
+
+## Environment Setup
+
+**MANDATORY — before starting ANY mission:**
+
+1. Check if a venv exists in your repo root: `ls .venv/`
+2. If not, create one: `python -m venv .venv`
+3. Activate it: `source .venv/bin/activate` (Linux) or `.venv\Scripts\activate` (Windows)
+4. Install all packages in dev mode:
+   ```bash
+   pip install -e packages/core -e packages/stdlib -e packages/benchmark -e packages/provider-claudecode
+   ```
+5. Verify: `python -c "import bricks; print(bricks.__version__)"`
+
+**Always run ALL commands inside the venv.** Never install packages globally. If you see `ModuleNotFoundError`, check that the venv is active first.
+
 ## Technical Constraints
 
+- **Cross-platform: Linux AND Windows.** All code must work on both. Use `pathlib.Path` not `os.path`. No hardcoded `/` or `\` separators. No Linux-only or Windows-only commands in code. Test paths with both forward and back slashes.
 - **Python 3.10+** -- use modern syntax (`X | Y` unions, `match`, etc.)
 - **Runtime dependencies:** pydantic v2, typer, ruamel.yaml
 - **Type hints everywhere** -- code must pass `mypy --strict`
@@ -82,19 +124,40 @@ examples/                # Runnable standalone scripts
 
 ```bash
 # Run tests
-pytest
+python -m pytest
+python -m pytest -q --tb=short
 
 # Type checking
-mypy bricks --strict
+python -m mypy packages/core/src/bricks --strict
 
-# Lint
+# Lint & format
 ruff check .
-
-# Format
 ruff format .
 
 # Run CLI
 bricks --help
+
+# Git (worktree-safe — never touch main locally)
+git fetch origin --prune
+git checkout -b mission-XXX-short-name origin/main
+git status
+git add <specific files>
+git commit -m "Mission XXX: description"
+git tag vX.Y.Z
+git push origin mission-XXX-short-name --tags
+git checkout origin/main --detach
+git branch -d <branch>
+git log --oneline -10
+git diff
+
+# GitHub CLI (PR-based merge)
+gh pr create --title "Mission XXX: description" --fill
+gh pr merge --merge
+gh run list --branch <branch> --limit 1
+gh run watch --exit-status
+gh run view <run-id> --log-failed
+gh pr list / view
+gh issue create / list / view
 ```
 
 ## Code Conventions
@@ -136,6 +199,9 @@ Write professional, idiomatic Python. Every piece of code should look like it be
 - Use `pytest.raises` for expected exceptions, `pytest.mark.parametrize` for variant inputs
 - Test edge cases: empty inputs, None, negative numbers, boundary values
 - No magic numbers in tests -- use named constants or fixtures
+- **Seam rule:** If your mission creates or modifies a data class that crosses module boundaries (e.g., a result object produced in module A and consumed in module B), you MUST write at least one test that instantiates it in the *consumer* module with a real value — not just in the producer. This catches "field added but never wired through" bugs that unit tests miss.
+- **Integration rule:** If your mission touches any pipeline boundary (compose → execute, DSL → engine, MCP → runtime), you MUST include at least one end-to-end test that passes a real input value through the full chain and asserts correct output. Mocking at the boundary is not sufficient.
+- **Live run rule:** If your mission fixes an integration bug or touches the compose → execute boundary, run the affected benchmark scenario once with `--live` before opening the PR and paste the output in the mission Results section. Example: `.venv/Scripts/python -m bricks_benchmark.showcase.run --live --scenario <affected-scenario> --model claudecode`. If no benchmark scenario covers your change, the CI smoke test is sufficient.
 
 **Imports:**
 - Group: stdlib → third-party → local, separated by blank lines
@@ -149,11 +215,13 @@ Write professional, idiomatic Python. Every piece of code should look like it be
 
 ## Git Workflow
 
-### Branching Rules
+### Worktree Awareness
 
-- **Numbered missions (MISSION_XXX) that touch code:** Create a feature branch `mission-XXX-short-name` before starting work. Do all work on the branch. Run the full verification suite (`pytest`, `mypy`, `ruff`). Merge to `main` only after all checks pass. Push both branch and main.
-- **Bench missions (BENCH_XXX):** Always on a separate branch (e.g., `bench/001-support-tickets`). Never merge to main without explicit CTO approval.
-- **Docs-only changes** (research files, marketing, README tweaks with no code impact): Can go straight to `main`.
+**You are running in a git worktree, NOT the main checkout.** The `main` branch is checked out in another directory (`Code/`). You CANNOT check out or merge into `main` locally — git will reject it. All merges to `main` happen remotely via GitHub PRs.
+
+**You NEVER use a `dev` branch.** There are only two states for you:
+1. **Working:** on a feature branch (`mission-XXX-short-name`)
+2. **Idle:** detached HEAD on `origin/main`
 
 ### Branch Naming
 
@@ -162,13 +230,100 @@ Write professional, idiomatic Python. Every piece of code should look like it be
 | Numbered mission | `mission-XXX-short-name` | `mission-042-repo-hygiene` |
 | Bench mission | `bench/XXX-short-name` | `bench/003-log-parser` |
 
-### Merge Process
+### Starting a Mission
 
-1. Ensure all tests pass on the branch
-2. `git checkout main && git merge mission-XXX-short-name`
-3. Tag the new version on main
-4. Push: `git push origin main && git push origin --tags`
-5. Delete the feature branch: `git branch -d mission-XXX-short-name`
+```bash
+# 1. Sync with remote (picks up other coders' changes)
+git fetch origin --prune
+
+# 2. Create feature branch from latest main
+git checkout -b mission-XXX-short-name origin/main
+
+# 3. Pre-flight check — verify codebase is healthy BEFORE you start
+python -m pytest --tb=short -q
+python -m mypy packages/core/src/bricks --strict
+ruff check .
+```
+
+If pre-flight fails and the failures are NOT from your code: **STOP. Report to CTO. Do not fix other coders' bugs without a mission.**
+
+### Finishing a Mission (Merge Process)
+
+```bash
+# 1. Run full verification suite
+python -m pytest --tb=short -q
+python -m mypy packages/core/src/bricks --strict
+ruff check .
+
+# 2. Stage and commit (specific files only, never git add -A)
+git add <specific files>
+git commit -m "Mission XXX: description"
+
+# 3. SYNC before version bump — another coder may have merged while you worked
+git fetch origin
+git rebase origin/main
+#    This gets the latest __version__ and CHANGELOG.md from main.
+#    If rebase conflicts: resolve, `git rebase --continue`, re-run tests.
+#    ONLY after rebase do you read the current version number.
+
+# 4. Bump version in pyproject.toml + bricks/__init__.py
+#    Read current __version__ from bricks/__init__.py (post-rebase!), increment patch by 1
+git add <version files>
+git commit -m "Bump version to vX.Y.Z"
+
+# 5. Tag the version
+git tag vX.Y.Z
+
+# 6. Push branch + tag to GitHub
+git push origin mission-XXX-short-name --tags
+
+# 7. Create PR via GitHub CLI
+gh pr create --title "Mission XXX: description" --fill
+
+# 8. Wait for CI to pass on the branch — BLOCKING
+gh run list --branch mission-XXX-short-name --limit 1
+gh run watch --exit-status
+#    If CI fails: read logs with `gh run view <run-id> --log-failed`
+#    Fix, push, wait for CI again. Repeat until green.
+
+# 9. Merge PR remotely (NOT local merge)
+gh pr merge --merge
+
+# 10. Fill in the mission Results section
+#     Update Status to ✅ Done at TOP of file AND in Results section at bottom
+```
+
+**CRITICAL:** Never run `git checkout main`, `git merge ... main`, or `git push origin main`. All of these will fail or cause conflicts because `main` is checked out in the other worktree.
+
+### Between Missions (Idle State)
+
+After a mission is merged, reset to idle state:
+
+```bash
+# 1. Sync with remote
+git fetch origin --prune
+
+# 2. Detach from the merged branch
+git checkout origin/main --detach
+
+# 3. Clean up the old branch
+git branch -d mission-XXX-short-name
+```
+
+You are now on detached HEAD with the latest code. When the next mission arrives, start from "Starting a Mission" above. If time has passed, `git fetch origin --prune` again before creating the new branch.
+
+### What If Another Coder Pushed While You Were Working?
+
+If your PR can't merge because `main` has moved:
+
+```bash
+# Rebase your branch on latest main
+git fetch origin
+git rebase origin/main
+# Resolve any conflicts, then force-push your branch
+git push origin mission-XXX-short-name --force-with-lease
+# Wait for CI again, then merge
+```
 
 ## Versioning
 
@@ -180,12 +335,11 @@ Write professional, idiomatic Python. Every piece of code should look like it be
 
 **Versioning rule for missions:** Mission files never specify a target version number. At the end of each mission, Claude Code reads the current `__version__` from `bricks/__init__.py` and increments the patch by 1. The PM tab does not set versions — the coder is the single source of truth.
 
-**GitHub push rule:** After every commit and tag, always push both to GitHub:
+**GitHub push rule:** After every commit and tag, push your branch (never main directly):
 ```bash
-git push origin main
-git push origin --tags
+git push origin mission-XXX-short-name --tags
 ```
-Every mission must end with both the commit and the tag live on GitHub. No exceptions.
+Then merge via `gh pr merge --merge`. The tag and commits flow to main through the PR. Every mission must end with the PR merged and CI green on main. No exceptions.
 
 ## File Maintenance Contract
 
@@ -208,11 +362,18 @@ The benchmark runner must embed `bricks.__version__` in ALL output: `results.jso
 
 ## Missions
 
-**MANDATORY — after completing ANY mission, you MUST fill in the `## Results` section of that mission file. Update the Status to ✅ Done, record the date, list files changed, and paste test results. No exceptions. This is how the PM verifies your work.**
+**Mission files live OUTSIDE the Code directory** at `../.missions/`. You may READ mission files but NEVER delete, move, or modify them (see Safety Rule #1).
+
+**MANDATORY — after completing ANY mission, you MUST do BOTH of the following:**
+
+1. **Update the `**Status:**` field at the TOP of the mission file** — change it from `🔵 Ready` or `🔄 In Progress` to `✅ Done`. This is the first thing the PM checks. If you only update the Results section at the bottom but leave the top status unchanged, the PM will miss your completed work.
+2. **Fill in the `## Results` section** at the bottom — set Status to ✅ Done, record the Completed date, the Version, list files changed, and paste test results.
+
+**Both updates are required. No exceptions. This is how the PM verifies your work.**
 
 When the user says **"new mission"**, do the following:
-1. Read `.missions/PROTOCOL.md`
-2. Find the highest-numbered `MISSION_XXX.md` file in `.missions/`
+1. Read `../.missions/PROTOCOL.md`
+2. Find the highest-numbered `MISSION_XXX.md` file in `../.missions/`
 3. Read it and execute the task
-4. Fill in the Results section when done — **this step is not optional**
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+4. When done: update the **Status field at the top** AND fill in the **Results section at the bottom** — this step is not optional
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 

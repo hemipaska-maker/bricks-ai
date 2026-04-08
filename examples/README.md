@@ -1,5 +1,6 @@
 # Bricks Examples
 
+**Quickest start** → `bricks demo` — interactive 3-act demo, no API key needed
 **Start here** → [end_to_end/quickstart.py](end_to_end/quickstart.py) — see Bricks in action in 30 seconds
 **Learn each piece** → [basics/01_hello_brick.py](basics/01_hello_brick.py) — understand how each building block works
 
@@ -15,6 +16,7 @@ Run these first. They show real data pipelines with real outputs.
 |---------|--------------|
 | [end_to_end/quickstart.py](end_to_end/quickstart.py) | 5 CRM records → filter active → count. 30-second demo. |
 | [end_to_end/crm_pipeline.py](end_to_end/crm_pipeline.py) | 50-record CRM dataset → filter, count, verify against expected outputs |
+| [end_to_end/crm_pipeline_dsl.py](end_to_end/crm_pipeline_dsl.py) | DSL version of CRM pipeline — same task, Python DSL instead of YAML |
 | [end_to_end/ticket_pipeline.py](end_to_end/ticket_pipeline.py) | 100 support tickets → validate emails, filter by priority, count |
 | [end_to_end/langchain_tool.py](end_to_end/langchain_tool.py) | Wrap `engine.execute()` as a LangChain (or any framework) tool |
 | [end_to_end/mcp_server/](end_to_end/mcp_server/) | Expose Bricks as an MCP server for Claude Desktop |
@@ -44,6 +46,7 @@ One concept per file. All run standalone with no API key.
 | [basics/04_nested_blueprints.py](basics/04_nested_blueprints.py) | Parent blueprint calling a child blueprint as a step |
 | [basics/05_discovery.py](basics/05_discovery.py) | Auto-discover bricks from a directory with `BrickDiscovery` |
 | [basics/06_skill_config.py](basics/06_skill_config.py) | Boot from `agent.yaml` or `skill.md` config files |
+| [basics/07_python_dsl.py](basics/07_python_dsl.py) | Python DSL: `@flow`, `step.*`, `for_each`, `branch` — write pipelines as Python |
 
 ```bash
 python examples/basics/01_hello_brick.py
