@@ -109,6 +109,10 @@ Rules:
    Use dict return whenever the task requires multiple output keys.
 9. on_error="fail" (default) stops on first error. on_error="collect" continues and gathers errors.
 10. branch condition must be a brick name string that returns boolean
+11. In for_each lambdas, use the brick's exact parameter name from the signatures above:
+    CORRECT: for_each(items=data, do=lambda item: step.count_dict_list(items=item))
+    WRONG:   for_each(items=data, do=lambda item: step.count_dict_list(item=item))
+12. Prefer filter_dict_list + calculate_aggregates over for_each when filtering and aggregating a single list.
 
 Task: {task}
 {input_context}

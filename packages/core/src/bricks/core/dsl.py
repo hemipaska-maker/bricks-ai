@@ -60,7 +60,7 @@ class Node:
             :class:`Node` objects — dependency edges are resolved later by
             :class:`~bricks.dsl.dag_builder.DAGBuilder`.
         items: Input items for ``for_each`` nodes.
-        do: Callable body for ``for_each`` nodes.
+        do: Brick name string (after extraction) or raw callable for ``for_each`` nodes.
         on_error: Error policy for ``for_each`` — ``"fail"`` (default, stop on
             first error) or ``"collect"`` (continue, gather all errors).
         condition: Condition for ``branch`` nodes (brick name string in v1).
@@ -77,7 +77,7 @@ class Node:
 
     # for_each fields
     items: Node | list[Any] | None = None
-    do: Callable[..., Any] | None = None
+    do: str | Callable[..., Any] | None = None
     on_error: str = "fail"
 
     # branch fields
@@ -226,21 +226,55 @@ def for_each(
 ) -> Node:
     """Map a step over a list of items.
 
+    Extracts the brick name from *do* by invoking it with a mock :class:`Node`
+    through an isolated :class:`ExecutionTracer`. The extracted name (a string)
+    is stored on the resulting node — **not** the callable — so it serialises
+    cleanly to a blueprint step.
+
     Args:
         items: A :class:`Node` whose output is a list, or a literal list.
         do: A callable that takes one item and returns a :class:`Node`.
+            Must call exactly one ``step.brick_name(...)`` inside.
         on_error: ``"fail"`` (stop on first error, default) or ``"collect"``
             (continue processing, gather all errors).
 
     Returns:
-        A :class:`Node` with ``type="for_each"``.
+        A :class:`Node` with ``type="for_each"`` and ``do`` set to the
+        extracted brick name string.
 
     Raises:
-        ValueError: If ``on_error`` is not ``"fail"`` or ``"collect"``.
+        ValueError: If ``on_error`` is invalid or if the brick name cannot
+            be extracted from the *do* callable.
     """
     if on_error not in ("fail", "collect"):
         raise ValueError(f"on_error must be 'fail' or 'collect', got {on_error!r}")
-    node = Node(type="for_each", items=items, do=do, on_error=on_error)
+
+    # Extract brick name by running the lambda through an isolated tracer.
+    # A fresh ExecutionTracer is used (not the module-level _tracer singleton)
+    # to avoid corrupting any outer trace that may be in progress.
+    import bricks.core.dsl as _dsl_module  # noqa: PLC0415
+
+    inner_tracer = ExecutionTracer()
+    outer_tracer = _dsl_module._tracer
+    _dsl_module._tracer = inner_tracer
+    inner_tracer.start()
+    try:
+        do(Node(type="brick", brick_name="__mock__", params={}))
+    except Exception:  # noqa: S110
+        pass
+    finally:
+        inner_tracer.stop()
+        _dsl_module._tracer = outer_tracer
+
+    inner_nodes = inner_tracer.get_nodes()
+    if not inner_nodes or not inner_nodes[0].brick_name:
+        raise ValueError(
+            "for_each: could not extract brick name from do= callable. "
+            "Ensure the lambda calls exactly one step.brick_name(...)."
+        )
+    do_brick: str = inner_nodes[0].brick_name
+
+    node = Node(type="for_each", items=items, do=do_brick, on_error=on_error)
     _tracer.record(node)
     return node
 
@@ -330,11 +364,26 @@ class FlowDefinition:
     def to_blueprint(self) -> BlueprintDefinition:
         """Convert to a :class:`~bricks.core.models.BlueprintDefinition`.
 
+        For multi-output flows (dict return), injects a proper ``outputs_map``
+        referencing each terminal node's step by name.
+
         Returns:
             A blueprint ready for the existing
             :class:`~bricks.core.engine.BlueprintEngine`.
         """
-        return self.dag.to_blueprint(name=self.name, description=self.description)
+        bp = self.dag.to_blueprint(name=self.name, description=self.description)
+        if self.output_nodes:
+            ordered = self.dag.topological_sort()
+            node_id_to_step = {
+                nid: f"step_{i + 1}_{self.dag.nodes[nid].brick_name or self.dag.nodes[nid].type}"
+                for i, nid in enumerate(ordered)
+            }
+            bp.outputs_map = {
+                key: f"${{{node_id_to_step[node.id]}.result}}"
+                for key, node in self.output_nodes.items()
+                if node.id in node_id_to_step
+            }
+        return bp
 
     def to_yaml(self) -> str:
         """Serialize to a YAML string.

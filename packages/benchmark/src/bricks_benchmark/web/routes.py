@@ -67,8 +67,13 @@ async def run_benchmark(req: BenchmarkRequest) -> BenchmarkResponse:
     bricks_engine = BricksEngine(provider=provider)
     llm_engine = RawLLMEngine(provider=provider)
 
-    bricks_raw = bricks_engine.solve(req.task_text, req.raw_data)
-    llm_raw = llm_engine.solve(req.task_text, req.raw_data)
+    # Engines expect data wrapped in markdown JSON fences (extract_markdown_fences brick).
+    # Guard against double-fencing if the data is already wrapped.
+    raw = req.raw_data
+    fenced_data = raw if raw.strip().startswith("```") else f"```json\n{raw}\n```"
+
+    bricks_raw = bricks_engine.solve(req.task_text, fenced_data)
+    llm_raw = llm_engine.solve(req.task_text, fenced_data)
 
     bricks_correct: bool | None = None
     llm_correct: bool | None = None

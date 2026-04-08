@@ -59,6 +59,8 @@ class EngineResult:
     """Full LLM text response (blueprint YAML for Bricks, JSON text for RawLLM)."""
     error: str = ""
     """Non-empty if the engine failed to produce valid outputs."""
+    flow_def: Any = None
+    """Optional FlowDefinition for reuse without YAML roundtrip."""
 
 
 @dataclass
@@ -79,6 +81,8 @@ class BenchmarkResult:
     model: str
     raw_response: str = ""
     error: str = ""
+    flow_def: Any = None
+    """Optional FlowDefinition for reuse without YAML roundtrip."""
 
 
 class Engine(ABC):
@@ -116,6 +120,7 @@ class BricksEngine(Engine):
             provider: Any LLMProvider instance (LiteLLMProvider or ClaudeCodeProvider).
         """
         from bricks.ai.composer import BlueprintComposer
+        from bricks.core.builtins import register_builtins
         from bricks.core.engine import BlueprintEngine
         from bricks.core.loader import BlueprintLoader
         from bricks.core.registry import BrickRegistry
@@ -125,6 +130,7 @@ class BricksEngine(Engine):
         self._loader = BlueprintLoader()
         registry = BrickRegistry()
         _register_stdlib(registry)
+        register_builtins(registry)
         self._registry = registry
         self._engine = BlueprintEngine(registry=registry)
 
@@ -170,6 +176,7 @@ class BricksEngine(Engine):
                 duration_seconds=time.monotonic() - t0,
                 model=compose_result.model,
                 raw_response=compose_result.blueprint_yaml,
+                flow_def=compose_result.flow_def,
             )
         except Exception as exc:
             logger.error("[BricksEngine] Execution failed: %s", exc)
@@ -183,24 +190,31 @@ class BricksEngine(Engine):
                 error=str(exc),
             )
 
-    def solve_reuse(self, blueprint_yaml: str, raw_data: str) -> EngineResult:
+    def solve_reuse(self, blueprint_yaml: str, raw_data: str, flow_def: Any = None) -> EngineResult:
         """Execute an existing blueprint without recomposing (0 LLM tokens).
 
         Used by CRM-reuse scenario to demonstrate amortized compose cost.
 
         Args:
-            blueprint_yaml: Previously composed blueprint YAML string.
+            blueprint_yaml: Previously composed blueprint YAML string (for display).
             raw_data: Raw API response data.
+            flow_def: Optional FlowDefinition for direct execution (preferred over YAML).
 
         Returns:
             EngineResult with execution outputs and zero token counts.
         """
         t0 = time.monotonic()
         try:
-            bp_def = self._loader.load_string(blueprint_yaml)
-            exec_result = self._engine.run(bp_def, inputs={"raw_api_response": raw_data})
+            if flow_def is not None:
+                exec_outputs = flow_def.execute(
+                    inputs={"raw_api_response": raw_data},
+                    engine=self._engine,
+                )
+            else:
+                bp_def = self._loader.load_string(blueprint_yaml)
+                exec_outputs = self._engine.run(bp_def, inputs={"raw_api_response": raw_data}).outputs
             return EngineResult(
-                outputs=exec_result.outputs,
+                outputs=exec_outputs,
                 tokens_in=0,
                 tokens_out=0,
                 duration_seconds=time.monotonic() - t0,

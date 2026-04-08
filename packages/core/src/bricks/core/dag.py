@@ -16,6 +16,29 @@ if TYPE_CHECKING:
     from bricks.core.models import BlueprintDefinition
 
 
+def _resolve_param(value: Any, node_to_step_name: dict[str, str]) -> Any:
+    """Recursively resolve Node references in param values to ``${step.result}`` strings.
+
+    Handles direct Node values, as well as Nodes nested inside lists and dicts.
+    If a Node's id is not in the mapping (shouldn't happen in normal DAG construction),
+    the raw value is returned unchanged as a defensive fallback.
+
+    Args:
+        value: A param value — may be a Node, list, dict, or scalar.
+        node_to_step_name: Mapping of node IDs to step names.
+
+    Returns:
+        The value with all resolvable Node references replaced by reference strings.
+    """
+    if isinstance(value, Node) and value.id in node_to_step_name:
+        return f"${{{node_to_step_name[value.id]}.result}}"
+    if isinstance(value, list):
+        return [_resolve_param(v, node_to_step_name) for v in value]
+    if isinstance(value, dict):
+        return {k: _resolve_param(v, node_to_step_name) for k, v in value.items()}
+    return value
+
+
 @dataclass
 class DAG:
     """Directed acyclic graph of Bricks DSL nodes.
@@ -129,7 +152,7 @@ class DAG:
         # Only applies to plain brick nodes — for_each/branch manage their own output.
         outputs_map: dict[str, str] = {}
         root_node = self.nodes.get(self.root_id) if self.root_id else None
-        if root_node is not None and root_node.type == "brick" and self.root_id in node_to_step_name:
+        if root_node is not None and root_node.type in ("brick", "for_each") and self.root_id in node_to_step_name:
             root_step = node_to_step_name[self.root_id]
             outputs_map = {"result": f"${{{root_step}.result}}"}
 
@@ -161,17 +184,14 @@ class DAG:
         if node.type == "brick":
             resolved: dict[str, Any] = {}
             for key, value in node.params.items():
-                if isinstance(value, Node) and value.id in node_to_step_name:
-                    resolved[key] = f"${{{node_to_step_name[value.id]}.result}}"
-                else:
-                    resolved[key] = value
+                resolved[key] = _resolve_param(value, node_to_step_name)
             return StepDefinition(name=step_name, brick=node.brick_name, params=resolved, save_as=step_name)
 
         if node.type == "for_each":
             items_ref: str = ""
             if isinstance(node.items, Node) and node.items.id in node_to_step_name:
                 items_ref = f"${{{node_to_step_name[node.items.id]}.result}}"
-            do_name = node.do.__name__ if callable(node.do) and hasattr(node.do, "__name__") else str(node.do)
+            do_name = node.do if isinstance(node.do, str) else str(node.do)
             return StepDefinition(
                 name=step_name,
                 brick="__for_each__",

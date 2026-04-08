@@ -39,6 +39,7 @@ def run_scenario(engine: Engine, task: BenchmarkTask) -> BenchmarkResult:
         model=result.model,
         raw_response=result.raw_response,
         error=result.error,
+        flow_def=result.flow_def,
     )
 
 
