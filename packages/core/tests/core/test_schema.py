@@ -293,3 +293,38 @@ class TestOutputKeyTable:
 
         reg = BrickRegistry()
         assert output_key_table(reg) == ""
+
+
+class TestLiteralAnnotation:
+    """Tests for Literal type formatting in signatures (Mission 077)."""
+
+    def test_literal_annotation_formatted_cleanly(self) -> None:
+        """_format_annotation(Literal["sum", "avg"]) returns '"sum"|"avg"'."""
+        from typing import Literal
+
+        from bricks.core.schema import _format_annotation
+
+        result = _format_annotation(Literal["sum", "avg"])
+        assert result == "'sum'|'avg'", f"Expected \"'sum'|'avg'\", got {result!r}"
+
+    def test_format_annotation_standard_type(self) -> None:
+        """_format_annotation(str) returns 'str'."""
+        from bricks.core.schema import _format_annotation
+
+        assert _format_annotation(str) == "str"
+        assert _format_annotation(int) == "int"
+
+    def test_compact_signatures_include_literal_values(self) -> None:
+        """compact_brick_signatures() emits Literal values for bricks that declare them."""
+        from typing import Literal
+
+        reg = BrickRegistry()
+
+        @brick(tags=["test"], description="Aggregate values.")
+        def aggregate(data: list, operation: Literal["sum", "avg", "min"]) -> dict:  # type: ignore[type-arg]
+            """Aggregate."""
+            return {"result": 0}
+
+        reg.register("aggregate", aggregate, aggregate.__brick_meta__)
+        result = compact_brick_signatures(reg)
+        assert "'sum'|'avg'|'min'" in result, f"Expected Literal values in signatures, got:\n{result}"

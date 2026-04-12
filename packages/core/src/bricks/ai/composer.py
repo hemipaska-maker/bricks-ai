@@ -95,6 +95,14 @@ Available primitives:
 - for_each(items, do=lambda item: step.brick(...), on_error="fail"|"collect") → maps a step over a list
 - branch(condition="brick_name", if_true=lambda: step.X(...), if_false=lambda: step.Y(...)) → conditional routing
 
+Data flow:
+- step.X(**kwargs) returns a Node — it does NOT return a value yet
+- Pass a Node to the next step: result = step.X(a=prev_step.output)
+- .output on any Node returns the same Node (for chaining syntax)
+- At execution time the engine substitutes each Node with its actual result value
+- Every brick returns a dict with a "result" key: step.add(a=1, b=2) → {{"result": 3}}
+- Use .output to chain: total = step.add(a=x, b=y); rounded = step.round_value(value=total.output)
+
 Rules:
 1. Write a single function decorated with @flow
 2. Function name should describe the task (e.g., def clean_and_process)
@@ -113,6 +121,16 @@ Rules:
     CORRECT: for_each(items=data, do=lambda item: step.count_dict_list(items=item))
     WRONG:   for_each(items=data, do=lambda item: step.count_dict_list(item=item))
 12. Prefer filter_dict_list + calculate_aggregates over for_each when filtering and aggregating a single list.
+
+Example (study this pattern — do not copy it literally):
+@flow
+def crm_summary(raw_api_response):
+    parsed   = step.extract_json_from_str(text=raw_api_response)
+    actives  = step.filter_dict_list(items=parsed.output, key="status", value="active")
+    count    = step.count_dict_list(items=actives.output)
+    total    = step.calculate_aggregates(items=actives.output, field="monthly_revenue", operation="sum")
+    average  = step.calculate_aggregates(items=actives.output, field="monthly_revenue", operation="avg")
+    return {{"active_count": count, "total_revenue": total, "avg_revenue": average}}
 
 Task: {task}
 {input_context}

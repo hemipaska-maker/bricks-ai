@@ -7,7 +7,7 @@ name starts with ``__`` is excluded from ``list_public()`` and signature output.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
@@ -16,7 +16,7 @@ from bricks.core.registry import BrickRegistry
 def _for_each_impl(
     items: list[Any],
     do_brick: str,
-    on_error: str = "fail",
+    on_error: Literal["fail", "collect"] = "fail",
     registry: BrickRegistry | None = None,
 ) -> dict[str, Any]:
     """Execute a brick for each item in the list.

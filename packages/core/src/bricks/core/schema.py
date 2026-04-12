@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import typing
 from typing import TYPE_CHECKING, Any
 
 from bricks.core.models import BlueprintDefinition
@@ -182,6 +183,27 @@ def parse_description_keys(description: str) -> list[str]:
     return re.findall(r"\{(\w+):", description)
 
 
+def _format_annotation(ann: Any) -> str:
+    """Format a type annotation for LLM-readable signature output.
+
+    Handles ``Literal`` types specially so the LLM sees valid values
+    instead of the verbose ``typing.Literal[...]`` repr.
+
+    Args:
+        ann: A type annotation (e.g. ``str``, ``Literal["sum", "avg"]``).
+
+    Returns:
+        Formatted string — e.g. ``'"sum"|"avg"'`` for Literal types,
+        ``'str'`` for standard types.
+    """
+    origin = getattr(ann, "__origin__", None)
+    if origin is typing.Literal:
+        return "|".join(repr(a) for a in ann.__args__)
+    if hasattr(ann, "__name__"):
+        return str(ann.__name__)
+    return str(ann)
+
+
 def signature_params(callable_: Any) -> str:
     """Format parameter signature for a callable.
 
@@ -194,11 +216,20 @@ def signature_params(callable_: Any) -> str:
     parts: list[str] = []
     try:
         sig = inspect.signature(callable_)
+        # Resolve stringified annotations (from __future__ import annotations)
+        try:
+            resolved_hints = typing.get_type_hints(
+                callable_,
+                localns=vars(typing),
+                include_extras=True,
+            )
+        except Exception:
+            resolved_hints = {}
         for pname, param in sig.parameters.items():
             if pname in ("self", "inputs", "metadata"):
                 continue
-            ann = param.annotation
-            type_name = ann.__name__ if hasattr(ann, "__name__") else str(ann)
+            ann = resolved_hints.get(pname, param.annotation)
+            type_name = _format_annotation(ann)
             if ann is inspect.Parameter.empty:
                 type_name = "Any"
             if param.default is not inspect.Parameter.empty:

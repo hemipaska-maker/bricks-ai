@@ -331,3 +331,30 @@ class TestComposeResultFlowDef:
         assert result.flow_def is not None
         assert isinstance(result.flow_def, FlowDefinition)
         assert result.flow_def.name  # must have a name derived from function name
+
+
+class TestDSLPromptTemplate:
+    """Tests for DSL_PROMPT_TEMPLATE content (Mission 077)."""
+
+    def test_prompt_contains_data_flow_contract(self) -> None:
+        """DSL_PROMPT_TEMPLATE includes the data flow contract block."""
+        from bricks.ai.composer import DSL_PROMPT_TEMPLATE
+
+        prompt = DSL_PROMPT_TEMPLATE.format(
+            brick_signatures="add(a: float, b: float) → dict",
+            task="test task",
+            input_context="",
+        )
+        assert "every brick returns a dict" in prompt.lower(), "Data flow contract missing from DSL_PROMPT_TEMPLATE"
+
+    def test_prompt_contains_worked_example(self) -> None:
+        """DSL_PROMPT_TEMPLATE includes the worked @flow example."""
+        from bricks.ai.composer import DSL_PROMPT_TEMPLATE
+
+        prompt = DSL_PROMPT_TEMPLATE.format(
+            brick_signatures="add(a: float, b: float) → dict",
+            task="test task",
+            input_context="",
+        )
+        assert "crm_summary" in prompt, "Worked example missing from DSL_PROMPT_TEMPLATE"
+        assert "do not copy it literally" in prompt, "Example instruction missing"

@@ -6,7 +6,7 @@ import csv
 import io
 import json
 import xml.etree.ElementTree as ET
-from typing import Any
+from typing import Any, Literal
 
 from bricks.core.brick import brick
 
@@ -261,7 +261,11 @@ def unflatten_dict(data: dict[str, Any], separator: str = ".") -> dict[str, Any]
 
 
 @brick(tags=["data", "aggregate", "math"], category="data_transformation", destructive=False)
-def calculate_aggregates(items: list[dict[str, Any]], field: str, operation: str) -> dict[str, float]:
+def calculate_aggregates(
+    items: list[dict[str, Any]],
+    field: str,
+    operation: Literal["sum", "avg", "min", "max", "count"],
+) -> dict[str, float]:
     """Aggregate a numeric field across a list of dicts. Returns {result: aggregated_value}.
 
     Args:

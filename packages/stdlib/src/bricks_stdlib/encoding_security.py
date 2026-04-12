@@ -8,6 +8,7 @@ import html
 import secrets
 import string
 import uuid
+from typing import Literal
 from urllib.parse import quote, unquote
 
 from bricks.core.brick import brick
@@ -40,7 +41,7 @@ def base64_decode(encoded: str) -> dict[str, str]:
 
 
 @brick(tags=["security", "hash", "digest"], category="encoding_security", destructive=False)
-def compute_hash(data: str, algorithm: str = "sha256") -> dict[str, str]:
+def compute_hash(data: str, algorithm: Literal["md5", "sha1", "sha256", "sha512"] = "sha256") -> dict[str, str]:
     """Compute a hash digest of a string. Returns {result: hex_digest}.
 
     Args:
@@ -140,7 +141,10 @@ def generate_uuid() -> dict[str, str]:
 
 
 @brick(tags=["security", "random", "token"], category="encoding_security", destructive=False)
-def random_string(length: int, charset: str = "alphanumeric") -> dict[str, str]:
+def random_string(
+    length: int,
+    charset: Literal["alphanumeric", "hex", "alpha", "digits"] = "alphanumeric",
+) -> dict[str, str]:
     """Generate a cryptographically secure random string. Returns {result: random_str}.
 
     Args:

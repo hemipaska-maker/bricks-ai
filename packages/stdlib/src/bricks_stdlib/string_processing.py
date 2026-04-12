@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import datetime
+from typing import Literal
 
 from bricks.core.brick import brick
 
@@ -156,7 +157,7 @@ def remove_html_tags(text: str) -> dict[str, str]:
 
 
 @brick(tags=["string", "case", "transform"], category="string_processing", destructive=False)
-def convert_case(text: str, case: str) -> dict[str, str]:
+def convert_case(text: str, case: Literal["upper", "lower", "title", "snake", "camel"]) -> dict[str, str]:
     """Convert string case. Returns {result: converted}.
 
     Args:

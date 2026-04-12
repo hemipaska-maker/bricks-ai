@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 from bricks.core.brick import brick
@@ -146,7 +146,7 @@ def is_iso_date(text: str) -> dict[str, bool]:
 
 
 @brick(tags=["validation", "comparison"], category="validation", destructive=False)
-def compare_values(a: Any, b: Any, operator: str) -> dict[str, bool]:
+def compare_values(a: Any, b: Any, operator: Literal["eq", "ne", "lt", "le", "gt", "ge"]) -> dict[str, bool]:
     """Compare two values using an operator. Returns {result: bool}.
 
     Args:

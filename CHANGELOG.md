@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.9] — 2026-04-12
+
+### Added
+- `_format_annotation()` in `schema.py`: formats `Literal` types as `'sum'|'avg'|'min'|'max'` instead of verbose `typing.Literal[...]` in brick signatures
+- `Literal` annotations on 6 stdlib/core bricks: `calculate_aggregates`, `convert_case`, `compute_hash`, `random_string`, `compare_values`, `_for_each_impl`
+- Data flow contract in `DSL_PROMPT_TEMPLATE`: teaches LLM that `step.X()` returns a Node, `.output` chains, and every brick returns `{"result": value}`
+- Worked `@flow` example in `DSL_PROMPT_TEMPLATE`: demonstrates multi-step chaining, dict-return for multiple outputs, and correct brick parameter names
+
 ## [0.5.8] — 2026-04-08
 
 ### Fixed
