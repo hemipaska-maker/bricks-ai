@@ -1,0 +1,36 @@
+{
+  "scenario": "CRM-pipeline",
+  "seed": 42,
+  "bricks": {
+    "correct": false,
+    "outputs": {},
+    "expected": {
+      "active_count": 18,
+      "total_active_revenue": 3447.5,
+      "avg_active_revenue": 191.53
+    },
+    "tokens_in": 4777,
+    "tokens_out": 377,
+    "duration_seconds": 35.53099999999995,
+    "model": "",
+    "error": "Syntax error: invalid syntax (<unknown>, line 1)"
+  },
+  "llm": {
+    "correct": false,
+    "outputs": {
+      "active_count": 18,
+      "total_active_revenue": 3091.5,
+      "avg_active_revenue": 171.75
+    },
+    "expected": {
+      "active_count": 18,
+      "total_active_revenue": 3447.5,
+      "avg_active_revenue": 191.53
+    },
+    "tokens_in": 3759,
+    "tokens_out": 30,
+    "duration_seconds": 6.936999999999898,
+    "model": "claude-code",
+    "error": ""
+  }
+}

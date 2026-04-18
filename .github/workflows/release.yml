@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: python
+
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.release_created }}
+
+      - uses: actions/setup-python@v5
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          python-version: "3.11"
+
+      - name: Build
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        if: ${{ steps.release.outputs.release_created }}
+        uses: pypa/gh-action-pypi-publish@release/v1

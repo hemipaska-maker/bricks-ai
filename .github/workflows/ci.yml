@@ -1,67 +1,33 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
-    branches: ["**"]
+  push:
+    branches: [main]
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  lint:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff mypy
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pip install -e ".[dev]"
+      - run: mypy src/bricks
 
+  test:
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install packages
-        run: |
-          pip install --upgrade pip
-          pip install -e "packages/core[dev,ai,mcp]"
-          pip install -e "packages/stdlib"
-          pip install -e "packages/benchmark"
-
-      - name: Run tests
-        run: pytest --tb=short -q
-
-  lint:
-    name: Lint & Type Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install packages
-        run: |
-          pip install --upgrade pip
-          pip install -e "packages/core[dev,ai,mcp]"
-          pip install -e "packages/stdlib"
-          pip install -e "packages/benchmark"
-
-      - name: Ruff lint
-        run: ruff check .
-
-      - name: Ruff format check
-        run: ruff format --check .
-
-      - name: Mypy type check
-        run: mypy packages/core/src/bricks --strict
+      - run: pip install -e ".[dev]"
+      - run: pytest

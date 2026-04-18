@@ -1,24 +1,86 @@
-# Root dev configuration — not a publishable package.
-# Each publishable package lives under packages/*/pyproject.toml.
-#
-# Dev setup:
-#   pip install -e packages/core[dev,ai,mcp]
-#   pip install -e packages/stdlib
-#   pip install -e packages/benchmark
+[project]
+name = "bricks-ai"
+version = "0.5.0-dev"
+description = "Deterministic execution engine: typed Python building blocks composed into auditable pipelines."
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Hemi", email = "hemipaska@gmail.com" },
+]
+keywords = ["bricks", "ai", "agents", "deterministic", "workflow", "automation", "llm", "pipeline"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+
+dependencies = [
+    "pydantic>=2.0",
+    "typer>=0.9",
+    "ruamel.yaml>=0.18",
+    "rich>=13.0",
+    "tzdata>=2024.1; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+ai = ["litellm>=1.0,<1.82.7"]
+mcp = ["mcp>=1.0"]
+benchmark = [
+    "tiktoken>=0.5",
+    "matplotlib>=3.7",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "PyYAML>=6.0",
+]
+all = [
+    "litellm>=1.0,<1.82.7",
+    "mcp>=1.0",
+    "tiktoken>=0.5",
+    "matplotlib>=3.7",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "PyYAML>=6.0",
+]
+dev = [
+    "pytest>=9.0",
+    "mypy>=1.8",
+    "ruff>=0.3",
+    "build",
+]
+
+[project.scripts]
+bricks = "bricks.cli.main:app"
+
+[project.entry-points."bricks.packs"]
+stdlib = "bricks.stdlib"
+
+[project.urls]
+Homepage = "https://github.com/hemipaska-maker/bricks-ai"
+Repository = "https://github.com/hemipaska-maker/bricks-ai"
+Issues = "https://github.com/hemipaska-maker/bricks-ai/issues"
+Documentation = "https://github.com/hemipaska-maker/bricks-ai#readme"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = [
-    "packages/core/tests",
-    "packages/stdlib/tests",
-    "packages/benchmark/src/bricks_benchmark/tests",
+    "tests",
+    "src/bricks/benchmark/tests",
 ]
 addopts = "--import-mode=importlib"
-pythonpath = [
-    "packages/core/src",
-    "packages/stdlib/src",
-    "packages/benchmark/src",
-    "packages/provider-claudecode/src",
-]
+pythonpath = ["src"]
 markers = [
     "live: live integration tests that call real LLM via ClaudeCodeProvider (run with --live)",
 ]
@@ -40,16 +102,17 @@ module = ["litellm", "litellm.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["bricks_provider_claudecode", "bricks_provider_claudecode.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = ["yaml"]
 ignore_missing_imports = true
+
 
 [[tool.mypy.overrides]]
 module = ["bricks.mcp.server", "bricks.cli.check_env"]
 warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = ["bricks.benchmark.*", "bricks.stdlib.*", "bricks.providers.*"]
+ignore_errors = true
 
 [tool.ruff]
 target-version = "py310"
@@ -75,6 +138,5 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "PLC0415"]
-"packages/**/tests/**/*.py" = ["S101", "PLC0415"]
-"packages/benchmark/**/*.py" = ["S101", "PLC0415", "S607"]
+"src/bricks/benchmark/**/*.py" = ["S101", "PLC0415", "S607"]
 "examples/**/*.py" = ["PLC0415"]

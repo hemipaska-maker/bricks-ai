@@ -1,29 +1,31 @@
 ---
 name: Bug Report
-about: Report a bug in Bricks
-title: "[BUG] "
+about: Report a bug
 labels: bug
 ---
 
-## Description
-A clear description of the bug.
+## What happened
+[Describe the unexpected behavior]
 
-## Steps to Reproduce
-1. ...
-2. ...
-3. ...
+## Expected behavior
+[What should have happened]
 
-## Expected Behavior
-What you expected to happen.
-
-## Actual Behavior
-What actually happened.
+## Steps to reproduce
+1.
+2.
+3.
 
 ## Environment
 - Bricks version:
 - Python version:
 - OS:
-- LLM provider/model:
 
-## Additional Context
-Logs, screenshots, or error messages.
+## Error output
+```
+[Traceback or error]
+```
+
+## Severity
+- [ ] Critical — blocks usage
+- [ ] Major — feature broken, workaround exists
+- [ ] Minor — cosmetic or edge case

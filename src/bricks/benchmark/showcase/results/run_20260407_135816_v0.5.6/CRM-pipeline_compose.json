@@ -1,0 +1,40 @@
+{
+  "scenario": "CRM-pipeline",
+  "seed": 42,
+  "bricks": {
+    "correct": true,
+    "outputs": {
+      "active_count": 18,
+      "total_active_revenue": 3447.5,
+      "avg_active_revenue": 191.52777777777777
+    },
+    "expected": {
+      "active_count": 18,
+      "total_active_revenue": 3447.5,
+      "avg_active_revenue": 191.53
+    },
+    "tokens_in": 2341,
+    "tokens_out": 167,
+    "duration_seconds": 15.20299999999952,
+    "model": "",
+    "error": ""
+  },
+  "llm": {
+    "correct": false,
+    "outputs": {
+      "active_count": 18,
+      "total_active_revenue": 2937.5,
+      "avg_active_revenue": 163.19444444444446
+    },
+    "expected": {
+      "active_count": 18,
+      "total_active_revenue": 3447.5,
+      "avg_active_revenue": 191.53
+    },
+    "tokens_in": 3759,
+    "tokens_out": 34,
+    "duration_seconds": 6.21900000000096,
+    "model": "claude-code",
+    "error": ""
+  }
+}

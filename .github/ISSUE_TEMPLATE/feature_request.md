@@ -1,18 +1,22 @@
 ---
 name: Feature Request
-about: Suggest a new feature for Bricks
-title: "[FEATURE] "
-labels: enhancement
+about: Propose a new feature or enhancement
+labels: feature
 ---
 
-## Problem
-What problem does this solve?
+## What
+[One paragraph: what this feature does]
 
-## Proposed Solution
-How should it work?
+## Why
+[Why this matters, what it unblocks]
 
-## Alternatives Considered
-Any other approaches you thought about.
+## Design Notes
+[Architecture guidance — key files, approach, risks, constraints. NOT step-by-step.]
 
-## Additional Context
-Examples, mockups, or references.
+## Acceptance Criteria
+- [ ] [Measurable criteria]
+- [ ] Tests pass (CI green)
+- [ ] Docs updated if user-facing
+
+## Out of Scope
+[What NOT to touch]

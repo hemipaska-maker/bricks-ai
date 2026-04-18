@@ -1,0 +1,233 @@
+{
+  "scenario": "CRM-reuse",
+  "total_seeds": 20,
+  "bricks_compose_tokens": 2610,
+  "bricks_reuse_pass_rate": 0.0,
+  "llm_pass_rate": 95.0,
+  "llm_tokens_avg": 3794,
+  "llm_tokens_total": 75898,
+  "bricks_records": [
+    {
+      "seed": 42,
+      "correct": true,
+      "tokens": 2610,
+      "reused": false
+    },
+    {
+      "seed": 43,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 44,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 45,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 46,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 47,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 48,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 49,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 50,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 51,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 52,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 53,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 54,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 55,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 56,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 57,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 58,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 59,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 60,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    },
+    {
+      "seed": 61,
+      "correct": false,
+      "tokens": 0,
+      "reused": true
+    }
+  ],
+  "llm_records": [
+    {
+      "seed": 42,
+      "correct": true,
+      "tokens": 3789
+    },
+    {
+      "seed": 43,
+      "correct": true,
+      "tokens": 3794
+    },
+    {
+      "seed": 44,
+      "correct": true,
+      "tokens": 3797
+    },
+    {
+      "seed": 45,
+      "correct": true,
+      "tokens": 3798
+    },
+    {
+      "seed": 46,
+      "correct": false,
+      "tokens": 3800
+    },
+    {
+      "seed": 47,
+      "correct": true,
+      "tokens": 3797
+    },
+    {
+      "seed": 48,
+      "correct": true,
+      "tokens": 3799
+    },
+    {
+      "seed": 49,
+      "correct": true,
+      "tokens": 3796
+    },
+    {
+      "seed": 50,
+      "correct": true,
+      "tokens": 3794
+    },
+    {
+      "seed": 51,
+      "correct": true,
+      "tokens": 3798
+    },
+    {
+      "seed": 52,
+      "correct": true,
+      "tokens": 3789
+    },
+    {
+      "seed": 53,
+      "correct": true,
+      "tokens": 3795
+    },
+    {
+      "seed": 54,
+      "correct": true,
+      "tokens": 3801
+    },
+    {
+      "seed": 55,
+      "correct": true,
+      "tokens": 3793
+    },
+    {
+      "seed": 56,
+      "correct": true,
+      "tokens": 3795
+    },
+    {
+      "seed": 57,
+      "correct": true,
+      "tokens": 3792
+    },
+    {
+      "seed": 58,
+      "correct": true,
+      "tokens": 3790
+    },
+    {
+      "seed": 59,
+      "correct": true,
+      "tokens": 3795
+    },
+    {
+      "seed": 60,
+      "correct": true,
+      "tokens": 3794
+    },
+    {
+      "seed": 61,
+      "correct": true,
+      "tokens": 3792
+    }
+  ]
+}

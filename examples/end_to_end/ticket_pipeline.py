@@ -50,7 +50,7 @@ outputs_map:
   high_count: "${high_count.result}"
 """
 
-# Fallback inline data (5 records) used when bricks_benchmark is not installed
+# Fallback inline data (5 records) used when bricks.benchmark is not installed
 _FALLBACK_TICKETS = [
     {
         "id": 1,
@@ -91,7 +91,7 @@ def _load_data() -> tuple[str, int, dict[str, int]]:
     Uses the benchmark ticket generator when available; falls back to inline data.
     """
     try:
-        from bricks_benchmark.showcase.ticket_generator import generate_ticket_task
+        from bricks.benchmark.showcase.ticket_generator import generate_ticket_task
 
         task = generate_ticket_task(seed=42)
         raw = task.raw_api_response.strip()
@@ -104,7 +104,7 @@ def _load_data() -> tuple[str, int, dict[str, int]]:
         return raw, high_count, task.expected_outputs
     except ImportError:
         high_count = sum(1 for t in _FALLBACK_TICKETS if t["priority"] == "high")
-        print(f"  bricks_benchmark not installed — using {len(_FALLBACK_TICKETS)} inline records")
+        print(f"  bricks.benchmark not installed — using {len(_FALLBACK_TICKETS)} inline records")
         return _FALLBACK_DATA, high_count, {}
 
 
@@ -135,7 +135,7 @@ def run_live(raw_data: str, expected_outputs: dict[str, int]) -> None:
     engine = Bricks.default(provider=provider)
 
     try:
-        from bricks_benchmark.showcase.ticket_generator import generate_ticket_task
+        from bricks.benchmark.showcase.ticket_generator import generate_ticket_task
 
         task = generate_ticket_task(seed=42)
         task_text = task.task_text
