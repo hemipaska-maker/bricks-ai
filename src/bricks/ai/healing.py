@@ -27,6 +27,9 @@ and calls the caller-supplied ``executor`` to run it. No direct DAG mutation.
 
 from __future__ import annotations
 
+import ast
+import difflib
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
@@ -99,6 +102,125 @@ with ``new_flow`` set on success (and tokens_in/out populated). Used by
 tier 40 (:class:`FullRecomposeHealer`). When compose fails validation, the
 callable returns ``HealResult()`` (no flow, no DSL) so the chain records
 the tokens spent and moves on."""
+
+
+def _rewrite_kwarg_name(source: str, brick_name: str, from_name: str, to_name: str) -> str:
+    """Rename a keyword argument in every ``step.<brick_name>(...)`` call.
+
+    Args:
+        source: The DSL text.
+        brick_name: Only calls on ``step.<brick_name>`` are touched.
+        from_name: The wrong kwarg name to replace.
+        to_name: The corrected kwarg name.
+
+    Returns:
+        The rewritten DSL. If the brick call or the kwarg is not present
+        in the source, the original string is returned unchanged so the
+        caller can detect the no-op.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return source
+
+    class _Renamer(ast.NodeTransformer):
+        changed = False
+
+        def visit_Call(self, node: ast.Call) -> ast.AST:  # ast API
+            self.generic_visit(node)
+            func = node.func
+            if not (
+                isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "step"
+                and func.attr == brick_name
+            ):
+                return node
+            for kw in node.keywords:
+                if kw.arg == from_name:
+                    kw.arg = to_name
+                    self.changed = True
+            return node
+
+    renamer = _Renamer()
+    new_tree = renamer.visit(tree)
+    if not renamer.changed:
+        return source
+    ast.fix_missing_locations(new_tree)
+    return ast.unparse(new_tree)
+
+
+def _insert_unwrap_before_step(source: str, failing_brick: str, wrapper_key: str) -> str:
+    """Insert ``extract_dict_field`` before the first ``step.<failing_brick>`` call.
+
+    Locates the assignment statement whose RHS is ``step.<failing_brick>(...)``,
+    finds the kwarg whose value is ``<name>.output`` (the wrapper-dict Node
+    ref), and rewrites the flow as::
+
+        <name>_items = step.extract_dict_field(data=<name>.output, field=<wrapper_key>)
+        <old_target> = step.<failing_brick>(..., items=<name>_items.output, ...)
+
+    Args:
+        source: The DSL text.
+        failing_brick: The brick whose consumer call needs an unwrap before it.
+        wrapper_key: The key name to pass to ``extract_dict_field``.
+
+    Returns:
+        The rewritten DSL, or the original string when the pattern cannot be
+        matched (no enclosing function, no matching call, or the kwarg is not
+        a ``<name>.output`` reference).
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return source
+
+    fn = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)), None)
+    if fn is None:
+        return source
+
+    for idx, stmt in enumerate(list(fn.body)):
+        if not isinstance(stmt, ast.Assign) or not isinstance(stmt.value, ast.Call):
+            continue
+        call = stmt.value
+        func = call.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "step"
+            and func.attr == failing_brick
+        ):
+            continue
+
+        target_kw: ast.keyword | None = None
+        producer_name: str | None = None
+        for kw in call.keywords:
+            value = kw.value
+            if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name) and value.attr == "output":
+                target_kw = kw
+                producer_name = value.value.id
+                break
+        if target_kw is None or producer_name is None:
+            continue
+
+        unwrap_target = f"{producer_name}_items"
+
+        unwrap_stmt = ast.parse(
+            f'{unwrap_target} = step.extract_dict_field(data={producer_name}.output, field="{wrapper_key}")'
+        ).body[0]
+
+        # Rewire the consumer kwarg to the unwrapped ref.
+        target_kw.value = ast.Attribute(
+            value=ast.Name(id=unwrap_target, ctx=ast.Load()),
+            attr="output",
+            ctx=ast.Load(),
+        )
+
+        fn.body.insert(idx, unwrap_stmt)
+        ast.fix_missing_locations(tree)
+        return ast.unparse(tree)
+
+    return source
 
 
 def _strip_fences(code: str) -> str:
@@ -527,6 +649,155 @@ class ShapeAwareLLMHealer:
             tokens_in=completion.input_tokens,
             tokens_out=completion.output_tokens,
         )
+
+
+class ParamNameHealer:
+    """Tier 10 — deterministic fix for ``TypeError: unexpected keyword argument``.
+
+    Parses the offending argument name out of the ``TypeError`` message,
+    asks the registry for the failing brick's real parameter names, and
+    swaps the wrong name for the closest match via ``difflib``. The DSL
+    is rewritten through Python's AST so the surrounding code shape is
+    preserved byte-for-byte.
+
+    The healer only fires when:
+
+    - The underlying cause is a ``TypeError`` whose message matches either
+      ``unexpected keyword argument '<X>'`` or
+      ``missing … required … argument '<X>'`` / ``required keyword-only argument: '<X>'``.
+    - A ``difflib`` match of ratio ≥ 0.6 exists among the brick's valid
+      param names. Anything weaker is a guess — we fall through to tier 20.
+    - ``ctx.registry`` is set — without it we cannot look up the brick.
+    """
+
+    tier: int = 10
+    name: str = "ParamNameHealer"
+
+    _BAD_KWARG_RE = re.compile(
+        r"unexpected keyword argument ['\"]([^'\"]+)['\"]",
+    )
+    _MISSING_KWARG_RE = re.compile(
+        r"(?:missing \d+ required (?:positional|keyword-only) arguments?: )['\"]([^'\"]+)['\"]"
+        r"|required keyword-only argument: ['\"]([^'\"]+)['\"]",
+    )
+
+    def can_heal(self, ctx: HealContext) -> bool:
+        """Accept only ``TypeError`` causes we recognise, with a registry available."""
+        if ctx.registry is None:
+            return False
+        cause = ctx.error.cause
+        if not isinstance(cause, TypeError):
+            return False
+        msg = str(cause)
+        return bool(self._BAD_KWARG_RE.search(msg) or self._MISSING_KWARG_RE.search(msg))
+
+    def heal(self, ctx: HealContext) -> HealResult:
+        """Rewrite the failing ``step.<brick>(...)`` call with the corrected kwarg."""
+        bad_kwarg = self._extract_kwarg(str(ctx.error.cause))
+        if bad_kwarg is None:
+            return HealResult()
+        try:
+            callable_, _ = ctx.registry.get(ctx.error.brick_name)
+        except Exception:  # brick vanished from registry — not our problem
+            return HealResult()
+
+        from bricks.core.schema import _callable_params  # noqa: PLC0415
+
+        valid_params = list(_callable_params(callable_).keys())
+        matches = difflib.get_close_matches(bad_kwarg, valid_params, n=1, cutoff=0.6)
+        if not matches:
+            return HealResult()
+        good_kwarg = matches[0]
+
+        # Avoid looping: if this exact rewrite was tried already, decline.
+        rewrite_sig = (ctx.error.brick_name, bad_kwarg, good_kwarg)
+        for att in ctx.prior_attempts:
+            if att.healer_name == self.name and att.error_after and rewrite_sig[1] in att.error_after:
+                return HealResult()
+
+        new_dsl = _rewrite_kwarg_name(
+            source=ctx.failed_dsl,
+            brick_name=ctx.error.brick_name,
+            from_name=bad_kwarg,
+            to_name=good_kwarg,
+        )
+        if new_dsl == ctx.failed_dsl:
+            # Rewrite did not find the call — nothing to change.
+            return HealResult()
+        return HealResult(new_dsl=new_dsl)
+
+    def _extract_kwarg(self, message: str) -> str | None:
+        """Return the offending kwarg name from the TypeError message, or None."""
+        match = self._BAD_KWARG_RE.search(message)
+        if match:
+            return match.group(1)
+        match = self._MISSING_KWARG_RE.search(message)
+        if match:
+            return match.group(1) or match.group(2)
+        return None
+
+
+class DictUnwrapHealer:
+    """Tier 15 — insert ``extract_dict_field`` before a consumer that
+    expects a list but received a wrapper dict.
+
+    Fires on ``AttributeError: 'str' object has no attribute 'get'`` (the
+    signature of iterating a dict's keys through code that assumed it had
+    dicts). Many bricks in the stdlib treat ``list[dict]`` inputs this way
+    — ``filter_dict_list``, ``count_dict_list``, ``map_values``,
+    ``calculate_aggregates`` — so the wrapper-dict mistake is common.
+
+    Strategy:
+
+    1. Find the failing ``step.<X>(...)`` call in the DSL AST.
+    2. Identify the kwarg whose value is ``<producer>.output``.
+    3. Guess the wrapper key the producer returned: parse a phrase like
+       ``key 'tickets'`` or ``under the key 'tickets'`` from the task text.
+       When nothing matches, fall through to tier 20.
+    4. Splice a new assignment ``<producer>_items =
+       step.extract_dict_field(data=<producer>.output, field=<key>)`` before
+       the failing step, rewire the kwarg to ``<producer>_items.output``,
+       and unparse.
+    """
+
+    tier: int = 15
+    name: str = "DictUnwrapHealer"
+
+    _CAUSE_RE = re.compile(
+        r"'str' object has no attribute 'get'|'dict' object has no attribute '(append|extend|insert|pop|sort)'",
+    )
+    _KEY_HINT_RE = re.compile(r"key ['\"]([a-zA-Z_][\w]*)['\"]")
+
+    def can_heal(self, ctx: HealContext) -> bool:
+        """Accept only AttributeError shapes consistent with wrapper-dict input."""
+        cause = ctx.error.cause
+        if not isinstance(cause, AttributeError):
+            return False
+        if not self._CAUSE_RE.search(str(cause)):
+            return False
+        # Avoid loops: if we tried the same wrap and it still failed, step aside.
+        return not any(att.healer_name == self.name and att.exec_succeeded is False for att in ctx.prior_attempts)
+
+    def heal(self, ctx: HealContext) -> HealResult:
+        """Insert extract_dict_field before the failing step."""
+        wrapper_key = self._guess_wrapper_key(ctx.task)
+        if wrapper_key is None:
+            return HealResult()
+        new_dsl = _insert_unwrap_before_step(
+            source=ctx.failed_dsl,
+            failing_brick=ctx.error.brick_name,
+            wrapper_key=wrapper_key,
+        )
+        if new_dsl == ctx.failed_dsl:
+            return HealResult()
+        return HealResult(new_dsl=new_dsl)
+
+    def _guess_wrapper_key(self, task: str) -> str | None:
+        """Pull the wrapper field name from phrases like ``key 'tickets'``."""
+        match = self._KEY_HINT_RE.search(task)
+        if match:
+            return match.group(1)
+        return None
 
 
 class FullRecomposeHealer:

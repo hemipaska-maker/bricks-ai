@@ -16,12 +16,14 @@ import pytest
 
 from bricks.ai.healing import (
     ChainResult,
+    DictUnwrapHealer,
     FullRecomposeHealer,
     HealAttempt,
     HealContext,
     HealerChain,
     HealResult,
     LLMRetryHealer,
+    ParamNameHealer,
     ShapeAwareLLMHealer,
 )
 from bricks.core.exceptions import BrickExecutionError
@@ -483,3 +485,182 @@ class TestFullRecomposeHealer:
         assert result.tokens_in == 7
         assert result.tokens_out == 3
         assert result.new_dsl.startswith("@flow")
+
+
+# --- ParamNameHealer (tier 10) ----------------------------------------------
+
+
+class _FakeRegistry:
+    """Minimal registry stand-in — only implements the .get method tier 10 needs."""
+
+    def __init__(self, bricks: dict[str, Any]) -> None:
+        self._bricks = bricks
+
+    def get(self, name: str):
+        if name not in self._bricks:
+            raise KeyError(name)
+        return (self._bricks[name], None)
+
+
+class TestParamNameHealer:
+    """Tier-10 deterministic fix for TypeError: unexpected keyword argument."""
+
+    def _dsl(self) -> str:
+        return "@flow\ndef do_it(data):\n    result = step.count_dict_list(item=data)\n    return result\n"
+
+    def _registry_with_count(self) -> _FakeRegistry:
+        def count_dict_list(items: list, *, metadata: Any = None) -> dict:
+            return {"result": len(items)}
+
+        return _FakeRegistry({"count_dict_list": count_dict_list})
+
+    def _ctx(
+        self,
+        cause: Exception,
+        *,
+        dsl: str | None = None,
+        registry: _FakeRegistry | None = None,
+        brick: str = "count_dict_list",
+    ) -> HealContext:
+        return HealContext(
+            task="count the items",
+            failed_flow=_StubFlow(label="orig"),  # type: ignore[arg-type]
+            failed_dsl=dsl or self._dsl(),
+            error=BrickExecutionError(brick, "step_1", cause),
+            attempt=0,
+            prior_attempts=[],
+            registry=registry or self._registry_with_count(),
+        )
+
+    def test_can_heal_only_on_typeerror_with_matching_message(self) -> None:
+        healer = ParamNameHealer()
+        typeerror = self._ctx(TypeError("got an unexpected keyword argument 'item'"))
+        assert healer.can_heal(typeerror) is True
+
+        attr = self._ctx(AttributeError("boom"))
+        assert healer.can_heal(attr) is False
+
+        unrelated_type = self._ctx(TypeError("some other message"))
+        assert healer.can_heal(unrelated_type) is False
+
+    def test_can_heal_false_without_registry(self) -> None:
+        healer = ParamNameHealer()
+        ctx = HealContext(
+            task="x",
+            failed_flow=_StubFlow(label="x"),  # type: ignore[arg-type]
+            failed_dsl="",
+            error=BrickExecutionError("b", "s", TypeError("unexpected keyword argument 'y'")),
+            attempt=0,
+            prior_attempts=[],
+            registry=None,
+        )
+        assert healer.can_heal(ctx) is False
+
+    def test_heal_rewrites_bad_kwarg_to_closest_match(self) -> None:
+        healer = ParamNameHealer()
+        ctx = self._ctx(TypeError("got an unexpected keyword argument 'item'"))
+        result = healer.heal(ctx)
+
+        assert result.produced_something is True
+        assert "items=data" in result.new_dsl
+        assert "item=data" not in result.new_dsl
+        # Deterministic tiers must not spend tokens.
+        assert result.tokens_in == 0
+        assert result.tokens_out == 0
+
+    def test_heal_returns_empty_when_no_close_match(self) -> None:
+        healer = ParamNameHealer()
+        ctx = self._ctx(TypeError("got an unexpected keyword argument 'xyzabc'"))
+        result = healer.heal(ctx)
+        assert result.produced_something is False
+
+    def test_heal_wont_loop_if_prior_attempt_failed_with_same_rewrite(self) -> None:
+        healer = ParamNameHealer()
+        ctx = self._ctx(TypeError("got an unexpected keyword argument 'item'"))
+        ctx.prior_attempts = [
+            HealAttempt(
+                healer_name=ParamNameHealer.name,
+                tier=10,
+                produced_flow=True,
+                exec_succeeded=False,
+                error_after="the kwarg 'item' still wrong",
+            )
+        ]
+        result = healer.heal(ctx)
+        assert result.produced_something is False
+
+
+# --- DictUnwrapHealer (tier 15) ---------------------------------------------
+
+
+class TestDictUnwrapHealer:
+    """Tier-15 deterministic fix for the wrapper-dict mistake."""
+
+    _TICKET_DSL = (
+        "@flow\n"
+        "def ticket_counts(raw_api_response):\n"
+        "    parsed = step.extract_json_from_str(text=raw_api_response)\n"
+        "    high = step.filter_dict_list(items=parsed.output, key='priority', value='high')\n"
+        "    return step.count_dict_list(items=high.output)\n"
+    )
+
+    _TASK_WITH_KEY = "Parse the JSON. The dict has key 'tickets' with the list of items."
+    _TASK_WITHOUT_KEY = "Just parse some JSON and count things."
+
+    def _ctx(
+        self,
+        cause: Exception,
+        *,
+        task: str = _TASK_WITH_KEY,
+        brick: str = "filter_dict_list",
+    ) -> HealContext:
+        return HealContext(
+            task=task,
+            failed_flow=_StubFlow(label="orig"),  # type: ignore[arg-type]
+            failed_dsl=self._TICKET_DSL,
+            error=BrickExecutionError(brick, "step_2", cause),
+            attempt=0,
+            prior_attempts=[],
+        )
+
+    def test_can_heal_requires_attribute_error_shape(self) -> None:
+        healer = DictUnwrapHealer()
+        assert healer.can_heal(self._ctx(AttributeError("'str' object has no attribute 'get'"))) is True
+        assert healer.can_heal(self._ctx(TypeError("nope"))) is False
+        assert healer.can_heal(self._ctx(AttributeError("some other attribute error"))) is False
+
+    def test_can_heal_declines_after_prior_same_healer_failed(self) -> None:
+        healer = DictUnwrapHealer()
+        ctx = self._ctx(AttributeError("'str' object has no attribute 'get'"))
+        ctx.prior_attempts = [
+            HealAttempt(
+                healer_name=DictUnwrapHealer.name,
+                tier=15,
+                produced_flow=True,
+                exec_succeeded=False,
+                error_after="still broken",
+            )
+        ]
+        assert healer.can_heal(ctx) is False
+
+    def test_heal_inserts_extract_dict_field_before_failing_step(self) -> None:
+        healer = DictUnwrapHealer()
+        ctx = self._ctx(AttributeError("'str' object has no attribute 'get'"))
+        result = healer.heal(ctx)
+
+        assert result.produced_something is True
+        assert "step.extract_dict_field" in result.new_dsl
+        assert "field='tickets'" in result.new_dsl or 'field="tickets"' in result.new_dsl
+        # The consumer must now reference the unwrapped step.
+        assert "items=parsed_items.output" in result.new_dsl
+        # Deterministic — no tokens.
+        assert result.tokens_in == 0
+
+    def test_heal_declines_when_task_has_no_key_hint(self) -> None:
+        healer = DictUnwrapHealer()
+        ctx = self._ctx(
+            AttributeError("'str' object has no attribute 'get'"),
+            task=self._TASK_WITHOUT_KEY,
+        )
+        result = healer.heal(ctx)
+        assert result.produced_something is False
