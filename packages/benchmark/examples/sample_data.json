@@ -1,8 +1,0 @@
-[
-  {"id": 1, "product": "Widget A", "category": "hardware", "quantity": 150, "unit_price": 12.50},
-  {"id": 2, "product": "Widget B", "category": "hardware", "quantity": 80, "unit_price": 24.99},
-  {"id": 3, "product": "Service X", "category": "software", "quantity": 500, "unit_price": 9.99},
-  {"id": 4, "product": "Service Y", "category": "software", "quantity": 200, "unit_price": 49.99},
-  {"id": 5, "product": "Widget C", "category": "hardware", "quantity": 0, "unit_price": 5.99},
-  {"id": 6, "product": "Service Z", "category": "software", "quantity": 350, "unit_price": 19.99}
-]

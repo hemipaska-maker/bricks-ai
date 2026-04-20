@@ -1,0 +1,80 @@
+{
+  "scenario": "CRM-hallucination",
+  "runs": 10,
+  "bricks_pass_rate": 100.0,
+  "llm_pass_rate": 30.0,
+  "bricks_tokens_avg": 2516,
+  "llm_tokens_avg": 3795,
+  "run_records": [
+    {
+      "seed": 42,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2514,
+      "llm_tokens": 3793
+    },
+    {
+      "seed": 43,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2513,
+      "llm_tokens": 3794
+    },
+    {
+      "seed": 44,
+      "bricks_correct": true,
+      "llm_correct": true,
+      "bricks_tokens": 2522,
+      "llm_tokens": 3797
+    },
+    {
+      "seed": 45,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2513,
+      "llm_tokens": 3798
+    },
+    {
+      "seed": 46,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2527,
+      "llm_tokens": 3795
+    },
+    {
+      "seed": 47,
+      "bricks_correct": true,
+      "llm_correct": true,
+      "bricks_tokens": 2516,
+      "llm_tokens": 3791
+    },
+    {
+      "seed": 48,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2527,
+      "llm_tokens": 3795
+    },
+    {
+      "seed": 49,
+      "bricks_correct": true,
+      "llm_correct": true,
+      "bricks_tokens": 2508,
+      "llm_tokens": 3796
+    },
+    {
+      "seed": 50,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2513,
+      "llm_tokens": 3795
+    },
+    {
+      "seed": 51,
+      "bricks_correct": true,
+      "llm_correct": false,
+      "bricks_tokens": 2513,
+      "llm_tokens": 3798
+    }
+  ]
+}

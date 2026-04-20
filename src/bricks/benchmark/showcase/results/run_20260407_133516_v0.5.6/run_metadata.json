@@ -1,0 +1,17 @@
+{
+  "bricks_version": "0.5.6",
+  "python_version": "3.10.11",
+  "timestamp": "2026-04-07T13:35:42.244143+00:00",
+  "ai_model": "claudecode",
+  "ai_provider": "anthropic",
+  "anthropic_sdk_version": "not installed",
+  "mode": "live",
+  "command": "python -m benchmark.showcase.run --live --scenario CRM-pipeline --model claudecode",
+  "scenarios_run": [
+    "CRM-pipeline"
+  ],
+  "os": "Windows 10",
+  "git_commit": "f10269c",
+  "git_branch": "HEAD",
+  "git_dirty": true
+}

@@ -1,0 +1,39 @@
+{
+  "scenario": "TICKET-pipeline",
+  "seed": 42,
+  "bricks": {
+    "correct": false,
+    "outputs": {},
+    "expected": {
+      "high_count": 25,
+      "critical_count": 25,
+      "total_urgent": 50,
+      "valid_email_count": 80
+    },
+    "tokens_in": 5535,
+    "tokens_out": 866,
+    "duration_seconds": 248.17200000000048,
+    "model": "",
+    "error": "Brick '__for_each__' failed at step 'step_4_for_each': is_email_valid() got an unexpected keyword argument 'item'"
+  },
+  "llm": {
+    "correct": true,
+    "outputs": {
+      "high_count": 25,
+      "critical_count": 25,
+      "total_urgent": 50,
+      "valid_email_count": 80
+    },
+    "expected": {
+      "high_count": 25,
+      "critical_count": 25,
+      "total_urgent": 50,
+      "valid_email_count": 80
+    },
+    "tokens_in": 8407,
+    "tokens_out": 30,
+    "duration_seconds": 11.406999999999243,
+    "model": "claude-code",
+    "error": ""
+  }
+}
