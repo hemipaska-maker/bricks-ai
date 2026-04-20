@@ -9,13 +9,15 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from bricks.core.dsl import FlowDefinition, branch, flow, for_each, step
-from bricks.core.exceptions import BlueprintValidationError, BrickError, DuplicateBlueprintError
+from bricks.core.exceptions import BlueprintValidationError, BrickError, BrickExecutionError, DuplicateBlueprintError
 from bricks.core.registry import BrickRegistry
 from bricks.core.schema import compact_brick_signatures
 from bricks.core.selector import AllBricksSelector, BrickSelector
@@ -77,10 +79,15 @@ class ComposeResult(BaseModel):
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_tokens: int = 0
+    total_cached_input_tokens: int = 0
     model: str = ""
     duration_seconds: float = 0.0
     system_prompt: str = ""
     cache_hit: bool = False
+    # Populated only when compose() is called with executor=<callable>.
+    exec_outputs: dict[str, Any] | None = None
+    exec_error: str = ""
+    heal_attempts: list[Any] = Field(default_factory=list)
 
 
 # System prompt — instructs the LLM to produce Python DSL instead of YAML.
@@ -187,6 +194,25 @@ _MAX_TOKENS = 2048
 _MAX_API_CALLS = 2
 
 
+@dataclass
+class _EmptyChainResult:
+    """Stand-in for ChainResult when the caller passed ``healers=[]``.
+
+    The composer still needs something with ``.attempts``, ``.success``,
+    and ``.final_error`` to fold into the ComposeResult, so this avoids a
+    late import and matches the shape. Not exported.
+    """
+
+    success: bool = False
+    outputs: dict[str, Any] | None = None
+    final_flow: FlowDefinition | None = None
+    final_dsl: str = ""
+    final_error: str = ""
+    attempts: list[Any] = field(default_factory=list)
+    total_tokens_in: int = 0
+    total_tokens_out: int = 0
+
+
 def _build_input_context(input_keys: list[str] | None) -> str:
     """Build an input hint line for the prompt.
 
@@ -225,6 +251,7 @@ class BlueprintComposer:
         provider: LLMProvider,
         selector: BrickSelector | None = None,
         store: BlueprintStore | None = None,
+        healers: list[Any] | None = None,
     ) -> None:
         """Initialise the composer.
 
@@ -233,16 +260,25 @@ class BlueprintComposer:
             selector: BrickSelector for Stage 1 filtering. Defaults to AllBricksSelector.
             store: Optional blueprint store for caching. When provided, cache hits
                    return immediately with zero API calls.
+            healers: Optional explicit healer list for the runtime-retry chain.
+                Only consulted when ``compose(..., executor=...)`` is called.
+                ``None`` means "build a sensible default chain with all five
+                shipped tiers at compose time" — we need the system prompt
+                to construct the LLM-backed tiers, so the default chain is
+                built lazily inside ``compose``. Pass ``[]`` to disable
+                healing entirely while still accepting an executor.
         """
         self._provider = provider
         self._selector = selector or AllBricksSelector()
         self._store = store
+        self._explicit_healers = healers
 
     def compose(
         self,
         task: str,
         registry: BrickRegistry,
         input_keys: list[str] | None = None,
+        executor: Callable[[FlowDefinition], dict[str, Any]] | None = None,
     ) -> ComposeResult:
         """Compose a Blueprint from a natural language task using Python DSL.
 
@@ -325,7 +361,6 @@ class BlueprintComposer:
         last = calls[-1]
         total_input = sum(c.input_tokens for c in calls)
         total_output = sum(c.output_tokens for c in calls)
-        elapsed = time.monotonic() - t0
 
         blueprint_yaml = ""
         dsl_code = ""
@@ -334,6 +369,37 @@ class BlueprintComposer:
             flow_def = self._parse_dsl_response(last.yaml_text)
             blueprint_yaml = flow_def.to_yaml()
             dsl_code = self._strip_fences(last.yaml_text)
+
+        exec_outputs: dict[str, Any] | None = None
+        exec_error = ""
+        heal_attempts: list[Any] = []
+
+        if executor is not None and last.is_valid and flow_def is not None:
+            try:
+                exec_outputs = executor(flow_def)
+            except BrickExecutionError as exc:
+                # Hand control to the healer chain — deterministic tiers first.
+                chain_result = self._run_healer_chain(
+                    task=task,
+                    flow_def=flow_def,
+                    dsl_code=dsl_code,
+                    error=exc,
+                    system_prompt=system,
+                    registry=registry,
+                    executor=executor,
+                )
+                heal_attempts = chain_result.attempts
+                total_input += chain_result.total_tokens_in
+                total_output += chain_result.total_tokens_out
+                if chain_result.success:
+                    exec_outputs = chain_result.outputs
+                    if chain_result.final_flow is not None:
+                        flow_def = chain_result.final_flow
+                        blueprint_yaml = flow_def.to_yaml()
+                    if chain_result.final_dsl:
+                        dsl_code = chain_result.final_dsl
+                else:
+                    exec_error = chain_result.final_error
 
         result = ComposeResult(
             task=task,
@@ -348,15 +414,19 @@ class BlueprintComposer:
             total_output_tokens=total_output,
             total_tokens=total_input + total_output,
             model="",
-            duration_seconds=elapsed,
+            duration_seconds=time.monotonic() - t0,
             system_prompt=system,
+            exec_outputs=exec_outputs,
+            exec_error=exec_error,
+            heal_attempts=heal_attempts,
         )
 
         logger.info(
-            "Compose complete: valid=%s, %d calls, %.1fs",
+            "Compose complete: valid=%s, %d calls, %.1fs, heal_attempts=%d",
             result.is_valid,
             result.api_calls,
             result.duration_seconds,
+            len(heal_attempts),
         )
 
         # Auto-save validated blueprint to store
@@ -364,6 +434,61 @@ class BlueprintComposer:
             self._auto_save(task, flow_def.name, blueprint_yaml)
 
         return result
+
+    def _run_healer_chain(
+        self,
+        *,
+        task: str,
+        flow_def: FlowDefinition,
+        dsl_code: str,
+        error: BrickExecutionError,
+        system_prompt: str,
+        registry: BrickRegistry,
+        executor: Callable[[FlowDefinition], dict[str, Any]],
+    ) -> Any:
+        """Assemble (or reuse) a HealerChain and ask it to recover from *error*.
+
+        Imported lazily so ``healing`` can depend on composer types without
+        creating an import cycle at module load time.
+        """
+        from bricks.ai.healing import (  # noqa: PLC0415
+            DictUnwrapHealer,
+            HealContext,
+            HealerChain,
+            LLMRetryHealer,
+            ParamNameHealer,
+            ShapeAwareLLMHealer,
+        )
+
+        if self._explicit_healers is not None:
+            healers: list[Any] = list(self._explicit_healers)
+        else:
+            healers = [
+                ParamNameHealer(),
+                DictUnwrapHealer(),
+                LLMRetryHealer(provider=self._provider, system_prompt=system_prompt),
+                ShapeAwareLLMHealer(provider=self._provider, system_prompt=system_prompt),
+                # Tier 40 (FullRecomposeHealer) intentionally omitted from the
+                # default chain — it recursively invokes compose() and needs a
+                # caller-supplied fresh_compose. Enable it by passing an
+                # explicit healers= list that includes it.
+            ]
+
+        if not healers:
+            # Caller opted out of healing.
+            return _EmptyChainResult(final_error=str(error))
+
+        chain = HealerChain(healers=healers, max_attempts=4)
+        ctx = HealContext(
+            task=task,
+            failed_flow=flow_def,
+            failed_dsl=dsl_code,
+            error=error,
+            attempt=0,
+            prior_attempts=[],
+            registry=registry,
+        )
+        return chain.heal(ctx, executor=executor, parser=self._parse_dsl_response)
 
     def _auto_save(self, task: str, blueprint_name: str, blueprint_yaml: str) -> None:
         """Auto-save a validated blueprint to the store.
