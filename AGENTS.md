@@ -7,6 +7,10 @@ Bricks is a Python library for deterministic LLM orchestration. It lets you comp
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
+## Pre-commit
+pip install pre-commit
+pre-commit install
+
 ## Commands
 Test all:        pytest
 Test one:        pytest tests/path/to/test_x.py::test_name

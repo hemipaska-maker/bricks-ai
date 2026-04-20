@@ -1,6 +1,6 @@
 # Bricks v0.1.1 -- Scenario D: Determinism Benchmark
 
-> **Claim:** Code generation produces a different program every time.  
+> **Claim:** Code generation produces a different program every time.
 > Bricks Blueprints produce identical execution every time.
 
 ## Diff: Generation 1 vs Generation 3
@@ -17,7 +17,7 @@ Same prompt. Same model. Different output.
      """
 -    Calculate property price including tax based on dimensions and rates.
 +    Calculate the total property price including tax.
-     
+
      Args:
 -        width: Property width in meters (must be positive).
 -        height: Property height in meters (must be positive).
@@ -27,7 +27,7 @@ Same prompt. Same model. Different output.
 +        height: Property height in meters (must be positive)
 +        price_per_sqm: Price per square meter in EUR (must be non-negative)
 +        tax_rate: Tax rate as decimal (e.g., 0.19 for 19%)
-     
+
      Returns:
 -        dict: Contains 'total' (float) and 'display' (str) keys.
 -              'total': Final price including tax.
@@ -35,7 +35,7 @@ Same prompt. Same model. Different output.
 +        Dictionary with keys:
 +            - 'total': float, total price including tax
 +            - 'display': str, formatted display string
-     
+
      Raises:
 -        ValueError: If width or height is not positive.
 +        ValueError: If width or height is not positive, or price_per_sqm is negative
@@ -50,16 +50,16 @@ Same prompt. Same model. Different output.
 +        raise ValueError(f"height must be positive, got {height}")
 +    if price_per_sqm < 0:
 +        raise ValueError(f"price_per_sqm must be non-negative, got {price_per_sqm}")
-     
+
      # Step 1: Compute area = width * height, rounded to 2dp
      area_result = multiply(width, height)
      area = area_result['result']
-     
+
 -    rounded_area_result = round_value(area, decimals=2)
 -    area = rounded_area_result['result']
 +    area_rounded = round_value(area, decimals=2)
 +    area = area_rounded['result']
-     
+
      # Step 2: Compute base_price = area * price_per_sqm
      base_price_result = multiply(area, price_per_sqm)
 ```
