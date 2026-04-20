@@ -20,7 +20,7 @@ Aggregate a numeric field across a list of dicts. Returns {result: aggregated_va
 
     Raises:
         ValueError: If operation is not recognized.
-    
+
 
 **Tags:** `aggregate`, `data`, `math`
 
@@ -45,7 +45,7 @@ Cast dict values to specified types. Returns {result: cast_dict}.
 
     Returns:
         dict with key ``result`` containing the dict with cast values.
-    
+
 
 **Tags:** `casting`, `data`, `types`
 
@@ -68,7 +68,7 @@ Convert a list of dicts to a CSV string. Returns {result: csv_string}.
 
     Returns:
         dict with key ``result`` containing the CSV text.
-    
+
 
 **Tags:** `csv`, `data`, `export`
 
@@ -90,7 +90,7 @@ Return the number of items in a list of dicts. Returns {result: count}.
 
     Returns:
         dict with key ``result`` containing the count.
-    
+
 
 **Tags:** `count`, `data`, `list`
 
@@ -113,7 +113,7 @@ Remove duplicate dicts keeping the first occurrence of each key value. Returns {
 
     Returns:
         dict with key ``result`` containing deduplicated list (first occurrence kept).
-    
+
 
 **Tags:** `data`, `dedup`, `list`
 
@@ -136,7 +136,7 @@ Serialize a dict to a JSON string. Returns {result: json_string}.
 
     Returns:
         dict with key ``result`` containing the JSON string.
-    
+
 
 **Tags:** `data`, `json`, `serialization`
 
@@ -160,7 +160,7 @@ Compute the diff between two dicts. Returns {result: diff}.
     Returns:
         dict with key ``result`` containing a dict with ``added``, ``removed``,
         and ``changed`` entries.
-    
+
 
 **Tags:** `data`, `dict`, `diff`
 
@@ -184,7 +184,7 @@ Extract a single field from a dict. Returns {result: field_value}.
 
     Returns:
         dict with key ``result`` containing the field value, or None if missing.
-    
+
 
 **Tags:** `data`, `dict`, `extraction`
 
@@ -210,7 +210,7 @@ Extract JSON from a string, stripping markdown code fences if present. Returns {
 
     Raises:
         ValueError: If no valid JSON is found.
-    
+
 
 **Tags:** `data`, `json`, `parsing`
 
@@ -234,7 +234,7 @@ Filter a list of dicts keeping only items where items[key] == value. Returns {re
 
     Returns:
         dict with key ``result`` containing matching dicts.
-    
+
 
 **Tags:** `data`, `filter`, `list`
 
@@ -259,7 +259,7 @@ Flatten a nested dict using dot-separated keys. Returns {result: flat_dict}.
 
     Returns:
         dict with key ``result`` containing the flattened dict.
-    
+
 
 **Tags:** `data`, `dict`, `flatten`
 
@@ -283,7 +283,7 @@ Group a list of dicts by a field value. Returns {result: grouped_dict}.
 
     Returns:
         dict with key ``result`` where each value is a list of matching dicts.
-    
+
 
 **Tags:** `data`, `group`, `list`
 
@@ -308,7 +308,7 @@ Inner-join two lists of dicts on a shared key. Returns {result: joined_list}.
 
     Returns:
         dict with key ``result`` containing merged dicts for matching keys.
-    
+
 
 **Tags:** `data`, `join`, `list`
 
@@ -333,7 +333,7 @@ Replace specified field values with '***'. Returns {result: masked_dict}.
 
     Returns:
         dict with key ``result`` containing the dict with sensitive values masked.
-    
+
 
 **Tags:** `data`, `masking`, `security`
 
@@ -357,7 +357,7 @@ Merge two dicts; override values take precedence. Returns {result: merged}.
 
     Returns:
         dict with key ``result`` containing the merged dict.
-    
+
 
 **Tags:** `data`, `dict`, `merge`
 
@@ -380,7 +380,7 @@ Parse XML text into a nested dict. Returns {result: dict}.
 
     Returns:
         dict with key ``result`` containing the parsed XML as a nested dict.
-    
+
 
 **Tags:** `data`, `parsing`, `xml`
 
@@ -404,7 +404,7 @@ Pivot a list of dicts into {index_value: value}. Returns {result: pivoted}.
 
     Returns:
         dict with key ``result`` mapping index_key values to value_key values.
-    
+
 
 **Tags:** `data`, `pivot`, `transform`
 
@@ -428,7 +428,7 @@ Remove keys with None values from a dict. Returns {result: cleaned}.
 
     Returns:
         dict with key ``result`` containing only non-None entries.
-    
+
 
 **Tags:** `cleaning`, `data`, `dict`
 
@@ -451,7 +451,7 @@ Rename dict keys according to a mapping. Returns {result: renamed}.
 
     Returns:
         dict with key ``result`` containing the dict with renamed keys.
-    
+
 
 **Tags:** `data`, `dict`, `rename`
 
@@ -475,7 +475,7 @@ Return a new dict containing only the specified keys. Returns {result: subset}.
 
     Returns:
         dict with key ``result`` containing only the selected keys.
-    
+
 
 **Tags:** `data`, `dict`, `select`
 
@@ -500,7 +500,7 @@ Set a field in a dict, returning the updated copy. Returns {result: updated_dict
 
     Returns:
         dict with key ``result`` containing the updated dict.
-    
+
 
 **Tags:** `data`, `dict`, `set`
 
@@ -526,7 +526,7 @@ Return a slice of a list of dicts. Returns {result: sliced_list}.
 
     Returns:
         dict with key ``result`` containing the sliced list.
-    
+
 
 **Tags:** `data`, `list`, `slice`
 
@@ -552,7 +552,7 @@ Sort a list of dicts by a field. Returns {result: sorted_list}.
 
     Returns:
         dict with key ``result`` containing the sorted list.
-    
+
 
 **Tags:** `data`, `list`, `sort`
 
@@ -577,7 +577,7 @@ Unflatten a dot-separated flat dict into a nested dict. Returns {result: nested}
 
     Returns:
         dict with key ``result`` containing the nested dict.
-    
+
 
 **Tags:** `data`, `dict`, `unflatten`
 
@@ -601,7 +601,7 @@ Validate that data contains all required keys defined in schema. Returns {result
 
     Returns:
         dict with key ``result`` — True if all required keys are present.
-    
+
 
 **Tags:** `data`, `schema`, `validation`
 
@@ -629,7 +629,7 @@ Calculate the number of days from today until a target date. Returns {result: in
 
     Raises:
         ValueError: If ``target_date`` is not in ``YYYY-MM-DD`` format.
-    
+
 
 **Tags:** `calculation`, `date`
 
@@ -654,7 +654,7 @@ Add a number of days to an ISO 8601 date. Returns {result: new_date}.
 
     Returns:
         dict with key ``result`` containing the resulting ISO date string.
-    
+
 
 **Tags:** `arithmetic`, `date`
 
@@ -678,7 +678,7 @@ Add hours to an ISO 8601 datetime string. Returns {result: new_datetime}.
 
     Returns:
         dict with key ``result`` containing the resulting ISO datetime string.
-    
+
 
 **Tags:** `arithmetic`, `date`
 
@@ -703,7 +703,7 @@ Convert a datetime from one timezone to another. Returns {result: converted_date
 
     Returns:
         dict with key ``result`` containing the converted datetime string.
-    
+
 
 **Tags:** `date`, `timezone`
 
@@ -728,7 +728,7 @@ Return the number of days between two ISO 8601 dates (a - b). Returns {result: d
 
     Returns:
         dict with key ``result`` containing the signed difference in days.
-    
+
 
 **Tags:** `date`, `diff`, `math`
 
@@ -753,7 +753,7 @@ Generate a list of ISO 8601 dates from start to end (exclusive). Returns {result
 
     Returns:
         dict with key ``result`` containing the list of ISO date strings.
-    
+
 
 **Tags:** `date`, `list`, `range`
 
@@ -778,7 +778,7 @@ Extract year, month, day, weekday from an ISO 8601 date. Returns {result: {year,
     Returns:
         dict with key ``result`` containing a dict with ``year``, ``month``, ``day``,
         and ``weekday`` (0=Monday).
-    
+
 
 **Tags:** `date`, `extraction`, `parts`
 
@@ -801,7 +801,7 @@ Format an ISO 8601 date string with strftime format. Returns {result: formatted}
 
     Returns:
         dict with key ``result`` containing the formatted date string.
-    
+
 
 **Tags:** `date`, `formatting`
 
@@ -824,7 +824,7 @@ Check if an ISO 8601 date is a business day (Mon-Fri). Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if Monday through Friday.
-    
+
 
 **Tags:** `business`, `calendar`, `date`
 
@@ -843,7 +843,7 @@ Return the current UTC datetime as ISO 8601. Returns {result: timestamp}.
 
     Returns:
         dict with key ``result`` containing the current UTC datetime string.
-    
+
 
 **Tags:** `date`, `now`, `utility`
 
@@ -862,7 +862,7 @@ Parse a date string with a format, return ISO 8601 date. Returns {result: iso_da
 
     Returns:
         dict with key ``result`` containing the ISO 8601 date string (YYYY-MM-DD).
-    
+
 
 **Tags:** `date`, `parsing`
 
@@ -891,7 +891,7 @@ Mask most characters of a string, keeping only the last N visible. Returns {resu
 
     Returns:
         dict with key ``result`` containing the masked string.
-    
+
 
 **Tags:** `mask`, `security`, `string`
 
@@ -917,7 +917,7 @@ Decode a base64 string to UTF-8. Returns {result: decoded}.
 
     Returns:
         dict with key ``result`` containing the decoded string.
-    
+
 
 **Tags:** `base64`, `encoding`
 
@@ -939,7 +939,7 @@ Encode a UTF-8 string to base64. Returns {result: encoded}.
 
     Returns:
         dict with key ``result`` containing the base64-encoded string.
-    
+
 
 **Tags:** `base64`, `encoding`
 
@@ -965,7 +965,7 @@ Compute a hash digest of a string. Returns {result: hex_digest}.
 
     Raises:
         ValueError: If the algorithm is not supported.
-    
+
 
 **Tags:** `digest`, `hash`, `security`
 
@@ -989,7 +989,7 @@ Backslash-escape specified characters in a string. Returns {result: escaped}.
 
     Returns:
         dict with key ``result`` containing the escaped string.
-    
+
 
 **Tags:** `encoding`, `escape`, `string`
 
@@ -1009,7 +1009,7 @@ Generate a random UUID v4. Returns {result: uuid_string}.
 
     Returns:
         dict with key ``result`` containing the UUID string.
-    
+
 
 **Tags:** `identity`, `security`, `uuid`
 
@@ -1027,7 +1027,7 @@ Escape HTML special characters. Returns {result: escaped}.
 
     Returns:
         dict with key ``result`` containing the HTML-escaped string.
-    
+
 
 **Tags:** `encoding`, `escape`, `html`
 
@@ -1049,7 +1049,7 @@ Unescape HTML entities back to plain text. Returns {result: unescaped}.
 
     Returns:
         dict with key ``result`` containing the unescaped string.
-    
+
 
 **Tags:** `encoding`, `escape`, `html`
 
@@ -1075,7 +1075,7 @@ Generate a cryptographically secure random string. Returns {result: random_str}.
 
     Raises:
         ValueError: If charset is not recognized or length < 1.
-    
+
 
 **Tags:** `random`, `security`, `token`
 
@@ -1098,7 +1098,7 @@ Decode a percent-encoded URL string. Returns {result: decoded}.
 
     Returns:
         dict with key ``result`` containing the decoded string.
-    
+
 
 **Tags:** `encoding`, `url`
 
@@ -1120,7 +1120,7 @@ Percent-encode a string for use in a URL. Returns {result: encoded}.
 
     Returns:
         dict with key ``result`` containing the percent-encoded string.
-    
+
 
 **Tags:** `encoding`, `url`
 
@@ -1144,7 +1144,7 @@ Check whether a list is empty. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` containing ``True`` if the list is empty.
-    
+
 
 **Tags:** `check`, `list`
 
@@ -1172,7 +1172,7 @@ Split a list into chunks of a given size. Returns {result: chunks}.
 
     Raises:
         ValueError: If size < 1.
-    
+
 
 **Tags:** `chunk`, `list`, `split`
 
@@ -1196,7 +1196,7 @@ Return elements in a but not in b (set difference). Returns {result: diff}.
 
     Returns:
         dict with key ``result`` containing elements in a that are not in b.
-    
+
 
 **Tags:** `difference`, `list`, `set`
 
@@ -1219,7 +1219,7 @@ Flatten one level of nesting from a list of lists. Returns {result: flat_list}.
 
     Returns:
         dict with key ``result`` containing the flattened list.
-    
+
 
 **Tags:** `flatten`, `list`
 
@@ -1242,7 +1242,7 @@ Return elements present in both lists (set intersection). Returns {result: commo
 
     Returns:
         dict with key ``result`` containing elements in both lists (order from a).
-    
+
 
 **Tags:** `intersection`, `list`, `set`
 
@@ -1266,7 +1266,7 @@ Extract a field from each dict in a list. Returns {result: values}.
 
     Returns:
         dict with key ``result`` containing the extracted values.
-    
+
 
 **Tags:** `extraction`, `list`, `map`
 
@@ -1289,7 +1289,7 @@ Sum all numeric values in a list. Returns {result: total}.
 
     Returns:
         dict with key ``result`` containing the sum.
-    
+
 
 **Tags:** `list`, `math`, `reduce`, `sum`
 
@@ -1311,7 +1311,7 @@ Return a reversed copy of a list. Returns {result: reversed_list}.
 
     Returns:
         dict with key ``result`` containing the list in reverse order.
-    
+
 
 **Tags:** `list`, `reverse`
 
@@ -1334,7 +1334,7 @@ Return the first n elements of a list. Returns {result: head}.
 
     Returns:
         dict with key ``result`` containing the first n items.
-    
+
 
 **Tags:** `head`, `list`, `slice`
 
@@ -1357,7 +1357,7 @@ Return unique values from a list, preserving order. Returns {result: unique_list
 
     Returns:
         dict with key ``result`` containing deduplicated list (first occurrence kept).
-    
+
 
 **Tags:** `dedup`, `list`, `unique`
 
@@ -1380,7 +1380,7 @@ Zip two lists into a list of [a_val, b_val] pairs. Returns {result: pairs}.
 
     Returns:
         dict with key ``result`` containing paired elements (stops at shorter list).
-    
+
 
 **Tags:** `combine`, `list`, `zip`
 
@@ -1405,7 +1405,7 @@ Return the absolute value of a number. Returns {result: absolute}.
 
     Returns:
         dict with key ``result`` containing the non-negative value.
-    
+
 
 **Tags:** `arithmetic`, `math`
 
@@ -1427,7 +1427,7 @@ Round value up to nearest integer. Returns {result: ceiling}.
 
     Returns:
         dict with key ``result`` containing the ceiling integer.
-    
+
 
 **Tags:** `math`, `rounding`
 
@@ -1451,7 +1451,7 @@ Clamp value to [minimum, maximum]. Returns {result: clamped}.
 
     Returns:
         dict with key ``result`` containing the clamped value.
-    
+
 
 **Tags:** `math`, `range`
 
@@ -1479,7 +1479,7 @@ Divide a by b. Returns {result: quotient}.
 
     Raises:
         ZeroDivisionError: If b is zero.
-    
+
 
 **Tags:** `arithmetic`, `math`
 
@@ -1502,7 +1502,7 @@ Round value down to nearest integer. Returns {result: floor}.
 
     Returns:
         dict with key ``result`` containing the floor integer.
-    
+
 
 **Tags:** `math`, `rounding`
 
@@ -1525,7 +1525,7 @@ Return the larger of two numbers. Returns {result: maximum}.
 
     Returns:
         dict with key ``result`` containing the maximum.
-    
+
 
 **Tags:** `comparison`, `math`
 
@@ -1549,7 +1549,7 @@ Return the smaller of two numbers. Returns {result: minimum}.
 
     Returns:
         dict with key ``result`` containing the minimum.
-    
+
 
 **Tags:** `comparison`, `math`
 
@@ -1576,7 +1576,7 @@ Compute a modulo b. Returns {result: remainder}.
 
     Raises:
         ZeroDivisionError: If b is zero.
-    
+
 
 **Tags:** `arithmetic`, `math`
 
@@ -1603,7 +1603,7 @@ Compute (value / total) * 100. Returns {result: percentage}.
 
     Raises:
         ZeroDivisionError: If total is zero.
-    
+
 
 **Tags:** `math`, `percentage`
 
@@ -1627,7 +1627,7 @@ Raise base to the power of exponent. Returns {result: power}.
 
     Returns:
         dict with key ``result`` containing base ** exponent.
-    
+
 
 **Tags:** `arithmetic`, `math`
 
@@ -1651,7 +1651,7 @@ Round a number to the specified number of decimal places. Returns {result: round
 
     Returns:
         dict with key ``result`` containing the rounded float.
-    
+
 
 **Tags:** `math`, `rounding`
 
@@ -1678,7 +1678,7 @@ Truncate a string to max_length characters, appending suffix if truncated. Retur
 
     Returns:
         dict with key ``result`` containing the truncated string.
-    
+
 
 **Tags:** `string`, `truncate`
 
@@ -1704,7 +1704,7 @@ Strip leading/trailing whitespace and collapse internal runs. Returns {result: c
 
     Returns:
         dict with key ``result`` containing the cleaned string.
-    
+
 
 **Tags:** `cleaning`, `string`
 
@@ -1727,7 +1727,7 @@ Join a list of strings with a separator. Returns {result: joined}.
 
     Returns:
         dict with key ``result`` containing the joined string.
-    
+
 
 **Tags:** `join`, `string`
 
@@ -1754,7 +1754,7 @@ Convert string case. Returns {result: converted}.
 
     Raises:
         ValueError: If case is not recognized.
-    
+
 
 **Tags:** `case`, `string`, `transform`
 
@@ -1777,7 +1777,7 @@ Count words and characters in text. Returns {result: {words: int, chars: int}}.
 
     Returns:
         dict with key ``result`` containing a dict with ``words`` and ``chars`` counts.
-    
+
 
 **Tags:** `count`, `stats`, `string`
 
@@ -1799,7 +1799,7 @@ Extract all email addresses from text. Returns {result: emails}.
 
     Returns:
         dict with key ``result`` containing a list of found email addresses.
-    
+
 
 **Tags:** `email`, `extraction`, `string`
 
@@ -1821,7 +1821,7 @@ Extract the content of the first markdown code fence. Returns {result: content}.
 
     Returns:
         dict with key ``result`` containing the fence content, or empty string if none found.
-    
+
 
 **Tags:** `extraction`, `markdown`, `string`
 
@@ -1844,7 +1844,7 @@ Find all non-overlapping matches of a regex pattern. Returns {result: matches}.
 
     Returns:
         dict with key ``result`` containing a list of matched strings.
-    
+
 
 **Tags:** `extraction`, `regex`, `string`
 
@@ -1867,7 +1867,7 @@ Extract all http/https URLs from text. Returns {result: urls}.
 
     Returns:
         dict with key ``result`` containing a list of found URLs.
-    
+
 
 **Tags:** `extraction`, `string`, `url`
 
@@ -1890,7 +1890,7 @@ Compute the Levenshtein edit distance between two strings. Returns {result: dist
 
     Returns:
         dict with key ``result`` containing the edit distance.
-    
+
 
 **Tags:** `distance`, `similarity`, `string`
 
@@ -1915,7 +1915,7 @@ Left-pad a string to the given width. Returns {result: padded}.
 
     Returns:
         dict with key ``result`` containing the padded string.
-    
+
 
 **Tags:** `padding`, `string`
 
@@ -1940,7 +1940,7 @@ Parse a date string with strptime format, return ISO 8601. Returns {result: iso_
 
     Returns:
         dict with key ``result`` containing the ISO 8601 date string.
-    
+
 
 **Tags:** `date`, `parsing`, `string`
 
@@ -1963,7 +1963,7 @@ Redact common PII patterns (email, phone, SSN) with [REDACTED]. Returns {result:
 
     Returns:
         dict with key ``result`` containing the redacted string.
-    
+
 
 **Tags:** `privacy`, `redaction`, `string`
 
@@ -1985,7 +1985,7 @@ Remove all HTML tags from a string. Returns {result: plain_text}.
 
     Returns:
         dict with key ``result`` containing only the text content.
-    
+
 
 **Tags:** `cleaning`, `html`, `string`
 
@@ -2009,7 +2009,7 @@ Replace all occurrences of old with new in text. Returns {result: replaced}.
 
     Returns:
         dict with key ``result`` containing the modified string.
-    
+
 
 **Tags:** `replace`, `string`
 
@@ -2033,7 +2033,7 @@ Reverse a string character by character. Returns {result: reversed}.
 
     Returns:
         dict with key ``result`` containing the reversed string.
-    
+
 
 **Tags:** `reverse`, `string`
 
@@ -2056,7 +2056,7 @@ Split a string by delimiter. Returns {result: parts}.
 
     Returns:
         dict with key ``result`` containing the list of parts.
-    
+
 
 **Tags:** `split`, `string`
 
@@ -2081,7 +2081,7 @@ Check if text starts with prefix AND ends with suffix. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if both conditions hold.
-    
+
 
 **Tags:** `check`, `predicate`, `string`
 
@@ -2105,7 +2105,7 @@ Remove all punctuation characters from text. Returns {result: stripped}.
 
     Returns:
         dict with key ``result`` containing text with punctuation removed.
-    
+
 
 **Tags:** `cleaning`, `punctuation`, `string`
 
@@ -2128,7 +2128,7 @@ Fill a template string with {key} placeholders. Returns {result: filled}.
 
     Returns:
         dict with key ``result`` containing the filled string.
-    
+
 
 **Tags:** `string`, `template`
 
@@ -2152,7 +2152,7 @@ Truncate text to max_length characters, appending '...' if cut. Returns {result:
 
     Returns:
         dict with key ``result`` containing the truncated string.
-    
+
 
 **Tags:** `string`, `truncate`
 
@@ -2182,7 +2182,7 @@ Compare two values using an operator. Returns {result: bool}.
 
     Raises:
         ValueError: If operator is not recognized.
-    
+
 
 **Tags:** `comparison`, `validation`
 
@@ -2207,7 +2207,7 @@ Check that a dict contains all required keys. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if all required keys are present.
-    
+
 
 **Tags:** `dict`, `keys`, `validation`
 
@@ -2230,7 +2230,7 @@ Check if a string is a valid email address format. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if email matches standard pattern.
-    
+
 
 **Tags:** `email`, `validation`
 
@@ -2254,7 +2254,7 @@ Check if a number is within [minimum, maximum] inclusive. Returns {result: bool}
 
     Returns:
         dict with key ``result`` — True if minimum <= value <= maximum.
-    
+
 
 **Tags:** `numeric`, `range`, `validation`
 
@@ -2278,7 +2278,7 @@ Check if a string is a valid ISO 8601 date (YYYY-MM-DD). Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if parseable as YYYY-MM-DD.
-    
+
 
 **Tags:** `date`, `iso`, `validation`
 
@@ -2300,7 +2300,7 @@ Check that a value is not None, empty string, empty list, or empty dict. Returns
 
     Returns:
         dict with key ``result`` — True if value has content.
-    
+
 
 **Tags:** `empty`, `validation`
 
@@ -2322,7 +2322,7 @@ Check if a string represents a valid number. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if the string can be parsed as a float.
-    
+
 
 **Tags:** `numeric`, `string`, `validation`
 
@@ -2344,7 +2344,7 @@ Check if a string looks like a valid E.164 or US phone number. Returns {result: 
 
     Returns:
         dict with key ``result`` — True if the number matches basic patterns.
-    
+
 
 **Tags:** `phone`, `validation`
 
@@ -2366,7 +2366,7 @@ Check if a string is a valid http/https URL. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if URL has a valid scheme and netloc.
-    
+
 
 **Tags:** `url`, `validation`
 
@@ -2389,7 +2389,7 @@ Check if text fully matches a regex pattern. Returns {result: bool}.
 
     Returns:
         dict with key ``result`` — True if the full string matches.
-    
+
 
 **Tags:** `pattern`, `regex`, `validation`
 
@@ -2401,4 +2401,3 @@ Check if text fully matches a regex pattern. Returns {result: bool}.
 **Output:**
 
 - `result` (dict[str, bool]): dict with key ``result`` — True if the full string matches.
-
