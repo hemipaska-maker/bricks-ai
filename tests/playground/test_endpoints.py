@@ -114,30 +114,6 @@ def test_run_anthropic_without_key_returns_400(client: TestClient) -> None:
     assert "api_key" in r.json()["detail"].lower()
 
 
-def test_run_anthropic_with_key_returns_501_until_issue_44(client: TestClient) -> None:
-    """Until #44 lands, Anthropic / OpenAI / Ollama return 501 with a pointer."""
-    r = client.post(
-        "/playground/run",
-        json={
-            "provider": "anthropic",
-            "model": "claude-haiku-4-5",
-            "api_key": "sk-fake",
-            "task": "t",
-            "data": [{}],
-        },
-    )
-    assert r.status_code == 501
-    assert "#44" in r.json()["detail"]
-
-
-def test_run_ollama_returns_501_until_issue_44(client: TestClient) -> None:
-    r = client.post(
-        "/playground/run",
-        json={"provider": "ollama", "model": "llama3", "task": "t", "data": [{}]},
-    )
-    assert r.status_code == 501
-
-
 def test_run_rejects_unknown_provider(client: TestClient) -> None:
     r = client.post(
         "/playground/run",

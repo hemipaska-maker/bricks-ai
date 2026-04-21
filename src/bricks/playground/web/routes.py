@@ -38,31 +38,50 @@ _UPLOAD_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 def _build_provider(provider: str, model: str, api_key: str | None) -> LLMProvider:
     """Return an LLMProvider for the given ``provider`` / ``model`` pair.
 
-    Only ``claude_code`` is fully wired in this PR. Anthropic, OpenAI, and
-    Ollama routes are implemented in #44 and raise 501 here.
+    All four providers from design.md §7 are implemented here. API keys
+    live only in the request body (BYOK) and are never read from the
+    environment.
 
     Args:
         provider: One of ``anthropic`` / ``openai`` / ``claude_code`` / ``ollama``.
         model: Provider-specific model identifier.
-        api_key: BYOK key (required for anthropic / openai, ignored otherwise).
+        api_key: BYOK key (required for anthropic / openai, ignored for
+            ``claude_code`` and ``ollama``).
 
     Returns:
         An ``LLMProvider`` instance.
 
     Raises:
-        HTTPException: 400 if BYOK is required but missing; 501 until #44 lands.
+        HTTPException: 400 if BYOK is required but missing.
     """
     if provider == "claude_code":
         from bricks.providers.claudecode import ClaudeCodeProvider
 
         return ClaudeCodeProvider(model=model or None)
 
+    if provider == "ollama":
+        from bricks.providers.ollama import OllamaProvider
+
+        return OllamaProvider(model=model)
+
     if provider in {"anthropic", "openai"} and not api_key:
         raise HTTPException(status_code=400, detail=f"{provider} requires an api_key in the request body (BYOK)")
 
+    if provider == "anthropic":
+        from bricks.providers.anthropic import AnthropicProvider
+
+        assert api_key is not None  # narrowed by the BYOK check above
+        return AnthropicProvider(model=model, api_key=api_key)
+
+    if provider == "openai":
+        from bricks.providers.openai import OpenAIProvider
+
+        assert api_key is not None
+        return OpenAIProvider(model=model, api_key=api_key)
+
     raise HTTPException(
-        status_code=501,
-        detail=f"Provider {provider!r} is not implemented in this build. See issue #44.",
+        status_code=400,
+        detail=f"Unknown provider {provider!r}",
     )
 
 
