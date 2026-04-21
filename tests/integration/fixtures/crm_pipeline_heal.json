@@ -1,0 +1,21 @@
+{
+  "description": "Heal-path fixture: the LLM emits DSL that validates but crashes at runtime with a wrong kwarg. ParamNameHealer (tier 10) is deterministic and rewrites `item=` → `items=` without a second LLM call. Re-capture by running `python -m bricks.playground.showcase.run --live --scenario CRM-pipeline` with an intentionally flaky prompt.",
+  "scenario": "CRM-pipeline",
+  "seed": 42,
+  "responses": [
+    {
+      "model": "claude-haiku-4-5",
+      "input_tokens": 1800,
+      "output_tokens": 225,
+      "cached_input_tokens": 0,
+      "dsl": "@flow\ndef count_active(raw_api_response):\n    parsed = step.extract_json_from_str(text=raw_api_response)\n    customers = step.extract_dict_field(data=parsed.output, field=\"customers\")\n    actives = step.filter_dict_list(items=customers.output, key=\"status\", value=\"active\")\n    return step.count_dict_list(item=actives.output)\n"
+    }
+  ],
+  "expected_outputs": {
+    "result": 2
+  },
+  "expected_heal": {
+    "tier": 10,
+    "healer_name": "ParamNameHealer"
+  }
+}
