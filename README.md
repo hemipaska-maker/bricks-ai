@@ -241,41 +241,33 @@ This command checks your Python version, litellm installation, and (on Windows) 
 ## CLI Reference
 
 <!-- [[[cog
-import os, subprocess
-env = {**os.environ, "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "100"}
-out = subprocess.run(
-    ["bricks", "--help"],
-    capture_output=True, text=True, check=True, env=env,
-).stdout.rstrip()
+import typer
+from bricks.cli.main import app
+click_app = typer.main.get_command(app)
 cog.outl("```")
-cog.outl(out)
+cog.outl("Usage: bricks [OPTIONS] COMMAND [ARGS]...")
+cog.outl("")
+cog.outl("Commands:")
+for name, cmd in sorted(click_app.commands.items()):
+    short = cmd.get_short_help_str() or (cmd.help or "").splitlines()[0]
+    cog.outl(f"  {name:<10}  {short}")
 cog.outl("```")
 ]]] -->
 ```
-                                                                                                   
- Usage: bricks [OPTIONS] COMMAND [ARGS]...                                                         
-                                                                                                   
- Bricks - Deterministic sequencing engine for typed Python building blocks.                        
-                                                                                                   
-+- Options ---------------------------------------------------------------------------------------+
-| --install-completion          Install completion for the current shell.                         |
-| --show-completion             Show completion for the current shell, to copy it or customize    |
-|                               the installation.                                                 |
-| --help                        Show this message and exit.                                       |
-+-------------------------------------------------------------------------------------------------+
-+- Commands --------------------------------------------------------------------------------------+
-| init       Scaffold a new Bricks project in the current directory.                              |
-| check      Validate a blueprint YAML file (lint without executing).                             |
-| run        Execute a blueprint.                                                                 |
-| dry-run    Validate a blueprint without executing (dry run).                                    |
-| list       List all available Bricks in the registry.                                           |
-| check-env  Diagnose the local environment (Python version, litellm, Windows path limits).       |
-| compose    AI-compose a blueprint from a natural language description.                          |
-| demo       Interactive 3-act demo: simplicity -> correctness -> savings.                        |
-| serve      Start the Bricks MCP server on stdio transport.                                      |
-| new        Scaffold new Bricks components.                                                      |
-| store      Blueprint store management.                                                          |
-+-------------------------------------------------------------------------------------------------+
+Usage: bricks [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  check       Validate a blueprint YAML file (lint...
+  check-env   Diagnose the local environment (Python...
+  compose     AI-compose a blueprint from a natural...
+  demo        Interactive 3-act demo: simplicity ->...
+  dry-run     Validate a blueprint without executing...
+  init        Scaffold a new Bricks project in the...
+  list        List all available Bricks in the registry.
+  new         Scaffold new Bricks components.
+  run         Execute a blueprint.
+  serve       Start the Bricks MCP server on stdio...
+  store       Blueprint store management.
 ```
 <!-- [[[end]]] -->
 
