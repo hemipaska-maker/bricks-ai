@@ -27,6 +27,9 @@ class CompletionResult:
             Surfaces tier-1 cache writes so callers can distinguish first-
             pay writes from subsequent reads. ``0`` for non-Anthropic
             providers.
+        cost_usd: Actual dollar cost reported by the provider for this call.
+            ``0.0`` when the provider doesn't report cost or tokens were
+            estimated rather than measured.
     """
 
     text: str
@@ -37,6 +40,7 @@ class CompletionResult:
     estimated: bool = False
     cached_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    cost_usd: float = 0.0
 
 
 class LLMProvider(ABC):
