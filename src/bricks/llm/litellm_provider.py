@@ -2,10 +2,69 @@
 
 from __future__ import annotations
 
+import re
 import time
+from typing import Any
 
 from bricks.errors import BricksComposeError, BricksConfigError
 from bricks.llm.base import CompletionResult, LLMProvider
+
+_ANTHROPIC_FAMILY_RE = re.compile(
+    r"^(claude-|openrouter/anthropic/|bedrock/anthropic/|anthropic/)",
+    re.IGNORECASE,
+)
+
+
+def _is_anthropic_family(model: str) -> bool:
+    """Return True for model strings that route through Anthropic.
+
+    Matches direct Anthropic IDs (``claude-haiku-4-5-20251001``) and the
+    pass-through prefixes LiteLLM uses for OpenRouter / Bedrock / explicit
+    ``anthropic/`` routing. OpenAI, Gemini, Ollama, and anything else are
+    handled by LiteLLM's own automatic caching (OpenAI) or left uncached
+    (everything else), so they stay on the plain-string code path below.
+    """
+    return bool(_ANTHROPIC_FAMILY_RE.match(model))
+
+
+def _build_system_content(system: str, model: str) -> str | list[dict[str, Any]]:
+    """Shape the system prompt for the caller's model family.
+
+    Anthropic models use content-block lists with ``cache_control`` set to
+    ``{"type": "ephemeral"}`` so the composer's ~2500-token system prompt
+    hits the prompt cache on every call after the first. Everything else
+    gets the legacy plain-string form.
+    """
+    if not system:
+        return system
+    if _is_anthropic_family(model):
+        return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    return system
+
+
+def _extract_cached_tokens(usage: Any) -> tuple[int, int]:
+    """Return ``(cached_input_tokens, cache_creation_input_tokens)`` from a
+    LiteLLM-normalised ``usage`` object.
+
+    LiteLLM exposes provider-specific fields through attribute access.
+    Anthropic surfaces ``cache_read_input_tokens`` and
+    ``cache_creation_input_tokens``. OpenAI exposes
+    ``prompt_tokens_details.cached_tokens`` (nested object). Missing
+    fields or shapes default to ``0`` so callers can treat them as
+    monotonic counters.
+    """
+    if usage is None:
+        return 0, 0
+
+    cached = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+    creation = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+
+    if cached == 0:
+        details = getattr(usage, "prompt_tokens_details", None)
+        if details is not None:
+            cached = int(getattr(details, "cached_tokens", 0) or 0)
+
+    return cached, creation
 
 
 class LiteLLMProvider(LLMProvider):
@@ -60,7 +119,7 @@ class LiteLLMProvider(LLMProvider):
             response = litellm.completion(
                 model=self._model,
                 messages=[
-                    {"role": "system", "content": system},
+                    {"role": "system", "content": _build_system_content(system, self._model)},
                     {"role": "user", "content": prompt},
                 ],
                 api_key=self._api_key,
@@ -70,6 +129,7 @@ class LiteLLMProvider(LLMProvider):
             usage = getattr(response, "usage", None)
             in_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
             out_tok = int(getattr(usage, "completion_tokens", 0) or 0)
+            cached_in, cache_write = _extract_cached_tokens(usage)
             return CompletionResult(
                 text=text,
                 input_tokens=in_tok,
@@ -77,6 +137,8 @@ class LiteLLMProvider(LLMProvider):
                 model=self._model,
                 duration_seconds=time.monotonic() - t0,
                 estimated=False,
+                cached_input_tokens=cached_in,
+                cache_creation_input_tokens=cache_write,
             )
         except ImportError:
             raise

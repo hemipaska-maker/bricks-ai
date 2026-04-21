@@ -348,8 +348,8 @@ class TestDSLPromptTemplate:
         )
         assert "every brick returns a dict" in prompt.lower(), "Data flow contract missing from DSL_PROMPT_TEMPLATE"
 
-    def test_prompt_contains_worked_example(self) -> None:
-        """DSL_PROMPT_TEMPLATE includes the worked @flow example."""
+    def test_prompt_contains_worked_examples(self) -> None:
+        """DSL_PROMPT_TEMPLATE includes worked @flow examples A/B/C."""
         from bricks.ai.composer import DSL_PROMPT_TEMPLATE
 
         prompt = DSL_PROMPT_TEMPLATE.format(
@@ -357,5 +357,7 @@ class TestDSLPromptTemplate:
             task="test task",
             input_context="",
         )
-        assert "crm_summary" in prompt, "Worked example missing from DSL_PROMPT_TEMPLATE"
-        assert "do not copy it literally" in prompt, "Example instruction missing"
+        assert "crm_summary" in prompt, "Example A missing from DSL_PROMPT_TEMPLATE"
+        assert "ticket_urgency_report" in prompt, "Example B missing from DSL_PROMPT_TEMPLATE"
+        assert "file_report" in prompt, "Example C missing from DSL_PROMPT_TEMPLATE"
+        assert "do not copy them literally" in prompt, "Example instruction missing"

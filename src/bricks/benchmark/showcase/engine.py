@@ -137,6 +137,13 @@ class BricksEngine(Engine):
     def solve(self, task_text: str, raw_data: str) -> EngineResult:
         """Compose blueprint from task_text, execute it with raw_data.
 
+        The executor closure is handed to the composer so the HealerChain
+        owns runtime-retry end-to-end. When the LLM emits DSL that
+        validates but crashes at execution time, composer catches the
+        ``BrickExecutionError`` internally and routes through the tiered
+        healers. Successful outputs come back via ``compose_result.exec_outputs``;
+        a final failure surfaces via ``compose_result.exec_error``.
+
         Args:
             task_text: Natural language task description (used for compose).
             raw_data: Raw API response data (passed as blueprint input).
@@ -145,7 +152,30 @@ class BricksEngine(Engine):
             EngineResult with blueprint execution outputs.
         """
         t0 = time.monotonic()
-        compose_result = self._composer.compose(task_text, self._registry, input_keys=["raw_api_response"])
+
+        def _run(flow_def: Any) -> dict[str, Any]:
+            return flow_def.execute(inputs={"raw_api_response": raw_data}, engine=self._engine)
+
+        try:
+            compose_result = self._composer.compose(
+                task_text,
+                self._registry,
+                input_keys=["raw_api_response"],
+                executor=_run,
+            )
+        except Exception as exc:
+            # Framework errors from compose itself (not BrickExecutionError —
+            # those are caught inside compose). Surface them as a failed result.
+            logger.error("[BricksEngine] Compose raised: %s", exc)
+            return EngineResult(
+                outputs={},
+                tokens_in=0,
+                tokens_out=0,
+                duration_seconds=time.monotonic() - t0,
+                model="",
+                raw_response="",
+                error=str(exc),
+            )
 
         if not compose_result.is_valid:
             logger.error("[BricksEngine] Compose failed: %s", compose_result.validation_errors)
@@ -159,18 +189,14 @@ class BricksEngine(Engine):
                 error="; ".join(compose_result.validation_errors),
             )
 
-        try:
-            if compose_result.flow_def is not None:
-                exec_outputs = compose_result.flow_def.execute(
-                    inputs={"raw_api_response": raw_data},
-                    engine=self._engine,
-                )
-            else:
-                bp_def = self._loader.load_string(compose_result.blueprint_yaml)
-                exec_outputs = self._engine.run(bp_def, inputs={"raw_api_response": raw_data}).outputs
-            logger.debug("[BricksEngine] Execution outputs: %s", exec_outputs)
+        if compose_result.exec_outputs is not None:
+            logger.debug(
+                "[BricksEngine] Execution outputs: %s (heal_attempts=%d)",
+                compose_result.exec_outputs,
+                len(compose_result.heal_attempts),
+            )
             return EngineResult(
-                outputs=exec_outputs,
+                outputs=compose_result.exec_outputs,
                 tokens_in=compose_result.total_input_tokens,
                 tokens_out=compose_result.total_output_tokens,
                 duration_seconds=time.monotonic() - t0,
@@ -178,17 +204,23 @@ class BricksEngine(Engine):
                 raw_response=compose_result.blueprint_yaml,
                 flow_def=compose_result.flow_def,
             )
-        except Exception as exc:
-            logger.error("[BricksEngine] Execution failed: %s", exc)
-            return EngineResult(
-                outputs={},
-                tokens_in=compose_result.total_input_tokens,
-                tokens_out=compose_result.total_output_tokens,
-                duration_seconds=time.monotonic() - t0,
-                model=compose_result.model,
-                raw_response=compose_result.blueprint_yaml,
-                error=str(exc),
-            )
+
+        # exec_outputs is None while is_valid is True → execution failed
+        # after all healers were exhausted.
+        logger.error(
+            "[BricksEngine] Execution failed after %d heal attempts: %s",
+            len(compose_result.heal_attempts),
+            compose_result.exec_error,
+        )
+        return EngineResult(
+            outputs={},
+            tokens_in=compose_result.total_input_tokens,
+            tokens_out=compose_result.total_output_tokens,
+            duration_seconds=time.monotonic() - t0,
+            model=compose_result.model,
+            raw_response=compose_result.blueprint_yaml,
+            error=compose_result.exec_error or "unknown runtime error",
+        )
 
     def solve_reuse(self, blueprint_yaml: str, raw_data: str, flow_def: Any = None) -> EngineResult:
         """Execute an existing blueprint without recomposing (0 LLM tokens).

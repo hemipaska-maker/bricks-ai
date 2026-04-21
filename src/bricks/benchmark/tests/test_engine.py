@@ -150,23 +150,27 @@ class TestRawLLMEngine:
         assert engine.__class__.__name__ == "RawLLMEngine"
 
 
-class TestBricksEngineSolveDirectExecution:
-    """Tests that BricksEngine.solve() uses flow_def.execute() when available."""
+class TestBricksEngineSolveDelegatesToComposer:
+    """BricksEngine.solve() now delegates execution to the composer via its
+    ``executor=`` param — the duplicated direct/yaml fallback was removed
+    when the HealerChain landed (#27). These tests pin the new contract.
+    """
 
-    def test_uses_direct_execution_when_flow_def_available(self) -> None:
-        """solve() calls flow_def.execute() and skips BlueprintLoader when flow_def is set."""
+    def test_passes_executor_closure_and_returns_exec_outputs(self) -> None:
+        """solve() must forward an executor to compose() and surface
+        ``exec_outputs`` on the resulting EngineResult."""
         from bricks.benchmark.showcase.engine import BricksEngine
-
-        mock_flow_def = MagicMock()
-        mock_flow_def.execute.return_value = {"active_count": 3}
 
         mock_compose_result = MagicMock()
         mock_compose_result.is_valid = True
-        mock_compose_result.flow_def = mock_flow_def
+        mock_compose_result.flow_def = MagicMock()
         mock_compose_result.blueprint_yaml = "yaml: placeholder"
         mock_compose_result.total_input_tokens = 10
         mock_compose_result.total_output_tokens = 5
         mock_compose_result.model = "test-model"
+        mock_compose_result.exec_outputs = {"active_count": 3}
+        mock_compose_result.exec_error = ""
+        mock_compose_result.heal_attempts = []
 
         engine = BricksEngine.__new__(BricksEngine)
         engine._composer = MagicMock()
@@ -177,32 +181,40 @@ class TestBricksEngineSolveDirectExecution:
 
         result = engine.solve("task", "raw data")
 
-        mock_flow_def.execute.assert_called_once()
+        # compose() must be called with an executor closure.
+        engine._composer.compose.assert_called_once()
+        kwargs = engine._composer.compose.call_args.kwargs
+        assert "executor" in kwargs and callable(kwargs["executor"])
+        # YAML fallback is gone — loader must not be touched.
         engine._loader.load_string.assert_not_called()
         assert result.outputs == {"active_count": 3}
 
-    def test_falls_back_to_yaml_when_flow_def_is_none(self) -> None:
-        """solve() falls back to BlueprintLoader when flow_def is None."""
+    def test_surfaces_exec_error_when_healing_exhausts(self) -> None:
+        """When compose returns a valid blueprint but exec_outputs is None,
+        solve() surfaces exec_error as EngineResult.error without touching
+        the loader."""
         from bricks.benchmark.showcase.engine import BricksEngine
-        from bricks.core.models import ExecutionResult
 
         mock_compose_result = MagicMock()
         mock_compose_result.is_valid = True
-        mock_compose_result.flow_def = None
+        mock_compose_result.flow_def = MagicMock()
         mock_compose_result.blueprint_yaml = "yaml: placeholder"
-        mock_compose_result.total_input_tokens = 10
-        mock_compose_result.total_output_tokens = 5
+        mock_compose_result.total_input_tokens = 30
+        mock_compose_result.total_output_tokens = 12
         mock_compose_result.model = "test-model"
+        mock_compose_result.exec_outputs = None
+        mock_compose_result.exec_error = "all tiers exhausted"
+        mock_compose_result.heal_attempts = [MagicMock(), MagicMock()]
 
         engine = BricksEngine.__new__(BricksEngine)
         engine._composer = MagicMock()
         engine._composer.compose.return_value = mock_compose_result
         engine._engine = MagicMock()
-        engine._engine.run.return_value = ExecutionResult(outputs={"x": 1}, steps=[])
         engine._loader = MagicMock()
         engine._registry = MagicMock()
 
         result = engine.solve("task", "raw data")
 
-        engine._loader.load_string.assert_called_once_with("yaml: placeholder")
-        assert result.outputs == {"x": 1}
+        assert result.outputs == {}
+        assert result.error == "all tiers exhausted"
+        engine._loader.load_string.assert_not_called()

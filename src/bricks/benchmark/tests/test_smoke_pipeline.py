@@ -88,17 +88,17 @@ def count_pipeline(raw_text):
         assert "result" in result, f"Expected 'result' key in outputs, got: {result}"
         assert result["result"] == 5, f"Expected 5 chars in 'hello', got: {result['result']}"
 
-    def test_compose_result_flow_def_survives_to_engine(self) -> None:
-        """Regression: ComposeResult.flow_def must be used by BricksEngine (not BlueprintLoader).
+    def test_compose_result_exec_outputs_survive_to_engine(self) -> None:
+        """Regression: BricksEngine.solve reads ``exec_outputs`` from ComposeResult.
 
-        Asserts that when ComposeResult.flow_def is set, BricksEngine.solve()
-        calls flow_def.execute() and never calls BlueprintLoader.load_string().
-        If this test fails, the YAML-roundtrip regression has been reintroduced.
+        After #27 the composer's HealerChain owns runtime execution; solve()
+        just forwards an executor closure and trusts ``exec_outputs``. This
+        test pins that contract — in particular, the YAML-roundtrip path
+        must never be re-introduced (loader.load_string must not be called).
         """
         from bricks.benchmark.showcase.engine import BricksEngine
 
         mock_flow_def = MagicMock(spec=FlowDefinition)
-        mock_flow_def.execute.return_value = {"active_count": 5}
 
         mock_compose_result = MagicMock(spec=ComposeResult)
         mock_compose_result.is_valid = True
@@ -107,6 +107,9 @@ def count_pipeline(raw_text):
         mock_compose_result.total_input_tokens = 0
         mock_compose_result.total_output_tokens = 0
         mock_compose_result.model = "test-model"
+        mock_compose_result.exec_outputs = {"active_count": 5}
+        mock_compose_result.exec_error = ""
+        mock_compose_result.heal_attempts = []
 
         engine = BricksEngine.__new__(BricksEngine)
         engine._composer = MagicMock()
@@ -117,7 +120,9 @@ def count_pipeline(raw_text):
 
         result = engine.solve("count active customers", '{"data": []}')
 
-        mock_flow_def.execute.assert_called_once()
+        # compose() must have been called with an executor closure.
+        kwargs = engine._composer.compose.call_args.kwargs
+        assert "executor" in kwargs and callable(kwargs["executor"])
         engine._loader.load_string.assert_not_called()
         assert result.outputs == {"active_count": 5}
 

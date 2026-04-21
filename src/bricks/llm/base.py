@@ -17,6 +17,16 @@ class CompletionResult:
         model: Which model actually responded.
         duration_seconds: Wall-clock time for this call.
         estimated: True if tokens are tiktoken estimates; False if from API.
+        cached_input_tokens: Number of input tokens served from the prompt
+            cache. Unified across providers: Anthropic's
+            ``cache_read_input_tokens`` and OpenAI's
+            ``prompt_tokens_details.cached_tokens`` both populate this.
+            ``0`` when caching is inactive, unsupported, or on a cache miss.
+        cache_creation_input_tokens: Anthropic-only counter for tokens that
+            were written to the ephemeral prompt cache on this call.
+            Surfaces tier-1 cache writes so callers can distinguish first-
+            pay writes from subsequent reads. ``0`` for non-Anthropic
+            providers.
     """
 
     text: str
@@ -25,6 +35,8 @@ class CompletionResult:
     model: str = ""
     duration_seconds: float = 0.0
     estimated: bool = False
+    cached_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
 
 
 class LLMProvider(ABC):
