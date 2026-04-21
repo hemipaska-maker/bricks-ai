@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -43,13 +44,17 @@ class ClaudeCodeProvider(LLMProvider):
         response = provider.complete("Say hello", system="You are helpful.")
     """
 
-    def __init__(self, timeout: int = 120) -> None:
+    def __init__(self, timeout: int = 120, model: str | None = None) -> None:
         """Initialise provider.
 
         Args:
             timeout: Maximum seconds to wait for a ``claude -p`` response.
+            model: Optional model alias to pass as ``--model`` (e.g.
+                ``"sonnet"``, ``"opus"``, ``"haiku"``). ``None`` lets
+                Claude Code pick its default.
         """
         self.timeout = timeout
+        self.model = model
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count using tiktoken, fallback to char/4.
@@ -71,18 +76,21 @@ class ClaudeCodeProvider(LLMProvider):
     def complete(self, prompt: str, system: str = "") -> CompletionResult:
         """Send a prompt through ``claude -p`` and return a CompletionResult.
 
-        The full prompt is passed via stdin to avoid OS argument-length limits.
-        Token counts are estimated (tiktoken if available, else char/4).
+        Invokes ``claude -p --output-format json`` and parses the structured
+        response to report real token usage and cost. Falls back to tiktoken
+        estimation if the CLI ever returns non-JSON output.
 
         Args:
             prompt: The user message to send.
             system: Optional system prompt prepended before the user message.
 
         Returns:
-            CompletionResult with response text and estimated token counts.
+            CompletionResult with response text, real token counts, and cost
+            when the CLI returns JSON; estimated counts otherwise.
 
         Raises:
-            RuntimeError: If the ``claude`` process exits with a non-zero code.
+            RuntimeError: If the ``claude`` process exits with a non-zero code
+                or the parsed response has ``is_error: true``.
             subprocess.TimeoutExpired: If the process exceeds ``self.timeout``.
         """
         full_prompt = f"{system}\n\n{prompt}" if system else prompt
@@ -95,13 +103,17 @@ class ClaudeCodeProvider(LLMProvider):
             if git_bash:
                 env["CLAUDE_CODE_GIT_BASH_PATH"] = git_bash
 
+        cmd = ["claude", "-p", "--output-format", "json"]
+        if self.model:
+            cmd.extend(["--model", self.model])
+
         logger.info("Sending prompt to claude -p (%d chars, timeout=%ds)", len(full_prompt), self.timeout)
         logger.debug("Full prompt:\n%s", full_prompt)
 
         t0 = time.monotonic()
         try:
-            result = subprocess.run(
-                ["claude", "-p"],  # noqa: S607
+            result = subprocess.run(  # noqa: S603
+                cmd,
                 input=full_prompt,
                 capture_output=True,
                 text=True,
@@ -120,11 +132,35 @@ class ClaudeCodeProvider(LLMProvider):
 
         logger.info("claude -p responded (%d chars, %.1fs)", len(result.stdout), elapsed)
         logger.debug("Raw response:\n%s", result.stdout)
+
+        try:
+            parsed = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            logger.warning("claude -p returned non-JSON; falling back to tiktoken estimate")
+            return CompletionResult(
+                text=result.stdout.strip(),
+                input_tokens=self._estimate_tokens(full_prompt),
+                output_tokens=self._estimate_tokens(result.stdout),
+                model=self.model or "claude-code",
+                duration_seconds=elapsed,
+                estimated=True,
+            )
+
+        if parsed.get("is_error"):
+            raise RuntimeError(parsed.get("result", "unknown error"))
+
+        usage = parsed.get("usage", {})
+        model_usage = parsed.get("modelUsage", {})
+        model_name = next(iter(model_usage), self.model or "claude-code")
+
         return CompletionResult(
-            text=result.stdout.strip(),
-            input_tokens=self._estimate_tokens(full_prompt),
-            output_tokens=self._estimate_tokens(result.stdout),
-            model="claude-code",
+            text=parsed.get("result", "").strip(),
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            model=model_name,
             duration_seconds=elapsed,
-            estimated=True,
+            estimated=False,
+            cached_input_tokens=usage.get("cache_read_input_tokens", 0),
+            cache_creation_input_tokens=usage.get("cache_creation_input_tokens", 0),
+            cost_usd=parsed.get("total_cost_usd", 0.0),
         )
