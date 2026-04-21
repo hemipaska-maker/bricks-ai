@@ -1,186 +1,263 @@
-"""API route handlers for the Bricks Benchmark web server."""
+"""API route handlers for the Bricks Playground web server.
+
+All routes live under the ``/playground`` prefix per design.md §6.
+"""
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+import yaml  # type: ignore[import-untyped]
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from bricks.playground.web.datasets import DatasetLoader
-from bricks.playground.web.schemas import BenchmarkRequest, BenchmarkResponse, EngineResultResponse
+from bricks import __version__ as _bricks_version
+from bricks.llm.base import LLMProvider
+from bricks.playground.web.schemas import (
+    EngineResult,
+    RunMetadata,
+    RunRequest,
+    RunResponse,
+    ScenarioDetail,
+    ScenarioSummary,
+    TokenBreakdown,
+    UploadResponse,
+)
 
-router = APIRouter()
+router = APIRouter(prefix="/playground")
 
-_loader = DatasetLoader()
 _PRESETS_DIR = Path(__file__).parent / "presets"
-
-_CLAUDECODE_MODEL = "claudecode"
-
-
-def _build_provider(model: str) -> Any:
-    """Return an LLMProvider for the given model string.
-
-    ``'claudecode'`` routes through ClaudeCodeProvider. Any other string is
-    passed to LiteLLMProvider.
-
-    Args:
-        model: Model string — ``'claudecode'`` or a LiteLLM model string.
-
-    Returns:
-        An LLMProvider instance.
-    """
-    if model == _CLAUDECODE_MODEL:
-        from bricks.providers.claudecode import ClaudeCodeProvider
-
-        return ClaudeCodeProvider(timeout=300)
-
-    from bricks.llm.litellm_provider import LiteLLMProvider
-
-    return LiteLLMProvider(model=model)
+_UPLOAD_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-# ── /api/run ────────────────────────────────────────────────────────────────
+def _build_provider(provider: str, model: str, api_key: str | None) -> LLMProvider:
+    """Return an LLMProvider for the given ``provider`` / ``model`` pair.
 
-
-@router.post("/api/run", response_model=BenchmarkResponse)
-async def run_benchmark(req: BenchmarkRequest) -> BenchmarkResponse:
-    """Run both BricksEngine and RawLLMEngine on the same task, return comparison.
+    Only ``claude_code`` is fully wired in this PR. Anthropic, OpenAI, and
+    Ollama routes are implemented in #44 and raise 501 here.
 
     Args:
-        req: Benchmark request with task text, raw data, and optional settings.
+        provider: One of ``anthropic`` / ``openai`` / ``claude_code`` / ``ollama``.
+        model: Provider-specific model identifier.
+        api_key: BYOK key (required for anthropic / openai, ignored otherwise).
 
     Returns:
-        BenchmarkResponse with results from both engines and token savings stats.
+        An ``LLMProvider`` instance.
 
     Raises:
-        HTTPException: If engine construction fails (e.g. missing API key).
+        HTTPException: 400 if BYOK is required but missing; 501 until #44 lands.
     """
-    from bricks.playground.showcase.engine import BricksEngine, RawLLMEngine
-    from bricks.playground.showcase.result_writer import check_correctness
+    if provider == "claude_code":
+        from bricks.providers.claudecode import ClaudeCodeProvider
 
-    try:
-        provider = _build_provider(req.model)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to build provider: {exc}") from exc
+        return ClaudeCodeProvider(model=model or None)
 
-    bricks_engine = BricksEngine(provider=provider)
-    llm_engine = RawLLMEngine(provider=provider)
+    if provider in {"anthropic", "openai"} and not api_key:
+        raise HTTPException(status_code=400, detail=f"{provider} requires an api_key in the request body (BYOK)")
 
-    # Engines expect data wrapped in markdown JSON fences (extract_markdown_fences brick).
-    # Guard against double-fencing if the data is already wrapped.
-    raw = req.raw_data
-    fenced_data = raw if raw.strip().startswith("```") else f"```json\n{raw}\n```"
-
-    bricks_raw = bricks_engine.solve(req.task_text, fenced_data)
-    llm_raw = llm_engine.solve(req.task_text, fenced_data)
-
-    bricks_correct: bool | None = None
-    llm_correct: bool | None = None
-    if req.expected_outputs is not None:
-        bricks_correct = check_correctness(bricks_raw.outputs, req.expected_outputs)
-        llm_correct = check_correctness(llm_raw.outputs, req.expected_outputs)
-
-    bricks_tokens = bricks_raw.tokens_in + bricks_raw.tokens_out
-    llm_tokens = llm_raw.tokens_in + llm_raw.tokens_out
-
-    savings_ratio = (llm_tokens / bricks_tokens) if bricks_tokens > 0 else 1.0
-    savings_percent = ((1 - bricks_tokens / llm_tokens) * 100) if llm_tokens > 0 else 0.0
-
-    return BenchmarkResponse(
-        bricks_result=EngineResultResponse(
-            engine_name="BricksEngine",
-            outputs=bricks_raw.outputs,
-            correct=bricks_correct,
-            tokens_in=bricks_raw.tokens_in,
-            tokens_out=bricks_raw.tokens_out,
-            duration_seconds=bricks_raw.duration_seconds,
-            model=bricks_raw.model,
-            raw_response=bricks_raw.raw_response,
-            error=bricks_raw.error,
-        ),
-        llm_result=EngineResultResponse(
-            engine_name="RawLLMEngine",
-            outputs=llm_raw.outputs,
-            correct=llm_correct,
-            tokens_in=llm_raw.tokens_in,
-            tokens_out=llm_raw.tokens_out,
-            duration_seconds=llm_raw.duration_seconds,
-            model=llm_raw.model,
-            raw_response=llm_raw.raw_response,
-            error=llm_raw.error,
-        ),
-        savings_ratio=round(savings_ratio, 2),
-        savings_percent=round(savings_percent, 1),
+    raise HTTPException(
+        status_code=501,
+        detail=f"Provider {provider!r} is not implemented in this build. See issue #44.",
     )
 
 
-# ── /api/datasets ────────────────────────────────────────────────────────────
+def _preset_path(scenario_id: str) -> Path | None:
+    """Resolve ``scenario_id`` to a YAML file inside ``presets/``.
 
-
-@router.get("/api/datasets")
-async def list_datasets() -> list[dict[str, Any]]:
-    """Return all built-in datasets with metadata, preview, and full data.
-
-    Returns:
-        List of dataset dicts with id, name, description, row_count, fields,
-        preview (first 3 rows), and full_data (JSON string).
+    Accepts both ``crm-pipeline`` (dashes) and ``crm_pipeline`` (underscores).
+    Returns ``None`` if no match exists.
     """
-    return _loader.list_datasets()
+    for sep in (scenario_id, scenario_id.replace("-", "_"), scenario_id.replace("_", "-")):
+        candidate = _PRESETS_DIR / f"{sep}.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
 
 
-# ── /api/bricks ──────────────────────────────────────────────────────────────
+def _load_preset_dict(path: Path) -> dict[str, Any]:
+    """Parse a preset YAML file into a dict; raise 500 on malformed YAML."""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise HTTPException(status_code=500, detail=f"Malformed preset {path.name!r}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=500, detail=f"Preset {path.name!r} did not parse to a mapping")
+    return data
 
 
-@router.get("/api/bricks")
-async def list_bricks() -> list[dict[str, Any]]:
-    """Return all registered stdlib bricks with name, description, and category.
-
-    Returns:
-        List of dicts with ``name``, ``description``, and ``category`` for each brick.
-    """
-    from bricks.core.registry import BrickRegistry
-
-    registry = BrickRegistry.from_stdlib()
-    return [
-        {
-            "name": name,
-            "description": meta.description,
-            "category": meta.category,
-        }
-        for name, meta in registry.list_all()
-    ]
+# ── GET /playground/scenarios ────────────────────────────────────────────────
 
 
-# ── /api/presets ─────────────────────────────────────────────────────────────
-
-
-@router.get("/api/presets")
-async def list_presets() -> list[dict[str, Any]]:
-    """Return preset benchmark scenarios from the presets directory.
-
-    Returns:
-        List of preset dicts with name, dataset_id, task_text, and expected_outputs.
-    """
-    import yaml
-
-    presets: list[dict[str, Any]] = []
-    if not _PRESETS_DIR.exists():
-        return presets
-
+@router.get("/scenarios", response_model=list[ScenarioSummary])
+async def list_scenarios() -> list[ScenarioSummary]:
+    """Return the list of available preset scenarios."""
+    out: list[ScenarioSummary] = []
+    if not _PRESETS_DIR.is_dir():
+        return out
     for path in sorted(_PRESETS_DIR.glob("*.yaml")):
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "name" in data:
-                presets.append(
-                    {
-                        "name": data.get("name", ""),
-                        "dataset_id": data.get("dataset_id"),
-                        "task_text": data.get("task_text", ""),
-                        "expected_outputs": data.get("expected_outputs"),
-                    }
-                )
-        except Exception:  # noqa: S112
-            continue
+        data = _load_preset_dict(path)
+        out.append(
+            ScenarioSummary(
+                id=path.stem.replace("_", "-"),
+                name=str(data.get("name", path.stem)),
+                description=str(data.get("description", "")),
+            )
+        )
+    return out
 
-    return presets
+
+# ── GET /playground/scenarios/{id} ───────────────────────────────────────────
+
+
+@router.get("/scenarios/{scenario_id}", response_model=ScenarioDetail)
+async def get_scenario(scenario_id: str) -> ScenarioDetail:
+    """Return the full body of a preset scenario."""
+    path = _preset_path(scenario_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"No scenario with id {scenario_id!r}")
+    data = _load_preset_dict(path)
+
+    # Resolve the data source: inline `data`, else `dataset_id` lookup via
+    # DatasetLoader (existing helper), else raise 500 if none.
+    body: Any = data.get("data")
+    dataset_id = data.get("dataset_id")
+    if body is None and dataset_id:
+        from bricks.playground.web.datasets import DatasetLoader
+
+        loader = DatasetLoader()
+        matching = next((ds for ds in loader.list_datasets() if ds.get("id") == dataset_id), None)
+        if matching is None:
+            raise HTTPException(status_code=500, detail=f"Dataset {dataset_id!r} referenced by preset not found")
+        # DatasetLoader gives us a full_data JSON string; parse to a value.
+        full = matching.get("full_data")
+        if isinstance(full, str):
+            try:
+                body = json.loads(full)
+            except json.JSONDecodeError:
+                body = full
+        else:
+            body = full
+
+    return ScenarioDetail(
+        id=scenario_id,
+        name=str(data.get("name", scenario_id)),
+        description=str(data.get("description", "")),
+        task=str(data.get("task_text", "")),
+        data=body,
+        expected_output=data.get("expected_outputs"),
+        required_bricks=data.get("required_bricks"),
+    )
+
+
+# ── POST /playground/upload ──────────────────────────────────────────────────
+
+
+@router.post("/upload", response_model=UploadResponse)
+async def upload(file: UploadFile = File(...)) -> UploadResponse:  # noqa: B008
+    """Accept a CSV or JSON upload; return parsed contents.
+
+    Rejects payloads larger than ``_UPLOAD_MAX_BYTES`` (5 MB).
+    """
+    raw = await file.read()
+    if len(raw) > _UPLOAD_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {_UPLOAD_MAX_BYTES // (1024 * 1024)} MB limit ({len(raw)} bytes)",
+        )
+
+    filename = file.filename or "upload"
+    suffix = Path(filename).suffix.lower()
+
+    data: Any
+    row_count: int | None = None
+
+    if suffix == ".csv" or (file.content_type or "").endswith("csv"):
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"CSV must be UTF-8: {exc}") from exc
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+        data = rows
+        row_count = len(rows)
+    else:
+        # Default to JSON.
+        try:
+            text = raw.decode("utf-8")
+            data = json.loads(text)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=400, detail=f"Could not parse JSON: {exc}") from exc
+        if isinstance(data, list):
+            row_count = len(data)
+
+    return UploadResponse(
+        data=data,
+        filename=filename,
+        size_bytes=len(raw),
+        row_count=row_count,
+    )
+
+
+# ── POST /playground/run ─────────────────────────────────────────────────────
+
+
+@router.post("/run", response_model=RunResponse, response_model_exclude_none=True)
+async def run_playground(req: RunRequest) -> RunResponse:
+    """Run BricksEngine on the task and return structured results.
+
+    ``compare`` is wired in #45; this PR always omits ``raw_llm`` from the
+    response.
+    """
+    from bricks.playground.showcase.engine import BricksEngine
+    from bricks.playground.showcase.result_writer import check_correctness
+
+    provider = _build_provider(req.provider, req.model, req.api_key)
+    engine = BricksEngine(provider=provider)
+
+    raw_data = req.data if isinstance(req.data, str) else json.dumps(req.data)
+    fenced = raw_data if raw_data.strip().startswith("```") else f"```json\n{raw_data}\n```"
+
+    t0 = time.monotonic()
+    result = engine.solve(req.task, fenced)
+    duration_ms = int((time.monotonic() - t0) * 1000)
+
+    checks = []
+    if req.expected_output is not None:
+        expected = req.expected_output
+        got = result.outputs or {}
+        for key, exp_val in expected.items():
+            got_val = got.get(key)
+            checks.append({"key": key, "expected": exp_val, "got": got_val, "pass": got_val == exp_val})
+        # Whole-dict correctness is available via check_correctness as a sanity
+        # gate but we already expose per-key results above.
+        check_correctness(got, expected)
+
+    bricks_result = EngineResult(
+        blueprint_yaml=result.raw_response or None,
+        outputs=result.outputs or {},
+        response=None,
+        tokens=TokenBreakdown(
+            **{
+                "in": result.tokens_in,
+                "out": result.tokens_out,
+                "total": result.tokens_in + result.tokens_out,
+            }
+        ),
+        duration_ms=duration_ms,
+        cost_usd=None,
+        checks=[{"key": c["key"], "expected": c["expected"], "got": c["got"], "pass": c["pass"]} for c in checks],
+    )
+
+    metadata = RunMetadata(
+        model=result.model or req.model,
+        provider=req.provider,
+        version=_bricks_version,
+        timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    )
+
+    return RunResponse(bricks=bricks_result, raw_llm=None, run_metadata=metadata)

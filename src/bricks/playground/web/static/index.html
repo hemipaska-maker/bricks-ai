@@ -1052,7 +1052,12 @@ outputs_map:
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') startRun();
   });
 
-  function startRun() {
+  // Live data returned from the most recent /playground/run call.
+  // showResults() uses this when present and falls back to the mock numbers
+  // when the fetch hasn't completed yet.
+  let lastRun = null;
+
+  async function startRun() {
     // configure steps
     const rawStep = document.querySelector('#steps li[data-s="3"]');
     rawStep.style.display = compareOn ? '' : 'none';
@@ -1064,8 +1069,12 @@ outputs_map:
 
     showView('view-running');
 
+    // Kick off the animation and the real fetch in parallel.
     const sequence = compareOn ? [0, 1, 2, 3, 4] : [0, 1, 2, 4];
     let i = 0;
+    let animationDone = false;
+    let runResponse = null;
+    let runError = null;
     const tick = () => {
       if (i > 0) {
         const prev = document.querySelector(`#steps li[data-s="${sequence[i-1]}"]`);
@@ -1077,18 +1086,100 @@ outputs_map:
         i++;
         setTimeout(tick, 520 + Math.random() * 300);
       } else {
-        setTimeout(showResults, 450);
+        animationDone = true;
+        if (runResponse !== null || runError !== null) {
+          lastRun = runResponse;
+          setTimeout(() => showResults(runError), 450);
+        }
       }
     };
     tick();
+
+    // Fire the real /playground/run request using whatever's in the setup view.
+    const taskText = document.getElementById('taskInput').value.trim();
+    const dataBodyEl = document.getElementById('dataBody');
+    let dataValue;
+    try {
+      dataValue = JSON.parse(dataBodyEl.textContent || '{}');
+    } catch (_) {
+      dataValue = dataBodyEl.textContent || '';
+    }
+
+    try {
+      const resp = await fetch('/playground/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          // Only claude_code is wired end-to-end until #44 lands.
+          provider: 'claude_code',
+          model: (document.getElementById('modelSel')?.value || '').toLowerCase().includes('haiku')
+            ? 'haiku' : (document.getElementById('modelSel')?.value || '').toLowerCase().includes('sonnet')
+            ? 'sonnet' : '',
+          task: taskText,
+          data: dataValue,
+          expected_output: window.__expectedOutput || null,
+          compare: compareOn,
+        }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+      runResponse = await resp.json();
+    } catch (err) {
+      runError = err;
+    }
+
+    if (animationDone) {
+      lastRun = runResponse;
+      showResults(runError);
+    }
   }
 
   // ---- results ----
-  function showResults() {
+  function showResults(runError) {
     const verdictTitle = document.getElementById('verdictTitle');
     const scoreGrid = document.getElementById('scoreGrid');
     const metrics = document.getElementById('metrics');
     const cmpTable = document.getElementById('cmpTable');
+
+    if (runError) {
+      verdictTitle.innerHTML = 'Run failed';
+      scoreGrid.className = 'score-grid';
+      scoreGrid.innerHTML = `
+        <div class="scol loss">
+          <div class="who"><i></i>Error</div>
+          <div class="meta">${String(runError.message || runError)}</div>
+        </div>`;
+      metrics.className = 'metrics';
+      metrics.innerHTML = '';
+      showView('view-results');
+      return;
+    }
+
+    // If the API returned real data, render it; otherwise fall back to the
+    // demo numbers baked into the mockup so the UI still animates through.
+    if (lastRun && lastRun.bricks) {
+      const b = lastRun.bricks;
+      const tokens = b.tokens?.total ?? ((b.tokens?.in || 0) + (b.tokens?.out || 0));
+      const cost = (b.cost_usd == null) ? '—' : `$${b.cost_usd.toFixed(4)}`;
+      const passed = (b.checks || []).filter(c => c.pass).length;
+      const total = (b.checks || []).length;
+      verdictTitle.innerHTML = 'Bricks ran deterministically.';
+      scoreGrid.className = 'score-grid';
+      scoreGrid.innerHTML = `
+        <div class="scol win">
+          <div class="who"><i></i>Bricks</div>
+          <div class="num">${passed}<span class="of">/${total || '?'}</span></div>
+          <div class="meta">${tokens.toLocaleString()} tokens · ${cost}</div>
+        </div>`;
+      metrics.className = 'metrics';
+      metrics.innerHTML = `
+        <div class="metric"><div class="k">Tokens</div><div class="v">${tokens.toLocaleString()}</div><div class="sub">composed once</div></div>
+        <div class="metric"><div class="k">Cost</div><div class="v">${cost}</div><div class="sub">${lastRun.run_metadata?.model || ''}</div></div>
+        <div class="metric"><div class="k">Duration</div><div class="v">${((b.duration_ms || 0) / 1000).toFixed(1)}s</div><div class="sub">wall clock</div></div>`;
+      if (cmpTable) cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = 'none');
+      if (typeof applyTweaks === 'function') applyTweaks();
+      showView('view-results');
+      return;
+    }
 
     if (compareOn) {
       verdictTitle.innerHTML = 'Bricks beat raw LLM';
@@ -1143,6 +1234,56 @@ outputs_map:
   ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
     e.preventDefault(); dz.classList.remove('drag');
   }));
+  dz.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const resp = await fetch('/playground/upload', { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const body = await resp.json();
+      document.getElementById('dataBody').innerHTML = hlJson(body.data);
+    } catch (err) {
+      console.error('upload failed', err);
+    }
+  });
+
+  // ---- scenario fetch (replaces hardcoded customers/options) ----
+  const scenSelect = document.getElementById('scenSelect');
+  const taskInput = document.getElementById('taskInput');
+  async function loadScenarios() {
+    try {
+      const resp = await fetch('/playground/scenarios');
+      if (!resp.ok) return;
+      const list = await resp.json();
+      if (!Array.isArray(list) || list.length === 0) return;
+      scenSelect.innerHTML = list
+        .map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`)
+        .join('');
+      await loadScenarioDetail(scenSelect.value);
+    } catch (err) {
+      // Fall back to the hardcoded mock data that's already rendered.
+      console.warn('scenario list fetch failed, keeping mock', err);
+    }
+  }
+  async function loadScenarioDetail(id) {
+    try {
+      const resp = await fetch(`/playground/scenarios/${encodeURIComponent(id)}`);
+      if (!resp.ok) return;
+      const detail = await resp.json();
+      if (detail.data != null) {
+        document.getElementById('dataBody').innerHTML = hlJson(detail.data);
+      }
+      if (detail.task) taskInput.value = detail.task;
+      window.__expectedOutput = detail.expected_output || null;
+    } catch (err) {
+      console.warn('scenario detail fetch failed', err);
+    }
+  }
+  scenSelect.addEventListener('change', () => loadScenarioDetail(scenSelect.value));
+  loadScenarios();
 
   // ---- copy yaml ----
   const copyYamlBtn = document.getElementById('copyYamlBtn');
