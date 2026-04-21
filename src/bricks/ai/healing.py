@@ -400,10 +400,21 @@ class HealerChain:
             cost predictable. Set higher for aggressive recovery.
     """
 
-    def __init__(self, healers: list[Healer], max_attempts: int = 2) -> None:
-        """Initialise the chain with a pool of healers."""
+    def __init__(
+        self,
+        healers: list[Healer],
+        max_attempts: int = 2,
+        plugin_manager: Any | None = None,
+    ) -> None:
+        """Initialise the chain with a pool of healers.
+
+        ``plugin_manager`` — optional ``pluggy.PluginManager``; when set the
+        chain fires ``heal_attempt`` for every tier that produces a flow
+        (succeeded or not). See :mod:`bricks.core.hooks`.
+        """
         self._healers: list[Healer] = sorted(healers, key=lambda h: h.tier)
         self._max_attempts = max_attempts
+        self._pm = plugin_manager
 
     @property
     def healers(self) -> list[Healer]:
@@ -477,6 +488,8 @@ class HealerChain:
                         tokens_out=result.tokens_out,
                     )
                 )
+                if self._pm is not None:
+                    self._pm.hook.heal_attempt(tier=healer.tier, healer_name=healer.name, succeeded=False)
                 # Swap in the new failure context for the next iteration.
                 ctx = HealContext(
                     task=ctx.task,
@@ -499,6 +512,8 @@ class HealerChain:
                     tokens_out=result.tokens_out,
                 )
             )
+            if self._pm is not None:
+                self._pm.hook.heal_attempt(tier=healer.tier, healer_name=healer.name, succeeded=True)
             return ChainResult(
                 success=True,
                 outputs=outputs,

@@ -5,6 +5,8 @@ All routes live under the ``/playground`` prefix per design.md §6.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import csv
 import io
 import json
@@ -15,8 +17,10 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from bricks import __version__ as _bricks_version
+from bricks.core.hooks import hookimpl as _hookimpl
 from bricks.llm.base import LLMProvider
 from bricks.playground.web.schemas import (
     EngineResult,
@@ -292,3 +296,172 @@ async def run_playground(req: RunRequest) -> RunResponse:
         raw_llm=raw_llm_result,
         run_metadata=metadata,
     )
+
+
+# ── POST /playground/run-stream (SSE) ────────────────────────────────────────
+
+
+class _HookStreamer:
+    """Pluggy plugin that pushes each hook call onto an ``asyncio.Queue``.
+
+    One plugin instance is registered per ``/playground/run-stream`` request.
+    Hooks fire on the worker thread running ``BricksEngine.solve``; the
+    plugin uses ``loop.call_soon_threadsafe`` to enqueue frames onto the
+    event loop's queue so the SSE generator can pick them up without
+    blocking the worker.
+    """
+
+    def __init__(self, queue: asyncio.Queue[Any], loop: asyncio.AbstractEventLoop) -> None:
+        self._queue = queue
+        self._loop = loop
+
+    def _push(self, phase: str, **payload: Any) -> None:
+        frame = {"phase": phase, **payload}
+        self._loop.call_soon_threadsafe(self._queue.put_nowait, frame)
+
+    # Each hookimpl mirrors a BricksHookSpec method.
+
+    @_hookimpl
+    def compose_start(self, task: str) -> None:
+        # Trim the task to keep the frame light.
+        self._push("compose_start", task=task[:200])
+
+    @_hookimpl
+    def compose_done(self, dsl: str, tokens_in: int, tokens_out: int) -> None:
+        self._push("compose_done", tokens_in=tokens_in, tokens_out=tokens_out)
+
+    @_hookimpl
+    def execute_start(self, blueprint_yaml: str) -> None:
+        self._push("execute_start")
+
+    @_hookimpl
+    def step_start(self, step_name: str, brick_name: str) -> None:
+        self._push("step_start", step_name=step_name, brick_name=brick_name)
+
+    @_hookimpl
+    def step_done(self, step_name: str, brick_name: str, duration_ms: int) -> None:
+        self._push("step_done", step_name=step_name, brick_name=brick_name, duration_ms=duration_ms)
+
+    @_hookimpl
+    def heal_attempt(self, tier: int, healer_name: str, succeeded: bool) -> None:
+        self._push("heal_attempt", tier=tier, healer_name=healer_name, succeeded=succeeded)
+
+    @_hookimpl
+    def raw_llm_start(self) -> None:
+        self._push("raw_llm_start")
+
+    @_hookimpl
+    def raw_llm_done(self, response: str, tokens_in: int, tokens_out: int) -> None:
+        self._push("raw_llm_done", tokens_in=tokens_in, tokens_out=tokens_out)
+
+    @_hookimpl
+    def check_done(self, key: str, expected: Any, got: Any, passed: bool) -> None:
+        self._push("check_done", key=key, expected=expected, got=got, passed=passed)
+
+    @_hookimpl
+    def run_failed(self, error: str) -> None:
+        self._push("run_failed", error=error)
+
+
+def _sse_frame(event: str | None, data: Any) -> str:
+    """Format ``data`` as an SSE frame, optionally with an ``event:`` line."""
+    payload = json.dumps(data, default=str)
+    if event:
+        return f"event: {event}\ndata: {payload}\n\n"
+    return f"data: {payload}\n\n"
+
+
+@router.post("/run-stream")
+async def run_playground_stream(req: RunRequest) -> StreamingResponse:
+    """SSE variant of ``/playground/run`` — streams lifecycle events.
+
+    Frames:
+
+    - ``data: {"phase": "<name>", ...}\\n\\n`` — one per hook call.
+    - ``event: done\\ndata: {...RunResponse...}\\n\\n`` — final result.
+    - ``event: error\\ndata: {"message": "..."}\\n\\n`` — on failure.
+
+    The existing non-streaming ``/playground/run`` endpoint is untouched
+    and still the right choice for programmatic callers.
+    """
+    from bricks.core.hooks import get_plugin_manager
+    from bricks.playground.showcase.engine import BricksEngine, RawLLMEngine
+
+    provider = _build_provider(req.provider, req.model, req.api_key)
+    raw_data = req.data if isinstance(req.data, str) else json.dumps(req.data)
+    fenced = raw_data if raw_data.strip().startswith("```") else f"```json\n{raw_data}\n```"
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[Any] = asyncio.Queue()
+    pm = get_plugin_manager()
+    pm.register(_HookStreamer(queue, loop))
+
+    sentinel_done = object()
+    sentinel_err = object()
+    err_holder: list[BaseException] = []
+    result_holder: dict[str, Any] = {}
+
+    def _run_in_thread() -> None:
+        try:
+            t0 = time.monotonic()
+            bricks_raw = BricksEngine(provider=provider, plugin_manager=pm).solve(req.task, fenced)
+            bricks_ms = int((time.monotonic() - t0) * 1000)
+
+            raw_llm_result: EngineResult | None = None
+            if req.compare:
+                t_raw = time.monotonic()
+                raw_raw = RawLLMEngine(provider=provider, plugin_manager=pm).solve(req.task, fenced)
+                raw_ms = int((time.monotonic() - t_raw) * 1000)
+                raw_llm_result = _engine_result(raw_raw, raw_ms, req.expected_output, is_raw=True)
+
+            bricks_result = _engine_result(bricks_raw, bricks_ms, req.expected_output, is_raw=False)
+
+            # Fire check_done for each key so the SSE stream carries per-check
+            # events even though checks are computed after execute returns.
+            for check in bricks_result.checks:
+                pm.hook.check_done(
+                    key=check.key,
+                    expected=check.expected,
+                    got=check.got,
+                    passed=check.pass_,
+                )
+
+            metadata = RunMetadata(
+                model=bricks_raw.model or req.model,
+                provider=req.provider,
+                version=_bricks_version,
+                timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            )
+            response = RunResponse(
+                bricks=bricks_result,
+                raw_llm=raw_llm_result,
+                run_metadata=metadata,
+            )
+            result_holder["response"] = response.model_dump(exclude_none=True, by_alias=True)
+            loop.call_soon_threadsafe(queue.put_nowait, sentinel_done)
+        except Exception as exc:
+            err_holder.append(exc)
+            loop.call_soon_threadsafe(queue.put_nowait, sentinel_err)
+
+    worker = asyncio.create_task(asyncio.to_thread(_run_in_thread))
+
+    async def _generator() -> Any:
+        try:
+            while True:
+                item = await queue.get()
+                if item is sentinel_done:
+                    yield _sse_frame("done", result_holder["response"])
+                    return
+                if item is sentinel_err:
+                    msg = str(err_holder[0]) if err_holder else "unknown error"
+                    yield _sse_frame("error", {"message": msg})
+                    return
+                yield _sse_frame(None, item)
+        finally:
+            if not worker.done():
+                worker.cancel()
+            with contextlib.suppress(BaseException):
+                await worker
+
+    headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    return StreamingResponse(_generator(), media_type="text/event-stream", headers=headers)

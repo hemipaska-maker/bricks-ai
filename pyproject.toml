@@ -42,6 +42,7 @@ playground = [
     "anthropic>=0.40",
     "openai>=1.0",
     "httpx>=0.27",
+    "pluggy>=1.3",
 ]
 all = [
     "litellm>=1.0,<1.82.7",
@@ -55,6 +56,7 @@ all = [
     "anthropic>=0.40",
     "openai>=1.0",
     "httpx>=0.27",
+    "pluggy>=1.3",
 ]
 dev = [
     "pytest>=9.0",

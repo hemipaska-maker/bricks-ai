@@ -253,6 +253,7 @@ class BlueprintComposer:
         selector: BrickSelector | None = None,
         store: BlueprintStore | None = None,
         healers: list[Any] | None = None,
+        plugin_manager: Any | None = None,
     ) -> None:
         """Initialise the composer.
 
@@ -268,11 +269,15 @@ class BlueprintComposer:
                 to construct the LLM-backed tiers, so the default chain is
                 built lazily inside ``compose``. Pass ``[]`` to disable
                 healing entirely while still accepting an executor.
+            plugin_manager: Optional ``pluggy.PluginManager`` for lifecycle
+                hooks. Passed through to the HealerChain so tier attempts
+                are observable. When ``None`` no hooks fire.
         """
         self._provider = provider
         self._selector = selector or AllBricksSelector()
         self._store = store
         self._explicit_healers = healers
+        self._pm = plugin_manager
 
     def compose(
         self,
@@ -345,6 +350,9 @@ class BlueprintComposer:
             keys_str = ", ".join(input_keys)
             user_message = f"{task}\nThe function receives these parameters: {keys_str}."
 
+        if self._pm is not None:
+            self._pm.hook.compose_start(task=task)
+
         # First call
         detail = self._compose_call(1, system, user_message)
         calls.append(detail)
@@ -371,12 +379,20 @@ class BlueprintComposer:
             flow_def = self._parse_dsl_response(last.yaml_text)
             blueprint_yaml = flow_def.to_yaml()
             dsl_code = self._strip_fences(last.yaml_text)
+            if self._pm is not None:
+                self._pm.hook.compose_done(
+                    dsl=dsl_code,
+                    tokens_in=total_input,
+                    tokens_out=total_output,
+                )
 
         exec_outputs: dict[str, Any] | None = None
         exec_error = ""
         heal_attempts: list[Any] = []
 
         if executor is not None and last.is_valid and flow_def is not None:
+            if self._pm is not None:
+                self._pm.hook.execute_start(blueprint_yaml=blueprint_yaml)
             try:
                 exec_outputs = executor(flow_def)
             except BrickExecutionError as exc:
@@ -402,6 +418,8 @@ class BlueprintComposer:
                         dsl_code = chain_result.final_dsl
                 else:
                     exec_error = chain_result.final_error
+                    if self._pm is not None:
+                        self._pm.hook.run_failed(error=exec_error or "unknown runtime error")
 
         result = ComposeResult(
             task=task,
@@ -481,7 +499,7 @@ class BlueprintComposer:
             # Caller opted out of healing.
             return _EmptyChainResult(final_error=str(error))
 
-        chain = HealerChain(healers=healers, max_attempts=4)
+        chain = HealerChain(healers=healers, max_attempts=4, plugin_manager=self._pm)
         ctx = HealContext(
             task=task,
             failed_flow=flow_def,

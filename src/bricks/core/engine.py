@@ -66,18 +66,27 @@ class BlueprintEngine:
 
     _MAX_DEPTH: int = 10
 
-    def __init__(self, registry: BrickRegistry, loader: Any | None = None) -> None:
+    def __init__(
+        self,
+        registry: BrickRegistry,
+        loader: Any | None = None,
+        plugin_manager: Any | None = None,
+    ) -> None:
         """Initialise the engine.
 
         Args:
             registry: The brick registry to use for step execution.
             loader: Optional BlueprintLoader. Defaults to a new BlueprintLoader instance.
+            plugin_manager: Optional ``pluggy.PluginManager`` for lifecycle
+                hooks (see :mod:`bricks.core.hooks`). When ``None`` no
+                hooks fire — production paths incur zero cost.
         """
         from bricks.core.loader import BlueprintLoader  # noqa: PLC0415 — avoid circular at module level
 
         self._registry = registry
         self._loader: BlueprintLoader = loader if loader is not None else BlueprintLoader()
         self._resolver = ReferenceResolver()
+        self._pm = plugin_manager
 
     def run(
         self,
@@ -217,6 +226,12 @@ class BlueprintEngine:
         brick_name: str = step.brick  # type: ignore[assignment]  # guaranteed non-None by caller
         callable_, meta = self._registry.get(brick_name)
 
+        # Fire step_start for top-level user bricks only. Internal wrapper
+        # primitives would flood the UI with per-iteration events; the outer
+        # wrapper step still emits its own start/done.
+        if self._pm is not None:
+            self._pm.hook.step_start(step_name=step.name, brick_name=brick_name)
+
         t0 = time.perf_counter()
         try:
             result = callable_(**resolved_params)
@@ -240,6 +255,13 @@ class BlueprintEngine:
 
         duration_ms = (time.perf_counter() - t0) * 1000
         completed.append((callable_, resolved_params, meta))
+
+        if self._pm is not None:
+            self._pm.hook.step_done(
+                step_name=step.name,
+                brick_name=brick_name,
+                duration_ms=int(duration_ms),
+            )
 
         step_result: StepResult | None = None
         if verbosity in (Verbosity.STANDARD, Verbosity.FULL):

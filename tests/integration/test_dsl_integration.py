@@ -61,6 +61,8 @@ def _make_composer(registry: BrickRegistry, response: str = _SIMPLE_DSL) -> Blue
 
     composer._selector = AllBricksSelector()
     composer._store = None
+    composer._explicit_healers = None
+    composer._pm = None
     return composer
 
 

@@ -113,11 +113,14 @@ class BricksEngine(Engine):
     The LLM only sees brick signatures during compose, not the raw data.
     """
 
-    def __init__(self, provider: Any) -> None:
+    def __init__(self, provider: Any, plugin_manager: Any | None = None) -> None:
         """Initialise with an LLMProvider.
 
         Args:
             provider: Any LLMProvider instance (LiteLLMProvider or ClaudeCodeProvider).
+            plugin_manager: Optional ``pluggy.PluginManager`` threaded into
+                composer + engine for lifecycle hooks. See
+                :mod:`bricks.core.hooks`. When ``None`` no hooks fire.
         """
         from bricks.ai.composer import BlueprintComposer
         from bricks.core.builtins import register_builtins
@@ -126,13 +129,14 @@ class BricksEngine(Engine):
         from bricks.core.registry import BrickRegistry
         from bricks.stdlib import register as _register_stdlib
 
-        self._composer = BlueprintComposer(provider=provider)
+        self._pm = plugin_manager
+        self._composer = BlueprintComposer(provider=provider, plugin_manager=plugin_manager)
         self._loader = BlueprintLoader()
         registry = BrickRegistry()
         _register_stdlib(registry)
         register_builtins(registry)
         self._registry = registry
-        self._engine = BlueprintEngine(registry=registry)
+        self._engine = BlueprintEngine(registry=registry, plugin_manager=plugin_manager)
 
     def solve(self, task_text: str, raw_data: str) -> EngineResult:
         """Compose blueprint from task_text, execute it with raw_data.
@@ -280,13 +284,16 @@ class RawLLMEngine(Engine):
         "No code, no explanation, no markdown fences — just raw JSON."
     )
 
-    def __init__(self, provider: Any) -> None:
+    def __init__(self, provider: Any, plugin_manager: Any | None = None) -> None:
         """Initialise with an LLMProvider.
 
         Args:
             provider: Any LLMProvider instance.
+            plugin_manager: Optional ``pluggy.PluginManager`` for the
+                ``raw_llm_start`` / ``raw_llm_done`` hooks.
         """
         self._provider = provider
+        self._pm = plugin_manager
 
     def solve(self, task_text: str, raw_data: str) -> EngineResult:
         """Send task + raw_data to LLM, parse JSON response.
@@ -305,9 +312,19 @@ class RawLLMEngine(Engine):
             "Compute the exact values. Return ONLY a JSON object."
         )
 
+        if self._pm is not None:
+            self._pm.hook.raw_llm_start()
+
         t0 = time.monotonic()
         completion = self._provider.complete(prompt, system=self._SYSTEM)
         duration = time.monotonic() - t0
+
+        if self._pm is not None:
+            self._pm.hook.raw_llm_done(
+                response=completion.text,
+                tokens_in=completion.input_tokens,
+                tokens_out=completion.output_tokens,
+            )
 
         raw_text = completion.text.strip()
         logger.debug("[RawLLMEngine] Raw response: %s", raw_text)

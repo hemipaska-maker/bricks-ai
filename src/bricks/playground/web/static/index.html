@@ -381,6 +381,53 @@
   .steps li.done .mark { background: var(--ok); border-color: var(--ok); color: #fff; }
   .steps li.done .mark::before { content: "✓"; }
 
+  /* ===== fan-out progress graphic (issue #56) ===== */
+  .fanout {
+    width: 100%;
+    max-width: 620px;
+    margin: 16px auto 0;
+    display: block;
+  }
+  .fanout .edge {
+    fill: none;
+    stroke: var(--rule-2);
+    stroke-width: 1.5;
+    color: var(--rule-2); /* arrow head inherits */
+    transition: stroke 220ms ease, color 220ms ease;
+  }
+  .fanout .fnode rect {
+    fill: var(--paper);
+    stroke: var(--rule-2);
+    stroke-width: 1.5;
+    transition: fill 220ms ease, stroke 220ms ease;
+  }
+  .fanout .fnode text {
+    fill: var(--faint);
+    font-family: var(--mono);
+    font-size: 11px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    transition: fill 220ms ease;
+  }
+  .fanout .fnode.on rect {
+    fill: var(--paper-2);
+    stroke: var(--accent);
+    stroke-width: 2;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .fanout .fnode.on text { fill: var(--ink); }
+  .fanout .fnode.done rect {
+    fill: var(--ok);
+    stroke: var(--ok);
+  }
+  .fanout .fnode.done text { fill: #fff; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+  .fanout.solo [data-compare-only="true"],
+  .fanout.solo .hide-if-solo { display: none; }
+
   /* ===== results view ===== */
   .results {
     max-width: 960px;
@@ -681,19 +728,21 @@
   <div class="spacer"></div>
   <div class="byok" title="Model">
     <select id="modelSel" style="padding-right: 24px;">
-      <option>Haiku 4.5</option>
-      <option>Sonnet 4.5</option>
-      <option>GPT-4o Mini</option>
-      <option>Llama3 local</option>
+      <option value="claude-haiku-4-5">Haiku 4.5</option>
+      <option value="claude-sonnet-4-5">Sonnet 4.5</option>
+      <option value="gpt-4o-mini">GPT-4o Mini</option>
+      <option value="gpt-4o">GPT-4o</option>
+      <option value="llama3">Llama3 local</option>
     </select>
   </div>
   <div class="byok" title="Bring your own key">
-    <select>
-      <option>Anthropic</option>
-      <option>OpenAI</option>
+    <select id="providerSel">
+      <option value="claude_code">Claude Code</option>
+      <option value="anthropic">Anthropic</option>
+      <option value="openai">OpenAI</option>
+      <option value="ollama">Ollama</option>
     </select>
-    <input type="password" placeholder="sk-ant-•••••••••" value="sk-ant-api03-xXxXxXx" />
-    <div class="byok-dot"><i></i>connected</div>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-••••••••• (optional for Claude Code / Ollama)" />
   </div>
 </nav>
 
@@ -794,13 +843,42 @@
     <div class="spinner"></div>
     <h2 id="runHeadline">Running your pipeline…</h2>
     <p id="runSub">Bricks composing a blueprint, then executing deterministically.</p>
-    <ol class="steps" id="steps">
-      <li data-s="0"><span class="mark">1</span>Parsing input data</li>
-      <li data-s="1"><span class="mark">2</span>Bricks — composing blueprint</li>
-      <li data-s="2"><span class="mark">3</span>Bricks — executing pipeline</li>
-      <li data-s="3" class="hide-if-solo"><span class="mark">4</span>Raw LLM — sending full prompt</li>
-      <li data-s="4"><span class="mark">5</span>Checking outputs</li>
-    </ol>
+    <svg class="fanout" id="fanout" viewBox="0 0 620 220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pipeline progress">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <!-- edges -->
+      <path class="edge" d="M 80 110 L 200 60"  marker-end="url(#arr)"/>
+      <path class="edge" d="M 80 110 L 200 160" marker-end="url(#arr)" data-compare-only="true"/>
+      <path class="edge" d="M 280 60  L 400 60"  marker-end="url(#arr)"/>
+      <path class="edge" d="M 280 160 L 400 160" marker-end="url(#arr)" data-compare-only="true"/>
+      <path class="edge" d="M 480 60  L 540 110" marker-end="url(#arr)"/>
+      <path class="edge" d="M 480 160 L 540 110" marker-end="url(#arr)" data-compare-only="true"/>
+      <!-- nodes -->
+      <g class="fnode" data-node="input" transform="translate(30 95)">
+        <rect width="80" height="30" rx="6"/>
+        <text x="40" y="20">Input</text>
+      </g>
+      <g class="fnode" data-node="compose" transform="translate(200 45)">
+        <rect width="90" height="30" rx="6"/>
+        <text x="45" y="20">Compose</text>
+      </g>
+      <g class="fnode" data-node="execute" transform="translate(400 45)">
+        <rect width="90" height="30" rx="6"/>
+        <text x="45" y="20">Execute</text>
+      </g>
+      <g class="fnode hide-if-solo" data-node="raw_llm" transform="translate(280 145)">
+        <rect width="130" height="30" rx="6"/>
+        <text x="65" y="20">Raw LLM call</text>
+      </g>
+      <g class="fnode" data-node="check" transform="translate(540 95)">
+        <rect width="80" height="30" rx="6"/>
+        <text x="40" y="20">Check</text>
+      </g>
+    </svg>
+    <p class="heal-note" id="healNote" style="display:none; margin-top:14px; font-size:13px; color:var(--muted); font-style:italic;"></p>
   </div>
 </main>
 
@@ -928,10 +1006,64 @@
       <button class="ghost">Share results</button>
     </div>
 
+    <details class="checks-drilldown" id="checksDrilldown" style="margin-top:24px;">
+      <summary style="cursor:pointer; font-family:var(--mono); font-size:12px; color:var(--muted); padding:6px 0;">
+        Per-check details
+      </summary>
+      <div id="checksTableHost" style="margin-top:12px; font-family:var(--mono); font-size:12px;"></div>
+    </details>
+
   </div>
 </main>
 
 <script>
+  function renderChecksTable(bricksChecks, rawChecks) {
+    const host = document.getElementById('checksTableHost');
+    if (!host) return;
+    const parent = document.getElementById('checksDrilldown');
+    if (!bricksChecks || bricksChecks.length === 0) {
+      host.innerHTML = '<em style="color:var(--faint)">No expected_output set — no checks computed.</em>';
+      if (parent) parent.style.display = '';
+      return;
+    }
+    if (parent) parent.style.display = '';
+    const fmt = (v) => {
+      if (v === null || v === undefined) return '<em style="color:var(--faint)">(missing)</em>';
+      if (typeof v === 'object') return `<code>${escapeHtml(JSON.stringify(v))}</code>`;
+      return `<code>${escapeHtml(String(v))}</code>`;
+    };
+    const icon = (ok) => ok ? '<span style="color:var(--ok)">✓</span>' : '<span style="color:#c53030">✗</span>';
+    const rawByKey = {};
+    if (rawChecks) rawChecks.forEach(c => { rawByKey[c.key] = c; });
+    const rows = bricksChecks.map(c => {
+      const r = rawChecks ? rawByKey[c.key] : null;
+      return `
+        <tr>
+          <td style="padding:6px 12px; border-bottom:1px solid var(--rule);">${escapeHtml(c.key)}</td>
+          <td style="padding:6px 12px; border-bottom:1px solid var(--rule);">${fmt(c.expected)}</td>
+          <td style="padding:6px 12px; border-bottom:1px solid var(--rule);">${fmt(c.got)} ${icon(c.pass)}</td>
+          ${rawChecks ? `<td style="padding:6px 12px; border-bottom:1px solid var(--rule);">${r ? fmt(r.got) + ' ' + icon(r.pass) : '<em style="color:var(--faint)">—</em>'}</td>` : ''}
+        </tr>`;
+    }).join('');
+    host.innerHTML = `
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="text-align:left; color:var(--faint); border-bottom:1px solid var(--rule-2);">
+            <th style="padding:6px 12px;">Key</th>
+            <th style="padding:6px 12px;">Expected</th>
+            <th style="padding:6px 12px;">Bricks got</th>
+            ${rawChecks ? '<th style="padding:6px 12px;">Raw LLM got</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
   // ---- sample customers (hardcoded) ----
   const customers = {
     customers: [
@@ -1043,7 +1175,6 @@ outputs_map:
 
   // ---- run flow ----
   const runBtn = document.getElementById('runBtn');
-  const steps = document.querySelectorAll('#steps li');
   const runHeadline = document.getElementById('runHeadline');
   const runSub = document.getElementById('runSub');
 
@@ -1052,50 +1183,57 @@ outputs_map:
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') startRun();
   });
 
-  // Live data returned from the most recent /playground/run call.
-  // showResults() uses this when present and falls back to the mock numbers
-  // when the fetch hasn't completed yet.
+  // Result payload from the most recent /playground/run-stream call.
   let lastRun = null;
 
-  async function startRun() {
-    // configure steps
-    const rawStep = document.querySelector('#steps li[data-s="3"]');
-    rawStep.style.display = compareOn ? '' : 'none';
-    steps.forEach(s => s.classList.remove('active', 'done'));
-    runHeadline.textContent = compareOn ? 'Running both pipelines…' : 'Running your pipeline…';
-    runSub.textContent = compareOn
-      ? 'Bricks composing + executing, raw LLM doing it in one shot.'
-      : 'Bricks composing a blueprint, then executing deterministically.';
+  // Map an SSE phase → the SVG node that should light up / finish.
+  // `compose_start` turns "compose" on; `step_start` keeps "execute" on; etc.
+  const PHASE_MAP = {
+    compose_start: { on: 'compose' },
+    compose_done:  { done: 'compose' },
+    execute_start: { on: 'execute' },
+    step_done:     { on: 'execute' },           // keep pulsing as each step clears
+    raw_llm_start: { on: 'raw_llm' },
+    raw_llm_done:  { done: 'raw_llm' },
+    check_done:    { on: 'check' },
+  };
 
-    showView('view-running');
+  function resetFanout() {
+    const fanout = document.getElementById('fanout');
+    fanout.classList.toggle('solo', !compareOn);
+    fanout.querySelectorAll('.fnode').forEach(n => n.classList.remove('on', 'done'));
+    document.querySelector('.fnode[data-node="input"]').classList.add('done');
+    document.getElementById('healNote').style.display = 'none';
+  }
 
-    // Kick off the animation and the real fetch in parallel.
-    const sequence = compareOn ? [0, 1, 2, 3, 4] : [0, 1, 2, 4];
-    let i = 0;
-    let animationDone = false;
-    let runResponse = null;
-    let runError = null;
-    const tick = () => {
-      if (i > 0) {
-        const prev = document.querySelector(`#steps li[data-s="${sequence[i-1]}"]`);
-        prev.classList.remove('active'); prev.classList.add('done');
+  function applyPhase(phase, payload) {
+    const cfg = PHASE_MAP[phase];
+    if (!cfg) return;
+    if (cfg.on) {
+      const el = document.querySelector(`.fnode[data-node="${cfg.on}"]`);
+      if (el) el.classList.add('on');
+    }
+    if (cfg.done) {
+      const el = document.querySelector(`.fnode[data-node="${cfg.done}"]`);
+      if (el) { el.classList.remove('on'); el.classList.add('done'); }
+    }
+    if (phase === 'heal_attempt') {
+      const note = document.getElementById('healNote');
+      note.textContent = `Healer tier ${payload.tier} (${payload.healer_name}) ${payload.succeeded ? 'recovered' : 'attempted'}`;
+      note.style.display = '';
+    }
+  }
+
+  function finalizeFanout() {
+    document.querySelectorAll('.fnode').forEach(n => {
+      if (n.classList.contains('on')) {
+        n.classList.remove('on');
+        n.classList.add('done');
       }
-      if (i < sequence.length) {
-        const cur = document.querySelector(`#steps li[data-s="${sequence[i]}"]`);
-        cur.classList.add('active');
-        i++;
-        setTimeout(tick, 520 + Math.random() * 300);
-      } else {
-        animationDone = true;
-        if (runResponse !== null || runError !== null) {
-          lastRun = runResponse;
-          setTimeout(() => showResults(runError), 450);
-        }
-      }
-    };
-    tick();
+    });
+  }
 
-    // Fire the real /playground/run request using whatever's in the setup view.
+  function collectRequestBody() {
     const taskText = document.getElementById('taskInput').value.trim();
     const dataBodyEl = document.getElementById('dataBody');
     let dataValue;
@@ -1104,33 +1242,88 @@ outputs_map:
     } catch (_) {
       dataValue = dataBodyEl.textContent || '';
     }
+    const provider = document.getElementById('providerSel')?.value || 'claude_code';
+    const model = document.getElementById('modelSel')?.value || '';
+    const apiKey = document.getElementById('apiKeyInput')?.value || '';
+    const body = {
+      provider,
+      model,
+      task: taskText,
+      data: dataValue,
+      expected_output: window.__expectedOutput || null,
+      compare: compareOn,
+    };
+    // BYOK: only include api_key for providers that require it.
+    if (provider === 'anthropic' || provider === 'openai') {
+      if (apiKey) body.api_key = apiKey;
+    }
+    return body;
+  }
 
+  async function startRun() {
+    runHeadline.textContent = compareOn ? 'Running both pipelines…' : 'Running your pipeline…';
+    runSub.textContent = compareOn
+      ? 'Bricks composing + executing, raw LLM doing it in one shot.'
+      : 'Bricks composing a blueprint, then executing deterministically.';
+
+    resetFanout();
+    showView('view-running');
+
+    let resp;
     try {
-      const resp = await fetch('/playground/run', {
+      resp = await fetch('/playground/run-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Only claude_code is wired end-to-end until #44 lands.
-          provider: 'claude_code',
-          model: (document.getElementById('modelSel')?.value || '').toLowerCase().includes('haiku')
-            ? 'haiku' : (document.getElementById('modelSel')?.value || '').toLowerCase().includes('sonnet')
-            ? 'sonnet' : '',
-          task: taskText,
-          data: dataValue,
-          expected_output: window.__expectedOutput || null,
-          compare: compareOn,
-        }),
+        body: JSON.stringify(collectRequestBody()),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
-      runResponse = await resp.json();
     } catch (err) {
-      runError = err;
+      lastRun = null;
+      showResults(err);
+      return;
+    }
+    if (!resp.ok) {
+      const errText = await resp.text();
+      lastRun = null;
+      showResults(new Error(`HTTP ${resp.status}: ${errText}`));
+      return;
     }
 
-    if (animationDone) {
-      lastRun = runResponse;
-      showResults(runError);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let finalResponse = null;
+    let finalError = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const frames = buf.split('\n\n');
+      buf = frames.pop();
+      for (const frame of frames) {
+        const lines = frame.split('\n');
+        let eventName = null;
+        let dataLine = '';
+        for (const l of lines) {
+          if (l.startsWith('event:')) eventName = l.slice(6).trim();
+          else if (l.startsWith('data:')) dataLine = l.slice(5).trim();
+        }
+        if (!dataLine) continue;
+        let payload;
+        try { payload = JSON.parse(dataLine); } catch { continue; }
+        if (eventName === 'done') {
+          finalResponse = payload;
+        } else if (eventName === 'error') {
+          finalError = new Error(payload.message || 'stream error');
+        } else if (payload.phase) {
+          applyPhase(payload.phase, payload);
+        }
+      }
     }
+
+    finalizeFanout();
+    lastRun = finalResponse;
+    setTimeout(() => showResults(finalError), 250);
   }
 
   // ---- results ----
@@ -1158,24 +1351,40 @@ outputs_map:
     // demo numbers baked into the mockup so the UI still animates through.
     if (lastRun && lastRun.bricks) {
       const b = lastRun.bricks;
+      const r = lastRun.raw_llm;
       const tokens = b.tokens?.total ?? ((b.tokens?.in || 0) + (b.tokens?.out || 0));
       const cost = (b.cost_usd == null) ? '—' : `$${b.cost_usd.toFixed(4)}`;
       const passed = (b.checks || []).filter(c => c.pass).length;
       const total = (b.checks || []).length;
-      verdictTitle.innerHTML = 'Bricks ran deterministically.';
-      scoreGrid.className = 'score-grid';
+      const hasRaw = r && r.tokens;
+      const rTokens = hasRaw ? (r.tokens?.total ?? ((r.tokens?.in || 0) + (r.tokens?.out || 0))) : 0;
+      const rPassed = hasRaw ? (r.checks || []).filter(c => c.pass).length : 0;
+
+      verdictTitle.innerHTML = hasRaw
+        ? (passed > rPassed ? 'Bricks beat raw LLM' : 'Side-by-side results')
+        : 'Bricks ran deterministically.';
+
+      scoreGrid.className = hasRaw ? 'score-grid dual' : 'score-grid';
       scoreGrid.innerHTML = `
         <div class="scol win">
           <div class="who"><i></i>Bricks</div>
           <div class="num">${passed}<span class="of">/${total || '?'}</span></div>
           <div class="meta">${tokens.toLocaleString()} tokens · ${cost}</div>
-        </div>`;
+        </div>` + (hasRaw ? `
+        <div class="scol ${rPassed >= passed ? 'win' : 'loss'}">
+          <div class="who"><i></i>Raw LLM</div>
+          <div class="num">${rPassed}<span class="of">/${total || '?'}</span></div>
+          <div class="meta">${rTokens.toLocaleString()} tokens</div>
+        </div>` : '');
+
       metrics.className = 'metrics';
       metrics.innerHTML = `
         <div class="metric"><div class="k">Tokens</div><div class="v">${tokens.toLocaleString()}</div><div class="sub">composed once</div></div>
         <div class="metric"><div class="k">Cost</div><div class="v">${cost}</div><div class="sub">${lastRun.run_metadata?.model || ''}</div></div>
         <div class="metric"><div class="k">Duration</div><div class="v">${((b.duration_ms || 0) / 1000).toFixed(1)}s</div><div class="sub">wall clock</div></div>`;
-      if (cmpTable) cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = 'none');
+      if (cmpTable) cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = hasRaw ? '' : 'none');
+
+      renderChecksTable(b.checks || [], hasRaw ? (r.checks || []) : null);
       if (typeof applyTweaks === 'function') applyTweaks();
       showView('view-results');
       return;
