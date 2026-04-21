@@ -208,9 +208,9 @@ class TestCompactBrickSignatures:
 
     def test_showcase_bricks_format(self) -> None:
         """Showcase bricks produce correct compact signatures."""
-        from bricks.benchmark.showcase.bricks import build_showcase_registry
-        from bricks.benchmark.showcase.bricks.math_bricks import add, multiply, round_value, subtract
-        from bricks.benchmark.showcase.bricks.string_bricks import format_result
+        from bricks.playground.showcase.bricks import build_showcase_registry
+        from bricks.playground.showcase.bricks.math_bricks import add, multiply, round_value, subtract
+        from bricks.playground.showcase.bricks.string_bricks import format_result
 
         reg = build_showcase_registry(multiply, round_value, add, subtract, format_result)
         result = compact_brick_signatures(reg)
@@ -276,10 +276,10 @@ class TestOutputKeyTable:
 
     def test_showcase_bricks_table(self) -> None:
         """Showcase bricks produce a valid output key table."""
-        from bricks.benchmark.showcase.bricks import build_showcase_registry
-        from bricks.benchmark.showcase.bricks.math_bricks import add, multiply, round_value
-        from bricks.benchmark.showcase.bricks.string_bricks import format_result
         from bricks.core.schema import output_key_table
+        from bricks.playground.showcase.bricks import build_showcase_registry
+        from bricks.playground.showcase.bricks.math_bricks import add, multiply, round_value
+        from bricks.playground.showcase.bricks.string_bricks import format_result
 
         reg = build_showcase_registry(multiply, round_value, add, format_result)
         result = output_key_table(reg)

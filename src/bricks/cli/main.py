@@ -505,3 +505,80 @@ def serve(
     typer.echo("Server ready. Waiting for MCP client...", err=True)
 
     asyncio.run(run_mcp_server(engine))
+
+
+def _find_free_port(preferred: int, host: str) -> int:
+    """Return ``preferred`` if free, otherwise the next available port.
+
+    Scans up to 20 ports past ``preferred`` before giving up.
+
+    Args:
+        preferred: Port to try first.
+        host: Interface to bind against while probing.
+
+    Returns:
+        A port number that is currently free on ``host``.
+
+    Raises:
+        OSError: If no free port is found within the scan window.
+    """
+    import socket  # noqa: PLC0415
+
+    for candidate in range(preferred, preferred + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind((host, candidate))
+            except OSError:
+                continue
+            return candidate
+    raise OSError(f"No free port in range [{preferred}, {preferred + 20})")
+
+
+@app.command()
+def playground(
+    port: int = typer.Option(8080, "--port", help="Port to bind. Probes for a free port starting here."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind. Use 0.0.0.0 for LAN access."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Skip auto-opening the browser."),
+    force_port: bool = typer.Option(
+        False, "--force-port", help="Fail if --port is taken instead of probing for a free one."
+    ),
+) -> None:
+    """Start the Bricks Playground local web UI.
+
+    Serves the Playground at ``http://{host}:{port}`` and opens the default
+    browser to it. Ctrl+C shuts down cleanly.
+    """
+    import threading  # noqa: PLC0415
+    import webbrowser  # noqa: PLC0415
+
+    try:
+        import uvicorn  # noqa: PLC0415
+
+        from bricks.playground.web.app import app as playground_app  # noqa: PLC0415
+    except ImportError as exc:
+        typer.echo("Error: Playground features require the 'playground' extra.", err=True)
+        typer.echo("Install with: pip install bricks[playground]", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if force_port:
+        bound_port = port
+    else:
+        try:
+            bound_port = _find_free_port(port, host)
+        except OSError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    url = f"http://{'localhost' if host == '127.0.0.1' else host}:{bound_port}"
+    typer.echo(f"\u2713 Bricks Playground running \u2192 {url}")
+
+    if not no_browser:
+        threading.Timer(0.3, lambda: webbrowser.open(url)).start()
+        typer.echo("  (browser opened \u00b7 Ctrl+C to stop)")
+    else:
+        typer.echo("  (Ctrl+C to stop)")
+
+    try:
+        uvicorn.run(playground_app, host=host, port=bound_port, log_level="warning")
+    except KeyboardInterrupt:
+        typer.echo("\nShutting down.")

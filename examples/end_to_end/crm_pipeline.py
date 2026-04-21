@@ -49,7 +49,7 @@ outputs_map:
   active_count: "${active_count.result}"
 """
 
-# Fallback inline data (5 records) used when bricks.benchmark is not installed
+# Fallback inline data (5 records) used when bricks.playground is not installed
 _FALLBACK_DATA = json.dumps(
     {
         "customers": [
@@ -69,7 +69,7 @@ def _load_data() -> tuple[str, int]:
     Uses the benchmark CRM generator when available; falls back to inline data.
     """
     try:
-        from bricks.benchmark.showcase.crm_generator import generate_crm_task
+        from bricks.playground.showcase.crm_generator import generate_crm_task
 
         task = generate_crm_task(seed=42)
         raw = task.raw_api_response.strip()
@@ -83,7 +83,7 @@ def _load_data() -> tuple[str, int]:
     except ImportError:
         data = json.loads(_FALLBACK_DATA)
         active_count = sum(1 for c in data["customers"] if c["status"] == "active")
-        print(f"  bricks.benchmark not installed — using {len(data['customers'])} inline records")
+        print(f"  bricks.playground not installed — using {len(data['customers'])} inline records")
         return _FALLBACK_DATA, active_count
 
 

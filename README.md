@@ -265,6 +265,7 @@ Commands:
   init        Scaffold a new Bricks project in the...
   list        List all available Bricks in the registry.
   new         Scaffold new Bricks components.
+  playground  Start the Bricks Playground local web UI.
   run         Execute a blueprint.
   serve       Start the Bricks MCP server on stdio...
   store       Blueprint store management.

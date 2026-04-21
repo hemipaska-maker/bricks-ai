@@ -32,12 +32,13 @@ dependencies = [
 [project.optional-dependencies]
 ai = ["litellm>=1.0,<1.82.7"]
 mcp = ["mcp>=1.0"]
-benchmark = [
+playground = [
     "tiktoken>=0.5",
     "matplotlib>=3.7",
     "fastapi>=0.100",
     "uvicorn>=0.20",
     "PyYAML>=6.0",
+    "python-multipart>=0.0.6",
 ]
 all = [
     "litellm>=1.0,<1.82.7",
@@ -47,6 +48,7 @@ all = [
     "fastapi>=0.100",
     "uvicorn>=0.20",
     "PyYAML>=6.0",
+    "python-multipart>=0.0.6",
 ]
 dev = [
     "pytest>=9.0",
@@ -78,7 +80,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
-    "src/bricks/benchmark/tests",
+    "src/bricks/playground/tests",
 ]
 addopts = "--import-mode=importlib"
 pythonpath = ["src"]
@@ -112,7 +114,7 @@ module = ["bricks.mcp.server", "bricks.cli.check_env"]
 warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
-module = ["bricks.benchmark.*", "bricks.stdlib.*", "bricks.providers.*"]
+module = ["bricks.playground.*", "bricks.stdlib.*", "bricks.providers.*"]
 ignore_errors = true
 
 [tool.ruff]
@@ -139,5 +141,5 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "PLC0415"]
-"src/bricks/benchmark/**/*.py" = ["S101", "PLC0415", "S607"]
+"src/bricks/playground/**/*.py" = ["S101", "PLC0415", "S607"]
 "examples/**/*.py" = ["PLC0415"]

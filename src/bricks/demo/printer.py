@@ -225,7 +225,7 @@ def print_closing() -> None:
     _console.print("  [cyan]bricks demo --act 1[/cyan]")
     _console.print("  [cyan]bricks demo --provider claudecode[/cyan]")
     _console.print()
-    _console.print("[dim]Full benchmark: python -m bricks.benchmark.showcase.run --live[/dim]")
+    _console.print("[dim]Full benchmark: python -m bricks.playground.showcase.run --live[/dim]")
     _console.print()
 
 

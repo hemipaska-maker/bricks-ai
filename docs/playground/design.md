@@ -8,7 +8,7 @@
 
 ## 1. Context
 
-Transform the existing `bricks.benchmark.web` module into `bricks.playground` — a local web UI that lets users try Bricks against embedded scenarios with live LLM execution. Replaces the CLI benchmark as the primary "try it" experience.
+Transform the existing `bricks.playground.web` module into `bricks.playground` — a local web UI that lets users try Bricks against embedded scenarios with live LLM execution. Replaces the CLI benchmark as the primary "try it" experience.
 
 **One-liner UX target:**
 
@@ -26,7 +26,7 @@ Local-only in v1. No hosted deployment, no auth, no persistence beyond the sessi
 ## 2. Scope
 
 **In:**
-- Full rename `bricks.benchmark` → `bricks.playground` (module, tests, docs, CLI, URLs)
+- Full rename `bricks.playground` → `bricks.playground` (module, tests, docs, CLI, URLs)
 - New UI from v2 mockup (see §9)
 - Four provider adapters: Anthropic, OpenAI, Claude Code (local CLI), Ollama (localhost)
 - BYOK flow — key in request body, never env var
@@ -53,7 +53,7 @@ Rename across the codebase:
 |---|---|
 | `src/bricks/benchmark/` | `src/bricks/playground/` |
 | `tests/benchmark/` | `tests/playground/` |
-| `bricks.benchmark.*` imports | `bricks.playground.*` |
+| `bricks.playground.*` imports | `bricks.playground.*` |
 | Web route prefix `/benchmark` | `/playground` |
 | CLI subcommand `bricks benchmark` | `bricks playground` |
 | AGENTS.md references | update |
