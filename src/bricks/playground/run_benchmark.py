@@ -1,10 +1,10 @@
 """Main entry point: run the Bricks vs Python benchmark.
 
 Usage:
-    python -m benchmark.run_benchmark              # demo mode
-    python -m benchmark.run_benchmark --live       # live mode (real API)
-    python -m benchmark.run_benchmark --verbose    # show YAML/Python code
-    python -m benchmark.run_benchmark --scenario 3 # one scenario only
+    python -m bricks.playground.run_benchmark              # demo mode
+    python -m bricks.playground.run_benchmark --live       # live mode (real API)
+    python -m bricks.playground.run_benchmark --verbose    # show YAML/Python code
+    python -m bricks.playground.run_benchmark --scenario 3 # one scenario only
 """
 
 from __future__ import annotations

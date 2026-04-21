@@ -10,14 +10,25 @@ Bricks is a deterministic execution engine for AI agents. Your LLM writes a YAML
 
 ---
 
-## Prove It — 30 Seconds
+## Try it in 30 seconds — `bricks playground`
+
+```bash
+pip install -e ".[playground]"
+bricks playground
+# ✓ Bricks Playground running → http://localhost:8080
+#   (browser opened · Ctrl+C to stop)
+```
+
+The Playground is a local web UI that runs your task through Bricks against embedded scenarios (CRM, tickets, orders) or your own CSV/JSON upload. BYOK for Anthropic / OpenAI; local Claude Code and Ollama need no key.
+
+## Prove It — 30 Seconds (CLI)
 
 ```bash
 git clone https://github.com/hemipaska-maker/bricks-ai.git
 cd bricks
 pip install -e ".[stdlib,ai]"
 export ANTHROPIC_API_KEY=sk-ant-...       # or any supported LLM — see below
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline
 ```
 
 Here's what you'll see — real results tested across three Claude models:
@@ -41,21 +52,21 @@ Bricks works with any model. Blueprints are model-agnostic — compose with one 
 ```bash
 # Anthropic (default)
 export ANTHROPIC_API_KEY=sk-ant-...
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline
 
 # OpenAI
 export OPENAI_API_KEY=sk-...
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model gpt-4o-mini
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline --model gpt-4o-mini
 
 # Google Gemini
 export GOOGLE_API_KEY=AIza...
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model gemini/gemini-2.0-flash
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline --model gemini/gemini-2.0-flash
 
 # Local with Ollama (free, no API key)
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model ollama/llama3
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline --model ollama/llama3
 
 # Claude Code Max plan ($0)
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline --model claudecode
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline --model claudecode
 ```
 
 ---
@@ -407,9 +418,9 @@ Three acts: compose a blueprint, execute it on CRM data, compare Bricks vs raw L
 Run the full benchmark suite:
 
 ```bash
-python -m bricks_benchmark.showcase.run --live                         # all scenarios
-python -m bricks_benchmark.showcase.run --live --scenario CRM-pipeline # single scenario
-python -m bricks_benchmark.showcase.run --live --scenario TICKET-pipeline  # support tickets
+python -m bricks.playground.showcase.run --live                         # all scenarios
+python -m bricks.playground.showcase.run --live --scenario CRM-pipeline # single scenario
+python -m bricks.playground.showcase.run --live --scenario TICKET-pipeline  # support tickets
 ```
 
 | Scenario | What it proves | Bricks | Raw LLM |

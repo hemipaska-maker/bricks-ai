@@ -1,4 +1,4 @@
-"""Dataset loader for the Bricks Benchmark web API.
+"""Dataset loader for the Bricks Playground web API.
 
 Loads built-in datasets from the ``web/datasets/`` directory and serves them
 via the ``/api/datasets`` endpoint.

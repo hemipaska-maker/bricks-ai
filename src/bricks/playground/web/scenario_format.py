@@ -1,4 +1,4 @@
-"""Portable YAML scenario format for Bricks Benchmark.
+"""Portable YAML scenario format for Bricks Playground.
 
 A ScenarioDefinition describes a complete benchmark task in a single file:
 what data to use, what to compute, and optionally what to expect.
