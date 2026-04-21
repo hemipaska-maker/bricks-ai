@@ -18,6 +18,7 @@ def _for_each_impl(
     items: list[Any],
     do_brick: str,
     on_error: Literal["fail", "collect"] = "fail",
+    item_kwarg: str = "item",
     registry: BrickRegistry | None = None,
 ) -> dict[str, Any]:
     """Execute a brick for each item in the list.
@@ -26,15 +27,20 @@ def _for_each_impl(
         items: List of items to iterate over.
         do_brick: Name of the brick to apply to each item.
         on_error: ``"fail"`` stops on first error; ``"collect"`` continues.
+        item_kwarg: Keyword name to pass each item under. Extracted by the
+            DSL tracer from the for_each lambda (e.g. ``"email"`` for
+            ``for_each(do=lambda e: step.is_email_valid(email=e))``).
+            Defaults to ``"item"`` for blueprints written without the DSL.
         registry: Registry to look up ``do_brick``. Required.
 
     Returns:
-        ``{"results": [...]}`` on success (fail mode).
-        ``{"results": [...], "errors": [...]}`` in collect mode.
+        ``{"results": [...], "result": [...]}`` on success (fail mode).
+        Also includes ``"errors": [...]`` in collect mode.
 
     Raises:
         ValueError: If ``registry`` is None.
-        Exception: Any exception raised by the target brick in fail mode.
+        BrickExecutionError: Re-raised (in fail mode) for inner brick
+            failures, attributed to the real inner brick name.
     """
     if registry is None:
         raise ValueError("__for_each__ requires a registry parameter.")
@@ -45,7 +51,7 @@ def _for_each_impl(
 
     for i, item in enumerate(items):
         try:
-            result = callable_(item=item)
+            result = callable_(**{item_kwarg: item})
         except BrickExecutionError:
             # Already attributed (e.g. nested for_each). Preserve it.
             if on_error != "collect":
@@ -68,7 +74,10 @@ def _for_each_impl(
             continue
         results.append(result)
 
-    output: dict[str, Any] = {"results": results}
+    # Aliases ``result`` to the per-item list so chained steps that use the
+    # DSL's ``<node>.output`` convention (resolved as ``${step.result}``)
+    # find the list. ``results`` stays for callers that already consume it.
+    output: dict[str, Any] = {"results": results, "result": results}
     if on_error == "collect":
         output["errors"] = errors
     return output

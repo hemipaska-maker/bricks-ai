@@ -195,7 +195,12 @@ class DAG:
             return StepDefinition(
                 name=step_name,
                 brick="__for_each__",
-                params={"items": items_ref, "do_brick": do_name, "on_error": node.on_error},
+                params={
+                    "items": items_ref,
+                    "do_brick": do_name,
+                    "item_kwarg": node.item_kwarg,
+                    "on_error": node.on_error,
+                },
                 save_as=step_name,
             )
 

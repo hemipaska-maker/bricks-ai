@@ -61,6 +61,9 @@ class Node:
             :class:`~bricks.dsl.dag_builder.DAGBuilder`.
         items: Input items for ``for_each`` nodes.
         do: Brick name string (after extraction) or raw callable for ``for_each`` nodes.
+        item_kwarg: Name of the keyword the lambda binds to the iteration
+            item — e.g. ``"email"`` for ``for_each(do=lambda e: step.X(email=e))``.
+            Defaults to ``"item"`` when the lambda cannot be introspected.
         on_error: Error policy for ``for_each`` — ``"fail"`` (default, stop on
             first error) or ``"collect"`` (continue, gather all errors).
         condition: Condition for ``branch`` nodes (brick name string in v1).
@@ -78,6 +81,7 @@ class Node:
     # for_each fields
     items: Node | list[Any] | None = None
     do: str | Callable[..., Any] | None = None
+    item_kwarg: str = "item"
     on_error: str = "fail"
 
     # branch fields
@@ -258,8 +262,9 @@ def for_each(
     outer_tracer = _dsl_module._tracer
     _dsl_module._tracer = inner_tracer
     inner_tracer.start()
+    mock = Node(type="brick", brick_name="__mock__", params={})
     try:
-        do(Node(type="brick", brick_name="__mock__", params={}))
+        do(mock)
     except Exception:  # noqa: S110
         pass
     finally:
@@ -275,7 +280,17 @@ def for_each(
     first = inner_nodes[0]
     do_brick: str = first.brick_name or f"__{first.type}__"
 
-    node = Node(type="for_each", items=items, do=do_brick, on_error=on_error)
+    # Find the kwarg the lambda binds the iteration item to — the key in
+    # the inner node's params whose value is the mock Node we injected.
+    # Default to "item" for backward compatibility when the lambda doesn't
+    # use the item, uses it positionally, or nests it inside an expression.
+    item_kwarg: str = "item"
+    for key, value in first.params.items():
+        if isinstance(value, Node) and value.id == mock.id:
+            item_kwarg = key
+            break
+
+    node = Node(type="for_each", items=items, do=do_brick, item_kwarg=item_kwarg, on_error=on_error)
     _tracer.record(node)
     return node
 
