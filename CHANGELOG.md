@@ -7,6 +7,34 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased] — Playground v0.5.0 (2026-04-21)
+
+### Added
+- **`bricks playground` CLI** — one-liner local web UI at `http://localhost:8080` with free-port probe, `--host`, `--no-browser`, `--force-port`. Ctrl+C shuts down cleanly.
+- **Playground web UI** — v2 mockup shipped into `src/bricks/playground/web/static/index.html`. Scenario picker, task + data panes, drag-drop CSV/JSON upload, compare-to-raw-LLM toggle.
+- **FastAPI endpoints** under `/playground` (design.md §6):
+  - `GET  /playground/scenarios`          — preset list
+  - `GET  /playground/scenarios/{id}`     — full scenario body
+  - `POST /playground/upload`             — CSV / JSON (5 MB cap)
+  - `POST /playground/run`                — RunRequest → RunResponse, compare toggle honoured
+- **Four provider adapters** (all BYOK — keys live in the request body, never env):
+  - `bricks.providers.anthropic.AnthropicProvider`  — Anthropic SDK
+  - `bricks.providers.openai.OpenAIProvider`        — OpenAI SDK
+  - `bricks.providers.ollama.OllamaProvider`        — `httpx` → localhost:11434
+  - `bricks.providers.claudecode.ClaudeCodeProvider` — enhanced in #47 (real cost + JSON + cache counters)
+- **`cost_usd`** on `CompletionResult` — real dollar cost when the provider reports it (currently Claude Code; others landing in follow-ups).
+- `python-multipart`, `anthropic>=0.40`, `openai>=1.0`, `httpx>=0.27` deps under the `playground` / `all` extras.
+
+### Changed
+- **`src/bricks/benchmark/` → `src/bricks/playground/`** (`git mv`, preserves history). 120 `bricks.benchmark.*` imports rewritten across 40 files.
+- `[project.optional-dependencies].benchmark` → `playground`. `testpaths` and ruff per-file-ignore updated accordingly.
+- CI matrix installs the renamed extra on 3.10 / 3.11 / 3.12.
+
+### Removed
+- Legacy `/api/{run,datasets,bricks,presets}` routes. The v2 UI talks exclusively to `/playground/*`.
+
+---
+
 ## [0.5.9] — 2026-04-12
 
 ### Added

@@ -17,13 +17,13 @@ Test one:        pytest tests/path/to/test_x.py::test_name
 Lint:            ruff check . && ruff format --check .
 Typecheck:       mypy src/bricks
 Run CLI:         bricks --help
-Run benchmark:   bricks-bench
+Run Playground:  bricks playground  (local web UI at http://localhost:8080)
 
 ## Architecture
 - `src/bricks/core/` — engine, context, DSL pipeline
 - `src/bricks/stdlib/` — standard bricks (text, data, logic)
-- `src/bricks/benchmark/` — benchmark suite + web GUI
-- `src/bricks/providers/` — LLM provider adapters
+- `src/bricks/playground/` — web GUI, benchmark runner, FastAPI backend
+- `src/bricks/providers/` — LLM provider adapters (claudecode, anthropic, openai, ollama)
 See docs/architecture.md for detail.
 
 ## Conventions

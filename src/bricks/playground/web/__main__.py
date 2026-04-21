@@ -1,4 +1,4 @@
-"""Entry point for the Bricks Benchmark web server.
+"""Entry point for the Bricks Playground web server.
 
 Run with:
     python -m bricks.playground.web

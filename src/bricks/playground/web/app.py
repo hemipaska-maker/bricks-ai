@@ -1,4 +1,4 @@
-"""FastAPI application for the Bricks Benchmark web server."""
+"""FastAPI application for the Bricks Playground web server."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from bricks.playground.web.routes import router
 _STATIC_DIR = Path(__file__).parent / "static"
 _INDEX_HTML = _STATIC_DIR / "index.html"
 
-app = FastAPI(title="Bricks Benchmark", version="0.1.0")
+app = FastAPI(title="Bricks Playground", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 app.include_router(router)
 
