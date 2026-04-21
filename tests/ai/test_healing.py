@@ -589,6 +589,43 @@ class TestParamNameHealer:
         result = healer.heal(ctx)
         assert result.produced_something is False
 
+    def test_heal_rewrites_for_each_inner_kwarg_post_issue_34_fix(self) -> None:
+        """Regression guard for issue #34.
+
+        Before the fix, ``BrickExecutionError.brick_name`` was ``"__for_each__"``,
+        so the healer looked up the wrapper's params (``items`` / ``do_brick``
+        / ``on_error``) instead of the real inner brick's and could not
+        propose a sane fix. After the fix the attribution points at the real
+        inner brick (``count_dict_list``), whose close-match swap
+        ``item`` → ``items`` is the correct repair.
+        """
+        dsl = (
+            "@flow\n"
+            "def count_batches(batches):\n"
+            "    return for_each(items=batches, do=lambda b: step.count_dict_list(item=b))\n"
+        )
+        ctx = HealContext(
+            task="count each batch",
+            failed_flow=_StubFlow(label="orig"),  # type: ignore[arg-type]
+            failed_dsl=dsl,
+            # brick_name is the real inner brick, as produced by the fixed
+            # __for_each__ builtin (not "__for_each__").
+            error=BrickExecutionError(
+                "count_dict_list",
+                "count_dict_list[item_0]",
+                TypeError("count_dict_list() got an unexpected keyword argument 'item'"),
+            ),
+            attempt=0,
+            prior_attempts=[],
+            registry=self._registry_with_count(),
+        )
+
+        result = ParamNameHealer().heal(ctx)
+
+        assert result.produced_something is True, "healer should propose a fix now that attribution is correct"
+        assert "items=b" in result.new_dsl
+        assert "item=b" not in result.new_dsl
+
 
 # --- DictUnwrapHealer (tier 15) ---------------------------------------------
 

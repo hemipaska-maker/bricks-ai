@@ -220,6 +220,14 @@ class BlueprintEngine:
         t0 = time.perf_counter()
         try:
             result = callable_(**resolved_params)
+        except BrickExecutionError as exc:
+            # Already attributed by an inner primitive (for_each / branch /
+            # sub-blueprint). Run teardown, then propagate unchanged so the
+            # real failing brick's name survives. See issue #34.
+            _call_teardown(callable_, resolved_params, meta, exc)
+            for prev_callable, prev_params, prev_meta in reversed(completed):
+                _call_teardown(prev_callable, prev_params, prev_meta, exc)
+            raise
         except Exception as exc:
             _call_teardown(callable_, resolved_params, meta, exc)
             for prev_callable, prev_params, prev_meta in reversed(completed):

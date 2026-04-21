@@ -108,11 +108,17 @@ def test_for_each_executes_over_list() -> None:
 
 
 def test_for_each_fail_mode_stops_on_error() -> None:
-    """__for_each__ in fail mode raises on first error."""
+    """__for_each__ in fail mode raises on first error, attributed to the
+    real inner brick (issue #34) rather than to ``__for_each__``."""
+    from bricks.core.exceptions import BrickExecutionError
+
     reg = _make_registry()
     callable_, _ = reg.get("__for_each__")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(BrickExecutionError) as exc_info:
         callable_(items=[1, 2, 3], do_brick="fail_always", on_error="fail")
+
+    assert exc_info.value.brick_name == "fail_always"
+    assert isinstance(exc_info.value.cause, RuntimeError)
 
 
 def test_for_each_collect_mode_gathers_errors() -> None:

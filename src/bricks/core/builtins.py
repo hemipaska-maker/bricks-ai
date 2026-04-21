@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from bricks.core.exceptions import BrickExecutionError
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
 
@@ -45,12 +46,27 @@ def _for_each_impl(
     for i, item in enumerate(items):
         try:
             result = callable_(item=item)
-            results.append(result)
-        except Exception as exc:
+        except BrickExecutionError:
+            # Already attributed (e.g. nested for_each). Preserve it.
             if on_error != "collect":
                 raise
-            errors.append({"index": i, "error": str(exc), "item": item})
+            errors.append({"index": i, "error": f"{do_brick}: propagated", "item": item})
             results.append(None)
+            continue
+        except Exception as exc:
+            # Attribute the failure to the real inner brick so healers,
+            # logs, and traceback consumers see ``do_brick`` — not the
+            # ``__for_each__`` wrapper. See issue #34.
+            if on_error != "collect":
+                raise BrickExecutionError(
+                    brick_name=do_brick,
+                    step_name=f"{do_brick}[item_{i}]",
+                    cause=exc,
+                ) from exc
+            errors.append({"index": i, "error": f"{do_brick}: {exc}", "item": item})
+            results.append(None)
+            continue
+        results.append(result)
 
     output: dict[str, Any] = {"results": results}
     if on_error == "collect":
@@ -83,17 +99,28 @@ def _branch_impl(
     if registry is None:
         raise ValueError("__branch__ requires a registry parameter.")
 
-    condition_fn, _ = registry.get(condition_brick)
-    raw = condition_fn(input=condition_input)
+    def _invoke(brick: str, position: str) -> Any:
+        """Invoke ``brick`` and attribute any failure to it (issue #34)."""
+        fn, _ = registry.get(brick)
+        try:
+            return fn(input=condition_input)
+        except BrickExecutionError:
+            raise  # already attributed
+        except Exception as exc:
+            raise BrickExecutionError(
+                brick_name=brick,
+                step_name=f"{brick}[{position}]",
+                cause=exc,
+            ) from exc
+
+    raw = _invoke(condition_brick, "condition")
     is_true = bool(raw.get("result", False) if isinstance(raw, dict) else raw)
 
     if is_true and if_true_brick:
-        target_fn, _ = registry.get(if_true_brick)
-        branch_result = target_fn(input=condition_input)
+        branch_result = _invoke(if_true_brick, "if_true")
         branch_taken = "true"
     elif if_false_brick:
-        target_fn, _ = registry.get(if_false_brick)
-        branch_result = target_fn(input=condition_input)
+        branch_result = _invoke(if_false_brick, "if_false")
         branch_taken = "false"
     else:
         branch_result = {}
