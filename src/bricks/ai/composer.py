@@ -31,17 +31,36 @@ logger = logging.getLogger(__name__)
 
 
 class ComposerError(BrickError):
-    """Raised when AI composition fails."""
+    """Raised when AI composition fails.
 
-    def __init__(self, message: str, cause: Exception | None = None) -> None:
+    ``dsl_code`` / ``blueprint_yaml`` are structured attributes set by the
+    composer on failure paths so callers can render the offending LLM
+    output without re-paying for another compose (see issue #60). When a
+    composer error lands without access to the raw output, both stay ``""``.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        *,
+        dsl_code: str = "",
+        blueprint_yaml: str = "",
+    ) -> None:
         """Initialise the error.
 
         Args:
             message: Human-readable error description.
             cause: The underlying exception, if any.
+            dsl_code: The raw LLM-generated Python DSL text that triggered
+                the failure, if available.
+            blueprint_yaml: The rendered blueprint YAML, if a
+                :class:`FlowDefinition` was produced before the failure.
         """
         super().__init__(message)
         self.cause = cause
+        self.dsl_code = dsl_code
+        self.blueprint_yaml = blueprint_yaml
 
 
 class CompositionError(ComposerError):
@@ -378,19 +397,34 @@ class BlueprintComposer:
         total_output = sum(c.output_tokens for c in calls)
         total_cached_in = sum(c.cached_input_tokens for c in calls)
 
+        # Always capture the raw LLM output — even on failure paths, so
+        # downstream callers can render the offending DSL without paying
+        # for another compose (issue #60).
+        dsl_code = self._strip_fences(last.yaml_text) if last.yaml_text else ""
         blueprint_yaml = ""
-        dsl_code = ""
         flow_def: FlowDefinition | None = None
+        validation_errors = list(last.validation_errors)
+        is_valid = last.is_valid
         if last.is_valid:
-            flow_def = self._parse_dsl_response(last.yaml_text)
-            blueprint_yaml = flow_def.to_yaml()
-            dsl_code = self._strip_fences(last.yaml_text)
-            if self._pm is not None:
-                self._pm.hook.compose_done(
-                    dsl=dsl_code,
-                    tokens_in=total_input,
-                    tokens_out=total_output,
-                )
+            try:
+                flow_def = self._parse_dsl_response(last.yaml_text)
+                blueprint_yaml = flow_def.to_yaml()
+            except CompositionError as exc:
+                # Post-AST-validation failure — the DSL validated but
+                # ``exec()`` or the FlowDefinition extraction raised.
+                # Return a structured is_valid=False ComposeResult instead
+                # of letting the exception escape compose().
+                is_valid = False
+                validation_errors.append(str(exc))
+                dsl_code = exc.dsl_code or dsl_code
+                flow_def = None
+            else:
+                if self._pm is not None:
+                    self._pm.hook.compose_done(
+                        dsl=dsl_code,
+                        tokens_in=total_input,
+                        tokens_out=total_output,
+                    )
 
         exec_outputs: dict[str, Any] | None = None
         exec_error = ""
@@ -432,8 +466,8 @@ class BlueprintComposer:
             blueprint_yaml=blueprint_yaml,
             dsl_code=dsl_code,
             flow_def=flow_def,
-            is_valid=last.is_valid,
-            validation_errors=last.validation_errors,
+            is_valid=is_valid,
+            validation_errors=validation_errors,
             calls=calls,
             api_calls=len(calls),
             total_input_tokens=total_input,
@@ -674,7 +708,10 @@ class BlueprintComposer:
 
         validation = validate_dsl(code)
         if not validation.valid:
-            raise CompositionError(f"LLM generated invalid DSL code. Errors: {validation.errors}\nCode:\n{code}")
+            raise CompositionError(
+                f"LLM generated invalid DSL code. Errors: {validation.errors}\nCode:\n{code}",
+                dsl_code=code,
+            )
 
         namespace: dict[str, Any] = {
             "step": step,
@@ -689,7 +726,10 @@ class BlueprintComposer:
             None,
         )
         if flow_def is None:
-            raise CompositionError(f"LLM code did not produce a FlowDefinition.\nCode:\n{code}")
+            raise CompositionError(
+                f"LLM code did not produce a FlowDefinition.\nCode:\n{code}",
+                dsl_code=code,
+            )
 
         return flow_def
 

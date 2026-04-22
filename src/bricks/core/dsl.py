@@ -269,19 +269,32 @@ def for_each(
     _dsl_module._tracer = inner_tracer
     inner_tracer.start()
     mock = Node(type="brick", brick_name="__mock__", params={})
+    trace_error: Exception | None = None
     try:
         do(mock)
-    except Exception:  # noqa: S110
-        pass
+    except Exception as exc:
+        # Capture rather than silence — the exception is usually the single
+        # most-useful hint when the trace records no nodes. See issue #60.
+        trace_error = exc
     finally:
         inner_tracer.stop()
         _dsl_module._tracer = outer_tracer
 
     inner_nodes = inner_tracer.get_nodes()
     if not inner_nodes:
+        hint_parts: list[str] = []
+        try:
+            source = inspect.getsource(do).strip()
+        except (OSError, TypeError):
+            source = ""
+        if source:
+            hint_parts.append(f"Lambda source: {source}")
+        if trace_error is not None:
+            hint_parts.append(f"Inner lambda raised: {type(trace_error).__name__}: {trace_error}")
+        extra = ("\n  " + "\n  ".join(hint_parts)) if hint_parts else ""
         raise ValueError(
             "for_each: could not extract brick name from do= callable. "
-            "Ensure the lambda calls exactly one step.brick_name(...)."
+            "Ensure the lambda calls exactly one step.brick_name(...)." + extra
         )
     first = inner_nodes[0]
     do_brick: str = first.brick_name or f"__{first.type}__"

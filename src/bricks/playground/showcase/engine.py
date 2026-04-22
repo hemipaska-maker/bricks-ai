@@ -171,15 +171,21 @@ class BricksEngine(Engine):
             )
         except Exception as exc:
             # Framework errors from compose itself (not BrickExecutionError —
-            # those are caught inside compose). Surface them as a failed result.
+            # those are caught inside compose). Surface them as a failed
+            # result. Any raw DSL the LLM emitted before the failure is
+            # attached to ComposerError as a structured attr (issue #60),
+            # so callers can render it in the Playground UI / results JSON.
             logger.error("[BricksEngine] Compose raised: %s", exc)
+            dsl_code_attr = getattr(exc, "dsl_code", "") or ""
+            blueprint_yaml_attr = getattr(exc, "blueprint_yaml", "") or ""
             return EngineResult(
                 outputs={},
                 tokens_in=0,
                 tokens_out=0,
                 duration_seconds=time.monotonic() - t0,
                 model="",
-                raw_response="",
+                raw_response=blueprint_yaml_attr,
+                dsl_code=dsl_code_attr,
                 error=str(exc),
             )
 
@@ -192,6 +198,7 @@ class BricksEngine(Engine):
                 duration_seconds=time.monotonic() - t0,
                 model=compose_result.model,
                 raw_response=compose_result.blueprint_yaml,
+                dsl_code=compose_result.dsl_code or "",
                 error="; ".join(compose_result.validation_errors),
             )
 
