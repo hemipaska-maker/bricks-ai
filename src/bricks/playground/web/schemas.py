@@ -137,6 +137,7 @@ class EngineResult(BaseModel):
     """Per-engine result payload for ``/playground/run`` (design.md §6)."""
 
     blueprint_yaml: str | None = None
+    dsl_code: str | None = None
     bricks_used: list[BrickUsage] | None = None
     response: str | None = None
     outputs: dict[str, Any]
@@ -144,6 +145,7 @@ class EngineResult(BaseModel):
     duration_ms: int
     cost_usd: float | None = None
     checks: list[CheckResult] = []
+    error: str | None = None
 
 
 class RunMetadata(BaseModel):

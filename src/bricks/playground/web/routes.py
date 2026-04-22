@@ -229,19 +229,68 @@ async def upload(file: UploadFile = File(...)) -> UploadResponse:  # noqa: B008
 # ── POST /playground/run ─────────────────────────────────────────────────────
 
 
+def _values_match(expected: Any, got: Any) -> bool:
+    """Check equality with float-precision tolerance.
+
+    If ``expected`` is a float written with N decimals (e.g. ``169.33``),
+    ``got`` is rounded to that precision before comparison — so
+    ``169.3333`` matches ``169.33`` instead of failing strict equality on
+    float rounding noise. Anything else (ints, strings, nested dicts)
+    still uses plain ``==``.
+    """
+    if isinstance(expected, float) and isinstance(got, (int, float)) and not isinstance(got, bool):
+        # Count decimals in the literal form the user wrote.
+        s = format(expected, "g")
+        decimals = len(s.split(".")[1]) if "." in s else 0
+        return round(float(got), decimals) == round(float(expected), decimals)
+    return got == expected
+
+
 def _checks_for(outputs: dict[str, Any], expected: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Build per-key correctness checks; empty list if no expected output."""
     if expected is None:
         return []
     got = outputs or {}
-    return [{"key": k, "expected": v, "got": got.get(k), "pass": got.get(k) == v} for k, v in expected.items()]
+    return [
+        {"key": k, "expected": v, "got": got.get(k), "pass": _values_match(v, got.get(k))} for k, v in expected.items()
+    ]
+
+
+def _bricks_used_from_flow(flow_def: Any) -> list[dict[str, Any]] | None:
+    """Extract per-brick usage counts from a composed blueprint.
+
+    Walks the flow's blueprint steps and tallies each ``brick`` name.
+    Returns ``None`` when the flow is unavailable (e.g. raw-LLM branch)
+    so the frontend can skip the pill list.
+    """
+    if flow_def is None:
+        return None
+    try:
+        bp = flow_def.to_blueprint()
+    except Exception:
+        return None
+    counts: dict[str, int] = {}
+    for step in bp.steps:
+        name = step.brick
+        if not name or name.startswith("__"):
+            continue  # hide built-in wrappers
+        counts[name] = counts.get(name, 0) + 1
+    if not counts:
+        return None
+    return [
+        {"name": name, "category": "", "count": count} for name, count in sorted(counts.items(), key=lambda kv: -kv[1])
+    ]
 
 
 def _engine_result(result: Any, duration_ms: int, expected: dict[str, Any] | None, *, is_raw: bool) -> EngineResult:
     """Shape a showcase engine result into an :class:`EngineResult`."""
     outputs = result.outputs or {}
+    bricks_used = None if is_raw else _bricks_used_from_flow(getattr(result, "flow_def", None))
+    err = getattr(result, "error", "") or None
     return EngineResult(
         blueprint_yaml=None if is_raw else (result.raw_response or None),
+        dsl_code=None if is_raw else (getattr(result, "dsl_code", "") or None),
+        bricks_used=bricks_used,
         outputs=outputs,
         response=result.raw_response if is_raw else None,
         tokens=TokenBreakdown(
@@ -254,6 +303,7 @@ def _engine_result(result: Any, duration_ms: int, expected: dict[str, Any] | Non
         duration_ms=duration_ms,
         cost_usd=None,
         checks=_checks_for(outputs, expected),
+        error=err,
     )
 
 

@@ -57,6 +57,8 @@ class EngineResult:
     """Model identifier string."""
     raw_response: str = ""
     """Full LLM text response (blueprint YAML for Bricks, JSON text for RawLLM)."""
+    dsl_code: str = ""
+    """Python DSL source the composer emitted (Bricks only, else empty)."""
     error: str = ""
     """Non-empty if the engine failed to produce valid outputs."""
     flow_def: Any = None
@@ -206,6 +208,7 @@ class BricksEngine(Engine):
                 duration_seconds=time.monotonic() - t0,
                 model=compose_result.model,
                 raw_response=compose_result.blueprint_yaml,
+                dsl_code=compose_result.dsl_code or "",
                 flow_def=compose_result.flow_def,
             )
 
@@ -223,6 +226,7 @@ class BricksEngine(Engine):
             duration_seconds=time.monotonic() - t0,
             model=compose_result.model,
             raw_response=compose_result.blueprint_yaml,
+            dsl_code=compose_result.dsl_code or "",
             error=compose_result.exec_error or "unknown runtime error",
         )
 

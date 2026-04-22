@@ -381,52 +381,110 @@
   .steps li.done .mark { background: var(--ok); border-color: var(--ok); color: #fff; }
   .steps li.done .mark::before { content: "✓"; }
 
-  /* ===== fan-out progress graphic (issue #56) ===== */
-  .fanout {
+  /* ===== flow diagram (Claude design prototype) — issue #56 ===== */
+  .flow {
+    position: relative;
     width: 100%;
-    max-width: 620px;
-    margin: 16px auto 0;
-    display: block;
+    max-width: 640px;
+    margin: 24px auto 0;
+    padding: 24px 0 8px;
+    box-sizing: border-box;
   }
-  .fanout .edge {
+  .flow-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .flow-svg path {
     fill: none;
     stroke: var(--rule-2);
-    stroke-width: 1.5;
-    color: var(--rule-2); /* arrow head inherits */
-    transition: stroke 220ms ease, color 220ms ease;
+    stroke-width: 1.25;
+    stroke-linecap: round;
   }
-  .fanout .fnode rect {
-    fill: var(--paper);
-    stroke: var(--rule-2);
-    stroke-width: 1.5;
-    transition: fill 220ms ease, stroke 220ms ease;
-  }
-  .fanout .fnode text {
-    fill: var(--faint);
-    font-family: var(--mono);
-    font-size: 11px;
-    text-anchor: middle;
-    dominant-baseline: middle;
-    transition: fill 220ms ease;
-  }
-  .fanout .fnode.on rect {
-    fill: var(--paper-2);
+  .flow-svg path.lit {
     stroke: var(--accent);
-    stroke-width: 2;
-    animation: pulse 1.2s ease-in-out infinite;
+    stroke-dasharray: 4 4;
+    animation: flow-dash 1.2s linear infinite;
   }
-  .fanout .fnode.on text { fill: var(--ink); }
-  .fanout .fnode.done rect {
-    fill: var(--ok);
-    stroke: var(--ok);
+  @keyframes flow-dash { to { stroke-dashoffset: -16; } }
+
+  .flow-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 36px 48px;
+    align-items: center;
+    justify-items: center;
   }
-  .fanout .fnode.done text { fill: #fff; }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.55; }
+  .flow-node {
+    position: relative;
+    z-index: 1;
+    min-width: 118px;
+    padding: 11px 16px;
+    background: #fff;
+    border: 1px solid var(--rule-2);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+    text-align: center;
+    transition: color .3s, border-color .3s, background .3s, box-shadow .3s;
   }
-  .fanout.solo [data-compare-only="true"],
-  .fanout.solo .hide-if-solo { display: none; }
+  .flow-node.active {
+    color: #FFF6EE;
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+  .flow-node.done {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .flow-node.done::after {
+    content: "";
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center / 9px no-repeat;
+  }
+  .flow-node .sub {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-top: 2px;
+  }
+  .flow-node.active .sub, .flow-node.done .sub { color: rgba(255,246,238,.7); }
+  .flow-node.done .sub { color: var(--accent-ink); opacity: 0.7; }
+
+  /* grid placement (input spans both rows on left, check spans both rows on right) */
+  .n-input   { grid-column: 1; grid-row: 1 / span 2; }
+  .n-compose { grid-column: 2; grid-row: 1; }
+  .n-execute { grid-column: 3; grid-row: 1; }
+  .n-raw     { grid-column: 2 / span 2; grid-row: 2; justify-self: center; }
+  .n-check   { grid-column: 4; grid-row: 1 / span 2; }
+
+  .flow-grid.solo .n-raw { display: none; }
+  .flow-grid.solo { grid-template-rows: auto; }
+  .flow-grid.solo .n-input,
+  .flow-grid.solo .n-check { grid-row: 1; }
+
+  .flow-caption {
+    margin-top: 40px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    min-height: 16px;
+    text-align: center;
+    transition: opacity .2s;
+  }
+  .flow-caption b { color: var(--ink-2); font-weight: 500; }
 
   /* ===== results view ===== */
   .results {
@@ -831,7 +889,6 @@
         Run
         <span class="kbd">⌘↵</span>
       </button>
-      <button class="ghost">Save as YAML</button>
     </div>
 
   </div>
@@ -843,42 +900,18 @@
     <div class="spinner"></div>
     <h2 id="runHeadline">Running your pipeline…</h2>
     <p id="runSub">Bricks composing a blueprint, then executing deterministically.</p>
-    <svg class="fanout" id="fanout" viewBox="0 0 620 220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pipeline progress">
-      <defs>
-        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
-        </marker>
-      </defs>
-      <!-- edges -->
-      <path class="edge" d="M 80 110 L 200 60"  marker-end="url(#arr)"/>
-      <path class="edge" d="M 80 110 L 200 160" marker-end="url(#arr)" data-compare-only="true"/>
-      <path class="edge" d="M 280 60  L 400 60"  marker-end="url(#arr)"/>
-      <path class="edge" d="M 280 160 L 400 160" marker-end="url(#arr)" data-compare-only="true"/>
-      <path class="edge" d="M 480 60  L 540 110" marker-end="url(#arr)"/>
-      <path class="edge" d="M 480 160 L 540 110" marker-end="url(#arr)" data-compare-only="true"/>
-      <!-- nodes -->
-      <g class="fnode" data-node="input" transform="translate(30 95)">
-        <rect width="80" height="30" rx="6"/>
-        <text x="40" y="20">Input</text>
-      </g>
-      <g class="fnode" data-node="compose" transform="translate(200 45)">
-        <rect width="90" height="30" rx="6"/>
-        <text x="45" y="20">Compose</text>
-      </g>
-      <g class="fnode" data-node="execute" transform="translate(400 45)">
-        <rect width="90" height="30" rx="6"/>
-        <text x="45" y="20">Execute</text>
-      </g>
-      <g class="fnode hide-if-solo" data-node="raw_llm" transform="translate(280 145)">
-        <rect width="130" height="30" rx="6"/>
-        <text x="65" y="20">Raw LLM call</text>
-      </g>
-      <g class="fnode" data-node="check" transform="translate(540 95)">
-        <rect width="80" height="30" rx="6"/>
-        <text x="40" y="20">Check</text>
-      </g>
-    </svg>
-    <p class="heal-note" id="healNote" style="display:none; margin-top:14px; font-size:13px; color:var(--muted); font-style:italic;"></p>
+    <div class="flow">
+      <svg class="flow-svg" id="flowSvg" viewBox="0 0 640 200" preserveAspectRatio="none"></svg>
+      <div class="flow-grid" id="flowGrid">
+        <div class="flow-node n-input"   data-n="input">Input<span class="sub">data</span></div>
+        <div class="flow-node n-compose" data-n="compose">Compose<span class="sub">bricks</span></div>
+        <div class="flow-node n-execute" data-n="execute">Execute<span class="sub">pipeline</span></div>
+        <div class="flow-node n-raw"     data-n="raw">Raw LLM<span class="sub">one-shot</span></div>
+        <div class="flow-node n-check"   data-n="check">Check<span class="sub">outputs</span></div>
+      </div>
+      <div class="flow-caption" id="flowCaption">Waiting for run…</div>
+    </div>
+    <p class="heal-note" id="healNote" style="display:none; margin-top:14px; font-size:13px; color:var(--muted); font-style:italic; text-align:center;"></p>
   </div>
 </main>
 
@@ -890,14 +923,15 @@
       <div>
         <div class="eyebrow">Results</div>
       </div>
-      <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">
-        run · 2026-04-20 · seed 42
+      <div class="run-meta" style="font-family: var(--mono); font-size: 11px; color: var(--muted);">
+        run · — · seed —
       </div>
     </div>
 
     <!-- verdict -->
     <div class="verdict">
       <h2 id="verdictTitle">Bricks ran deterministically.</h2>
+      <div id="errorPanel" style="display:none; margin:8px 0 20px; padding:12px 14px; background:#fff4f4; border:1px solid #f2c7c7; border-radius:8px; color:#7a1a1a; font-family:var(--mono); font-size:12.5px; line-height:1.55;"></div>
       <div class="score-grid" id="scoreGrid">
         <div class="scol win">
           <div class="who"><i></i>Bricks</div>
@@ -1001,9 +1035,8 @@
       </button>
       <button class="ghost" id="copyYamlBtn">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-2px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <span id="copyYamlLabel">Copy YAML</span>
+        <span id="copyYamlLabel">Copy blueprint</span>
       </button>
-      <button class="ghost">Share results</button>
     </div>
 
     <details class="checks-drilldown" id="checksDrilldown" style="margin-top:24px;">
@@ -1092,70 +1125,6 @@
   }
   document.getElementById('dataBody').innerHTML = hlJson(customers);
 
-  // ---- yaml highlight ----
-  const yamlRaw = `name: parse_and_analyze_customers
-inputs:
-  raw_api_response: ""
-steps:
-  - name: extract_json
-    brick: extract_markdown_fences
-    params:
-      text: "\${inputs.raw_api_response}"
-    save_as: json_fenced
-  - name: parse_json
-    brick: extract_json_from_str
-    params:
-      text: "\${json_fenced.result}"
-    save_as: parsed_data
-  - name: filter_active
-    brick: filter_dict_list
-    params:
-      items: "\${parsed_data.data.customers}"
-      key: "status"
-      value: "active"
-    save_as: active_customers
-  - name: active_count
-    brick: count_dict_list
-    params:
-      items: "\${active_customers.result}"
-    save_as: count_result
-  - name: total_active_revenue
-    brick: calculate_aggregates
-    params:
-      items: "\${active_customers.result}"
-      field: "monthly_revenue"
-      operation: "sum"
-    save_as: total_revenue
-  - name: avg_active_revenue
-    brick: calculate_aggregates
-    params:
-      items: "\${active_customers.result}"
-      field: "monthly_revenue"
-      operation: "avg"
-    save_as: avg_revenue
-outputs_map:
-  active_count: "\${count_result.result}"
-  total_active_revenue: "\${total_revenue.result}"
-  avg_active_revenue: "\${avg_revenue.result}"`;
-
-  function hlYaml(src){
-    return src.split('\n').map(line => {
-      const m = line.match(/^(\s*)(- )?([A-Za-z_][A-Za-z0-9_]*)(:)(\s*)(.*)$/);
-      if (!m) return esc(line);
-      const [, ind, dash, key, colon, sp, val] = m;
-      let v = '';
-      if (val === '') v = '';
-      else if (val.startsWith('"') && val.endsWith('"')) {
-        const inner = esc(val.slice(1,-1)).replace(/\$\{[^}]+\}/g, x=>`<span class="y-ref">${x}</span>`);
-        v = `<span class="y-str">"${inner}"</span>`;
-      } else if (/^-?\d+(\.\d+)?$/.test(val)) v = `<span class="y-num">${esc(val)}</span>`;
-      else v = esc(val);
-      const d = dash ? `<span class="y-dash">- </span>` : '';
-      return `${ind}${d}<span class="y-key">${esc(key)}</span><span class="y-dash">${colon}</span>${sp}${v}`;
-    }).join('\n');
-  }
-  document.getElementById('yamlCode').innerHTML = hlYaml(yamlRaw);
-
   // ---- view switching ----
   function showView(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
@@ -1186,37 +1155,107 @@ outputs_map:
   // Result payload from the most recent /playground/run-stream call.
   let lastRun = null;
 
-  // Map an SSE phase → the SVG node that should light up / finish.
-  // `compose_start` turns "compose" on; `step_start` keeps "execute" on; etc.
-  const PHASE_MAP = {
-    compose_start: { on: 'compose' },
-    compose_done:  { done: 'compose' },
-    execute_start: { on: 'execute' },
-    step_done:     { on: 'execute' },           // keep pulsing as each step clears
-    raw_llm_start: { on: 'raw_llm' },
-    raw_llm_done:  { done: 'raw_llm' },
-    check_done:    { on: 'check' },
+  // ── flow diagram (ported from Claude design prototype) ────────────────
+  //
+  // Five steps driving node+connector state. SSE phases map onto a step
+  // index below; the visuals run off paintStep().
+  const CAPTIONS = {
+    0: 'Parsing input data',
+    1: 'Composing <b>blueprint</b> from bricks',
+    2: 'Executing <b>deterministic</b> pipeline',
+    3: 'Sending full prompt to <b>raw LLM</b>',
+    4: 'Checking outputs against expected',
+  };
+  const STEP_STATE = {
+    0: { active: ['input'],   done: [] },
+    1: { active: ['compose'], done: ['input'] },
+    2: { active: ['execute'], done: ['input', 'compose'] },
+    3: { active: ['raw'],     done: ['input', 'compose', 'execute'] },
+    4: { active: ['check'],   done: ['input', 'compose', 'execute', 'raw'] },
+  };
+
+  function paintConnectors(compare) {
+    const flowGrid = document.getElementById('flowGrid');
+    const svg = document.getElementById('flowSvg');
+    if (!flowGrid || !svg) return;
+    const host = flowGrid.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${host.width} ${host.height}`);
+    const cx = n => {
+      const el = flowGrid.querySelector(`[data-n="${n}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: r.left - host.left, y: r.top - host.top,
+        w: r.width, h: r.height,
+        rx: r.right - host.left, by: r.bottom - host.top,
+        cy: r.top - host.top + r.height / 2,
+      };
+    };
+    const I = cx('input'), C = cx('compose'), E = cx('execute'), K = cx('check');
+    const R = compare ? cx('raw') : null;
+    const paths = [];
+    if (I && C) paths.push({ id: 'ic', d: `M${I.rx} ${I.cy} C ${I.rx + 40} ${I.cy}, ${C.x - 40} ${C.cy}, ${C.x} ${C.cy}` });
+    if (C && E) paths.push({ id: 'ce', d: `M${C.rx} ${C.cy} L ${E.x} ${E.cy}` });
+    if (E && K) paths.push({ id: 'ek', d: `M${E.rx} ${E.cy} C ${E.rx + 40} ${E.cy}, ${K.x - 40} ${K.cy}, ${K.x} ${K.cy}` });
+    if (compare && I && R) paths.push({ id: 'ir', d: `M${I.rx} ${I.cy} C ${I.rx + 60} ${I.cy + 30}, ${R.x - 60} ${R.y + R.h / 2}, ${R.x} ${R.y + R.h / 2}` });
+    if (compare && R && K) paths.push({ id: 'rk', d: `M${R.x + R.w} ${R.y + R.h / 2} C ${R.x + R.w + 60} ${R.y + R.h / 2}, ${K.x - 60} ${K.cy + 30}, ${K.x} ${K.cy}` });
+    svg.innerHTML = paths.map(p => `<path id="p-${p.id}" d="${p.d}"/>`).join('');
+  }
+
+  function lightConnectors(activeNodes) {
+    const svg = document.getElementById('flowSvg');
+    if (!svg) return;
+    svg.querySelectorAll('path').forEach(p => p.classList.remove('lit'));
+    const feeds = { compose: 'ic', execute: 'ce', check: 'ek', raw: 'ir' };
+    activeNodes.forEach(n => {
+      const id = feeds[n];
+      if (id) {
+        const el = svg.querySelector(`#p-${id}`);
+        if (el) el.classList.add('lit');
+      }
+      if (n === 'check') {
+        const rk = svg.querySelector('#p-rk');
+        if (rk) rk.classList.add('lit');
+      }
+    });
+  }
+
+  function paintStep(s) {
+    const st = STEP_STATE[s];
+    if (!st) return;
+    const flowGrid = document.getElementById('flowGrid');
+    flowGrid.querySelectorAll('.flow-node').forEach(n => n.classList.remove('active', 'done'));
+    st.done.forEach(id => { const el = flowGrid.querySelector(`[data-n="${id}"]`); if (el) el.classList.add('done'); });
+    st.active.forEach(id => { const el = flowGrid.querySelector(`[data-n="${id}"]`); if (el) el.classList.add('active'); });
+    lightConnectors(st.active);
+    const caption = document.getElementById('flowCaption');
+    if (caption) caption.innerHTML = CAPTIONS[s] || '';
+  }
+
+  // SSE phase → step index. compose_done advances to execute; raw_llm_done
+  // advances to check; check_done keeps us on step 4.
+  const PHASE_TO_STEP = {
+    compose_start: 1,
+    compose_done:  2,
+    execute_start: 2,
+    step_start:    2,
+    step_done:     2,
+    raw_llm_start: 3,
+    raw_llm_done:  4,
+    check_done:    4,
   };
 
   function resetFanout() {
-    const fanout = document.getElementById('fanout');
-    fanout.classList.toggle('solo', !compareOn);
-    fanout.querySelectorAll('.fnode').forEach(n => n.classList.remove('on', 'done'));
-    document.querySelector('.fnode[data-node="input"]').classList.add('done');
+    const flowGrid = document.getElementById('flowGrid');
+    flowGrid.classList.toggle('solo', !compareOn);
+    paintStep(0);  // input active, everything else pending
+    requestAnimationFrame(() => requestAnimationFrame(() => paintConnectors(compareOn)));
     document.getElementById('healNote').style.display = 'none';
   }
 
   function applyPhase(phase, payload) {
-    const cfg = PHASE_MAP[phase];
-    if (!cfg) return;
-    if (cfg.on) {
-      const el = document.querySelector(`.fnode[data-node="${cfg.on}"]`);
-      if (el) el.classList.add('on');
-    }
-    if (cfg.done) {
-      const el = document.querySelector(`.fnode[data-node="${cfg.done}"]`);
-      if (el) { el.classList.remove('on'); el.classList.add('done'); }
-    }
+    const s = PHASE_TO_STEP[phase];
+    if (s != null) paintStep(s);
     if (phase === 'heal_attempt') {
       const note = document.getElementById('healNote');
       note.textContent = `Healer tier ${payload.tier} (${payload.healer_name}) ${payload.succeeded ? 'recovered' : 'attempted'}`;
@@ -1225,13 +1264,21 @@ outputs_map:
   }
 
   function finalizeFanout() {
-    document.querySelectorAll('.fnode').forEach(n => {
-      if (n.classList.contains('on')) {
-        n.classList.remove('on');
-        n.classList.add('done');
-      }
+    // Mark every node done when the stream closes successfully.
+    const flowGrid = document.getElementById('flowGrid');
+    flowGrid.querySelectorAll('.flow-node').forEach(n => {
+      n.classList.remove('active');
+      n.classList.add('done');
     });
+    const svg = document.getElementById('flowSvg');
+    if (svg) svg.querySelectorAll('path').forEach(p => p.classList.remove('lit'));
   }
+
+  // Repaint connectors on resize while the running view is showing.
+  window.addEventListener('resize', () => {
+    const running = document.getElementById('view-running');
+    if (running && running.classList.contains('on')) paintConnectors(compareOn);
+  });
 
   function collectRequestBody() {
     const taskText = document.getElementById('taskInput').value.trim();
@@ -1245,12 +1292,21 @@ outputs_map:
     const provider = document.getElementById('providerSel')?.value || 'claude_code';
     const model = document.getElementById('modelSel')?.value || '';
     const apiKey = document.getElementById('apiKeyInput')?.value || '';
+
+    // Expected-output textarea wins if user typed valid JSON; otherwise
+    // fall back to whatever the scenario preset loaded into __expectedOutput.
+    const expectedRaw = document.getElementById('expectedInput')?.value?.trim() || '';
+    let expected = window.__expectedOutput || null;
+    if (expectedRaw) {
+      try { expected = JSON.parse(expectedRaw); } catch (_) { /* keep preset */ }
+    }
+
     const body = {
       provider,
       model,
       task: taskText,
       data: dataValue,
-      expected_output: window.__expectedOutput || null,
+      expected_output: expected,
       compare: compareOn,
     };
     // BYOK: only include api_key for providers that require it.
@@ -1261,6 +1317,8 @@ outputs_map:
   }
 
   async function startRun() {
+    // Refresh the scenario label each click so uploads/edits reflect in results.
+    if (typeof captureScenarioName === 'function') captureScenarioName();
     runHeadline.textContent = compareOn ? 'Running both pipelines…' : 'Running your pipeline…';
     runSub.textContent = compareOn
       ? 'Bricks composing + executing, raw LLM doing it in one shot.'
@@ -1331,7 +1389,6 @@ outputs_map:
     const verdictTitle = document.getElementById('verdictTitle');
     const scoreGrid = document.getElementById('scoreGrid');
     const metrics = document.getElementById('metrics');
-    const cmpTable = document.getElementById('cmpTable');
 
     if (runError) {
       verdictTitle.innerHTML = 'Run failed';
@@ -1339,97 +1396,232 @@ outputs_map:
       scoreGrid.innerHTML = `
         <div class="scol loss">
           <div class="who"><i></i>Error</div>
-          <div class="meta">${String(runError.message || runError)}</div>
+          <div class="meta">${escapeHtml(String(runError.message || runError))}</div>
         </div>`;
       metrics.className = 'metrics';
+      metrics.innerHTML = '';
+      renderOutputsTable([], null);
+      renderBricksUsed(null);
+      renderBlueprintDSL('');
+      renderResMeta(null);
+      showView('view-results');
+      return;
+    }
+
+    if (!lastRun || !lastRun.bricks) {
+      // Defensive: no data and no error — should not happen in normal flow.
+      verdictTitle.innerHTML = 'No results';
+      scoreGrid.innerHTML = '';
       metrics.innerHTML = '';
       showView('view-results');
       return;
     }
 
-    // If the API returned real data, render it; otherwise fall back to the
-    // demo numbers baked into the mockup so the UI still animates through.
-    if (lastRun && lastRun.bricks) {
-      const b = lastRun.bricks;
-      const r = lastRun.raw_llm;
-      const tokens = b.tokens?.total ?? ((b.tokens?.in || 0) + (b.tokens?.out || 0));
-      const cost = (b.cost_usd == null) ? '—' : `$${b.cost_usd.toFixed(4)}`;
-      const passed = (b.checks || []).filter(c => c.pass).length;
-      const total = (b.checks || []).length;
-      const hasRaw = r && r.tokens;
-      const rTokens = hasRaw ? (r.tokens?.total ?? ((r.tokens?.in || 0) + (r.tokens?.out || 0))) : 0;
-      const rPassed = hasRaw ? (r.checks || []).filter(c => c.pass).length : 0;
+    const b = lastRun.bricks;
+    const r = lastRun.raw_llm;
+    const tokens = b.tokens?.total ?? ((b.tokens?.in || 0) + (b.tokens?.out || 0));
+    const cost = (b.cost_usd == null) ? '—' : `$${b.cost_usd.toFixed(4)}`;
+    const passed = (b.checks || []).filter(c => c.pass).length;
+    const total = (b.checks || []).length;
+    const hasRaw = r && r.tokens;
+    const rTokens = hasRaw ? (r.tokens?.total ?? ((r.tokens?.in || 0) + (r.tokens?.out || 0))) : 0;
+    const rPassed = hasRaw ? (r.checks || []).filter(c => c.pass).length : 0;
+    const rHasOutputs = hasRaw && r.outputs && Object.keys(r.outputs).length > 0;
 
-      verdictTitle.innerHTML = hasRaw
-        ? (passed > rPassed ? 'Bricks beat raw LLM' : 'Side-by-side results')
-        : 'Bricks ran deterministically.';
+    const bricksFailed = !!b.error || (Object.keys(b.outputs || {}).length === 0);
+    const rawFailed = hasRaw && (!!r.error || !rHasOutputs);
 
-      scoreGrid.className = hasRaw ? 'score-grid dual' : 'score-grid';
-      scoreGrid.innerHTML = `
-        <div class="scol win">
-          <div class="who"><i></i>Bricks</div>
-          <div class="num">${passed}<span class="of">/${total || '?'}</span></div>
-          <div class="meta">${tokens.toLocaleString()} tokens · ${cost}</div>
-        </div>` + (hasRaw ? `
-        <div class="scol ${rPassed >= passed ? 'win' : 'loss'}">
-          <div class="who"><i></i>Raw LLM</div>
-          <div class="num">${rPassed}<span class="of">/${total || '?'}</span></div>
-          <div class="meta">${rTokens.toLocaleString()} tokens</div>
-        </div>` : '');
+    // Binary pass/fail — any failing check = FAIL, all-correct = PASS.
+    const badge = (failed, p, t) => {
+      if (failed) return { label: 'FAIL', cls: 'loss' };
+      if (t === 0) return { label: 'DONE', cls: 'win' };
+      return p === t ? { label: 'PASS', cls: 'win' } : { label: 'FAIL', cls: 'loss' };
+    };
+    const bb = badge(bricksFailed, passed, total);
+    const rb = hasRaw ? badge(rawFailed, rPassed, total) : null;
 
-      metrics.className = 'metrics';
-      metrics.innerHTML = `
-        <div class="metric"><div class="k">Tokens</div><div class="v">${tokens.toLocaleString()}</div><div class="sub">composed once</div></div>
-        <div class="metric"><div class="k">Cost</div><div class="v">${cost}</div><div class="sub">${lastRun.run_metadata?.model || ''}</div></div>
-        <div class="metric"><div class="k">Duration</div><div class="v">${((b.duration_ms || 0) / 1000).toFixed(1)}s</div><div class="sub">wall clock</div></div>`;
-      if (cmpTable) cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = hasRaw ? '' : 'none');
-
-      renderChecksTable(b.checks || [], hasRaw ? (r.checks || []) : null);
-      if (typeof applyTweaks === 'function') applyTweaks();
-      showView('view-results');
-      return;
-    }
-
-    if (compareOn) {
-      verdictTitle.innerHTML = 'Bricks beat raw LLM';
-      scoreGrid.className = 'score-grid dual';
-      scoreGrid.innerHTML = `
-        <div class="scol win">
-          <div class="who"><i></i>Bricks</div>
-          <div class="num">3<span class="of">/3</span></div>
-          <div class="meta">deterministic · 2,400 tok · $0.0012</div>
-        </div>
-        <div class="scol loss">
-          <div class="who"><i></i>Raw LLM</div>
-          <div class="num">0<span class="of">/3</span></div>
-          <div class="meta">drifted · 9,730 tok · $0.0049</div>
-        </div>`;
-      metrics.className = 'metrics dual';
-      metrics.innerHTML = `
-        <div class="metric"><div class="k">Accuracy</div><div class="v">+100%</div><div class="sub">vs raw LLM</div></div>
-        <div class="metric"><div class="k">Tokens</div><div class="v">4× less</div><div class="sub">2,400 vs 9,730</div></div>
-        <div class="metric"><div class="k">Cost</div><div class="v">−75%</div><div class="sub">$0.0012 vs $0.0049</div></div>
-        <div class="metric"><div class="k">Duration</div><div class="v">6.2s</div><div class="sub">vs 4.9s</div></div>`;
-      cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = '');
+    // Headline copy.
+    if (bricksFailed) {
+      verdictTitle.innerHTML = 'Bricks failed — see error below';
+    } else if (hasRaw) {
+      verdictTitle.innerHTML = bricksFailed && !rawFailed ? 'Raw LLM beat Bricks'
+        : rawFailed && !bricksFailed ? 'Bricks beat raw LLM'
+        : passed > rPassed ? 'Bricks beat raw LLM'
+        : passed < rPassed ? 'Raw LLM beat Bricks'
+        : 'Side-by-side results';
     } else {
-      verdictTitle.innerHTML = 'Bricks ran deterministically.';
-      scoreGrid.className = 'score-grid';
-      scoreGrid.innerHTML = `
-        <div class="scol win">
-          <div class="who"><i></i>Bricks</div>
-          <div class="num">3<span class="of">/3</span></div>
-          <div class="meta">100% · 2,400 tokens · $0.0012</div>
-        </div>`;
-      metrics.className = 'metrics';
-      metrics.innerHTML = `
-        <div class="metric"><div class="k">Tokens</div><div class="v">2,400</div><div class="sub">composed once</div></div>
-        <div class="metric"><div class="k">Cost</div><div class="v">$0.0012</div><div class="sub">claude-haiku-4-5</div></div>
-        <div class="metric"><div class="k">Duration</div><div class="v">6.2s</div><div class="sub">wall clock</div></div>`;
-      cmpTable.querySelectorAll('.raw-col').forEach(el => el.style.display = 'none');
+      verdictTitle.innerHTML = total
+        ? (passed === total ? 'Bricks ran clean.' : 'Bricks ran with failing checks.')
+        : 'Bricks ran deterministically.';
     }
+
+    // Subheading per column: tokens + a hint when no expected_output set.
+    const metaLine = (failed, hasOutputs, outs, p, t, tk) => {
+      if (failed) return `${tk.toLocaleString()} tokens · failed`;
+      const outCount = Object.keys(outs || {}).length;
+      const hint = t === 0 ? `${outCount} output${outCount === 1 ? '' : 's'} · ` : '';
+      return `${hint}${tk.toLocaleString()} tokens`;
+    };
+
+    scoreGrid.className = hasRaw ? 'score-grid dual' : 'score-grid';
+    scoreGrid.innerHTML = `
+      <div class="scol ${bb.cls}">
+        <div class="who"><i></i>Bricks</div>
+        <div class="num">${bb.label}</div>
+        <div class="meta">${metaLine(bricksFailed, true, b.outputs, passed, total, tokens)} · ${cost}</div>
+      </div>` + (hasRaw ? `
+      <div class="scol ${rb.cls}">
+        <div class="who"><i></i>Raw LLM</div>
+        <div class="num">${rb.label}</div>
+        <div class="meta">${metaLine(rawFailed, rHasOutputs, r.outputs, rPassed, total, rTokens)}</div>
+      </div>` : '');
+
+    // Metric cards — adds a Savings card in compare mode.
+    let metricsHtml = `
+      <div class="metric"><div class="k">Tokens</div><div class="v">${tokens.toLocaleString()}</div><div class="sub">composed once</div></div>
+      <div class="metric"><div class="k">Cost</div><div class="v">${cost}</div><div class="sub">${escapeHtml(lastRun.run_metadata?.model || '')}</div></div>
+      <div class="metric"><div class="k">Duration</div><div class="v">${((b.duration_ms || 0) / 1000).toFixed(1)}s</div><div class="sub">wall clock</div></div>`;
+    if (hasRaw && rTokens > 0) {
+      const savedPct = Math.round((1 - tokens / rTokens) * 100);
+      const savedSign = savedPct > 0 ? '−' : savedPct < 0 ? '+' : '';
+      const ratio = tokens > 0 ? (rTokens / tokens) : Infinity;
+      const ratioStr = !isFinite(ratio) ? '∞×' : (ratio >= 2 ? `${ratio.toFixed(1)}×` : '');
+      metricsHtml += `
+        <div class="metric"><div class="k">Token savings</div><div class="v">${savedSign}${Math.abs(savedPct)}%</div><div class="sub">${ratioStr ? ratioStr + ' · ' : ''}${tokens.toLocaleString()} vs ${rTokens.toLocaleString()}</div></div>`;
+    }
+    metrics.className = hasRaw ? 'metrics dual' : 'metrics';
+    metrics.innerHTML = metricsHtml;
+
+    // Error panel — only shown when the backend reports an error.
+    renderErrorPanel(bricksFailed ? (b.error || 'Bricks returned no outputs.') : null,
+                     hasRaw && rawFailed ? (r.error || 'Raw LLM returned no usable outputs.') : null);
+
+    renderOutputsTable(b.checks || [], hasRaw ? (r.checks || []) : null);
+    renderBlueprintDSL(b.dsl_code || b.blueprint_yaml || '');
+    renderBricksUsed(b.bricks_used || null);
+    renderResMeta(lastRun.run_metadata || null);
+    renderChecksTable(b.checks || [], hasRaw ? (r.checks || []) : null);
 
     if (typeof applyTweaks === 'function') applyTweaks();
     showView('view-results');
+  }
+
+  function renderOutputsTable(bricksChecks, rawChecks) {
+    const tbl = document.getElementById('cmpTable');
+    if (!tbl) return;
+    const tbody = tbl.querySelector('tbody');
+    const showRaw = !!rawChecks;
+    tbl.querySelectorAll('.raw-col').forEach(el => el.style.display = showRaw ? '' : 'none');
+    if (!bricksChecks || bricksChecks.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="${showRaw ? 4 : 3}" style="color:var(--faint); padding:12px 0;">No expected_output set — no checks to compare.</td></tr>`;
+      return;
+    }
+    const rawByKey = {};
+    if (rawChecks) rawChecks.forEach(c => { rawByKey[c.key] = c; });
+    const cell = (val, ok, expected) => {
+      const cls = ok ? 'pass' : 'fail';
+      const span = ok ? '' : 'class="s"';
+      return `<td class="${cls}"><span ${span}>${escapeHtml(_fmtScalar(val, expected))}</span></td>`;
+    };
+    tbody.innerHTML = bricksChecks.map(c => {
+      const rawCell = showRaw && rawByKey[c.key]
+        ? `<td class="raw-col ${rawByKey[c.key].pass ? 'pass' : 'fail'}"><span ${rawByKey[c.key].pass ? '' : 'class="s"'}>${escapeHtml(_fmtScalar(rawByKey[c.key].got, c.expected))}</span></td>`
+        : showRaw ? `<td class="raw-col"><em style="color:var(--faint)">—</em></td>` : '';
+      return `<tr>
+        <td>${escapeHtml(c.key)}</td>
+        <td class="exp">${escapeHtml(_fmtScalar(c.expected, c.expected))}</td>
+        ${cell(c.got, c.pass, c.expected)}
+        ${rawCell}
+      </tr>`;
+    }).join('');
+  }
+
+  function _fmtScalar(v, expected) {
+    if (v === null || v === undefined) return '(missing)';
+    if (typeof v === 'object') return JSON.stringify(v);
+    if (typeof v === 'number') {
+      if (Number.isInteger(v)) return String(v);
+      // If the expected value is a float with N decimals, round displayed
+      // value to the same precision so 169.3333 shows as 169.33 when
+      // compared against 169.33. Keeps raw precision when no expected.
+      if (typeof expected === 'number' && !Number.isInteger(expected)) {
+        const s = String(expected);
+        const decimals = s.includes('.') ? s.split('.')[1].length : 0;
+        return v.toLocaleString(undefined, {minimumFractionDigits: decimals, maximumFractionDigits: decimals});
+      }
+      return v.toLocaleString(undefined, {maximumFractionDigits: 4});
+    }
+    return String(v);
+  }
+
+  function renderBlueprintDSL(text) {
+    const pre = document.getElementById('yamlCode');
+    if (!pre) return;
+    pre.textContent = text || '(no blueprint available)';
+    // Update the drawer subtitle with the step count inferred from the DSL.
+    const summary = pre.parentElement?.querySelector('.drw-s');
+    if (summary) {
+      const stepCount = (text.match(/step\./g) || []).length;
+      summary.textContent = stepCount ? `${stepCount} bricks · Python DSL · reusable` : 'Python DSL · reusable';
+    }
+  }
+
+  function renderBricksUsed(list) {
+    const host = document.querySelector('.bricks-used');
+    const summary = host?.parentElement?.querySelector('.drw-s');
+    if (!host) return;
+    if (!list || list.length === 0) {
+      host.innerHTML = '<em style="color:var(--faint); font-family:var(--mono); font-size:11px;">(not available)</em>';
+      if (summary) summary.textContent = '—';
+      return;
+    }
+    host.innerHTML = list.map(b => {
+      const cnt = b.count > 1 ? `<b class="pill-count">\u00d7${b.count}</b>` : '';
+      const cat = b.category ? `<em>${escapeHtml(b.category)}</em>` : '';
+      return `<span class="brick-pill">${escapeHtml(b.name)}${cat}${cnt}</span>`;
+    }).join('');
+    const uniq = list.length;
+    const total = list.reduce((s, b) => s + (b.count || 1), 0);
+    if (summary) summary.textContent = `${uniq} unique · ${total} call${total === 1 ? '' : 's'} · deterministic`;
+  }
+
+  function renderResMeta(meta) {
+    const foot = document.querySelector('.res-foot');
+    if (foot) {
+      if (!meta) { foot.innerHTML = ''; }
+      else {
+        foot.innerHTML = `
+          <span><b>model</b>${escapeHtml(meta.model || '')}</span>
+          <span><b>seed</b>${escapeHtml(String(meta.seed ?? '—'))}</span>
+          <span><b>version</b>${escapeHtml(meta.version || '')}</span>`;
+      }
+    }
+    const topMeta = document.querySelector('.res-top .run-meta');
+    if (topMeta) {
+      const scen = window.__scenarioName ? `${window.__scenarioName}` : 'custom';
+      const ts = meta && meta.timestamp ? meta.timestamp.replace('T', ' ').replace('Z', ' UTC') : '—';
+      const seed = meta ? (meta.seed ?? '—') : '—';
+      topMeta.textContent = `scenario · ${scen}  ·  run · ${ts}  ·  seed ${seed}`;
+    }
+  }
+
+  function renderErrorPanel(bricksErr, rawErr) {
+    const panel = document.getElementById('errorPanel');
+    if (!panel) return;
+    if (!bricksErr && !rawErr) {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+      return;
+    }
+    const sections = [];
+    if (bricksErr) {
+      sections.push(`<div><strong>Bricks:</strong> ${escapeHtml(String(bricksErr))}</div>`);
+    }
+    if (rawErr) {
+      sections.push(`<div><strong>Raw LLM:</strong> ${escapeHtml(String(rawErr))}</div>`);
+    }
+    panel.innerHTML = sections.join('<div style="height:6px"></div>');
+    panel.style.display = '';
   }
 
   // ---- back ----
@@ -1443,21 +1635,7 @@ outputs_map:
   ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
     e.preventDefault(); dz.classList.remove('drag');
   }));
-  dz.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const resp = await fetch('/playground/upload', { method: 'POST', body: fd });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const body = await resp.json();
-      document.getElementById('dataBody').innerHTML = hlJson(body.data);
-    } catch (err) {
-      console.error('upload failed', err);
-    }
-  });
+  // drop handler is installed below (shared with the Upload button).
 
   // ---- scenario fetch (replaces hardcoded customers/options) ----
   const scenSelect = document.getElementById('scenSelect');
@@ -1487,155 +1665,129 @@ outputs_map:
       }
       if (detail.task) taskInput.value = detail.task;
       window.__expectedOutput = detail.expected_output || null;
+      const expectedEl = document.getElementById('expectedInput');
+      if (expectedEl) {
+        expectedEl.value = detail.expected_output
+          ? JSON.stringify(detail.expected_output, null, 2)
+          : '';
+      }
     } catch (err) {
       console.warn('scenario detail fetch failed', err);
     }
   }
-  scenSelect.addEventListener('change', () => loadScenarioDetail(scenSelect.value));
-  loadScenarios();
+  function captureScenarioName() {
+    const opt = scenSelect.selectedOptions?.[0];
+    window.__scenarioName = opt ? opt.textContent.trim() : '';
+  }
+  scenSelect.addEventListener('change', () => {
+    captureScenarioName();
+    loadScenarioDetail(scenSelect.value);
+  });
+  loadScenarios().then(captureScenarioName);
 
-  // ---- copy yaml ----
+  // ---- copy blueprint (copies the live DSL text) ----
   const copyYamlBtn = document.getElementById('copyYamlBtn');
   if (copyYamlBtn) {
     const label = document.getElementById('copyYamlLabel');
     copyYamlBtn.addEventListener('click', async () => {
+      const src = document.getElementById('yamlCode')?.textContent || '';
       try {
-        await navigator.clipboard.writeText(yamlRaw);
-        label.textContent = 'Copied ✓';
-        setTimeout(() => { label.textContent = 'Copy YAML'; }, 1600);
+        await navigator.clipboard.writeText(src);
+        label.textContent = 'Copied \u2713';
+        setTimeout(() => { label.textContent = 'Copy blueprint'; }, 1600);
       } catch (err) {
         label.textContent = 'Copy failed';
-        setTimeout(() => { label.textContent = 'Copy YAML'; }, 1600);
+        setTimeout(() => { label.textContent = 'Copy blueprint'; }, 1600);
       }
     });
   }
 
-  /* ================= TWEAKS ================= */
-  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-    "verdictFont": "Instrument Serif",
-    "verdictSize": 36,
-    "verdictItalicEm": false,
-    "verdictDot": true,
-    "verdictCopy": "Bricks ran deterministically."
-  }/*EDITMODE-END*/;
+  // ---- Upload-CSV/JSON button (opens a hidden file input) ----
+  const uploadInput = document.createElement('input');
+  uploadInput.type = 'file';
+  uploadInput.accept = '.csv,.json,application/json,text/csv';
+  uploadInput.style.display = 'none';
+  document.body.appendChild(uploadInput);
 
-  const FONT_PRESETS = {
-    "Inter Semibold":    { family: "'Inter', sans-serif",             weight: 600, tracking: "-0.02em", lh: 1.18 },
-    "Inter Bold":        { family: "'Inter', sans-serif",             weight: 700, tracking: "-0.025em", lh: 1.15 },
-    "Space Grotesk":     { family: "'Space Grotesk', sans-serif",     weight: 600, tracking: "-0.02em", lh: 1.15 },
-    "Fraunces":          { family: "'Fraunces', serif",               weight: 500, tracking: "-0.015em", lh: 1.12 },
-    "Playfair Display":  { family: "'Playfair Display', serif",       weight: 600, tracking: "-0.01em",  lh: 1.12 },
-    "Instrument Serif":  { family: "'Instrument Serif', serif",       weight: 400, tracking: "-0.01em",  lh: 1.1  },
-    "JetBrains Mono":    { family: "'JetBrains Mono', monospace",     weight: 500, tracking: "-0.02em",  lh: 1.2  },
+  async function handleFile(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const resp = await fetch('/playground/upload', { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const body = await resp.json();
+      document.getElementById('dataBody').innerHTML = hlJson(body.data);
+      const head = document.querySelector('.data-wrap .data-head');
+      if (head) {
+        const fname = head.querySelector('.fname');
+        const fsize = head.querySelector('.fsize');
+        if (fname) {
+          const svg = fname.querySelector('svg')?.outerHTML || '';
+          fname.innerHTML = `${svg} ${escapeHtml(body.filename || 'upload')}`;
+        }
+        if (fsize) {
+          const kb = (body.size_bytes / 1024).toFixed(1);
+          const rows = body.row_count != null ? `${body.row_count} rows · ` : '';
+          fsize.textContent = `${rows}${kb} KB`;
+        }
+      }
+      window.__expectedOutput = null;  // user is bringing their own data
+    } catch (err) {
+      console.error('upload failed', err);
+    }
+  }
+
+  document.querySelector('.upload-mini')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    uploadInput.click();
+  });
+  uploadInput.addEventListener('change', () => handleFile(uploadInput.files?.[0]));
+
+  // (re-wire drop to share handler — overrides the earlier drop handler)
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    handleFile(e.dataTransfer?.files?.[0]);
+  });
+
+  // ---- Model dropdown filters by selected provider ----
+  const MODELS_BY_PROVIDER = {
+    claude_code: [
+      { value: 'haiku', label: 'Claude Haiku (via CLI)' },
+      { value: 'sonnet', label: 'Claude Sonnet (via CLI)' },
+      { value: 'opus', label: 'Claude Opus (via CLI)' },
+      { value: '', label: 'CLI default' },
+    ],
+    anthropic: [
+      { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
+      { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+    ],
+    openai: [
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { value: 'gpt-4o', label: 'GPT-4o' },
+    ],
+    ollama: [
+      { value: 'llama3', label: 'Llama3 local' },
+      { value: 'mistral', label: 'Mistral local' },
+    ],
   };
 
-  const state = { ...TWEAK_DEFAULTS };
-
-  function applyTweaks(){
-    const preset = FONT_PRESETS[state.verdictFont] || FONT_PRESETS["Inter Semibold"];
-    const root = document.documentElement.style;
-    root.setProperty('--verdict-font', preset.family);
-    root.setProperty('--verdict-weight', preset.weight);
-    root.setProperty('--verdict-size', state.verdictSize + 'px');
-    root.setProperty('--verdict-tracking', preset.tracking);
-    root.setProperty('--verdict-lh', preset.lh);
-    root.setProperty('--verdict-em-style', state.verdictItalicEm ? 'italic' : 'normal');
-    root.setProperty('--verdict-em-weight', state.verdictItalicEm ? '400' : 'inherit');
-
-    // re-render verdict copy (non-compare view only)
-    const el = document.getElementById('verdictTitle');
-    if (el && !window.compareOn) {
-      const html = (state.verdictCopy || '')
-        .replace(/\{em\}/g, '<em>')
-        .replace(/\{\/em\}/g, '</em>');
-      el.innerHTML = html;
+  function refreshModelOptions() {
+    const prov = document.getElementById('providerSel')?.value || 'claude_code';
+    const modelSel = document.getElementById('modelSel');
+    if (!modelSel) return;
+    const opts = MODELS_BY_PROVIDER[prov] || MODELS_BY_PROVIDER.claude_code;
+    modelSel.innerHTML = opts.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+    // Hide api-key input for providers that don't need one.
+    const apiKey = document.getElementById('apiKeyInput');
+    if (apiKey) {
+      const needsKey = prov === 'anthropic' || prov === 'openai';
+      apiKey.style.display = needsKey ? '' : 'none';
+      apiKey.placeholder = needsKey ? 'sk-ant-••••••••• / sk-•••••••••' : 'no key needed';
     }
-    if (el) el.classList.toggle('with-dot', !!state.verdictDot);
   }
-
-  function persist(patch){
-    Object.assign(state, patch);
-    applyTweaks();
-    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patch }, '*'); } catch(e){}
-  }
-
-  // ---- tweaks panel DOM ----
-  const tweaks = document.createElement('div');
-  tweaks.id = 'tweaks-panel';
-  tweaks.style.cssText = `
-    position: fixed; right: 20px; bottom: 20px;
-    width: 280px; background: #fff;
-    border: 1px solid var(--rule-2); border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(28,26,22,.14), 0 2px 6px rgba(28,26,22,.06);
-    padding: 18px 18px 16px; z-index: 9999;
-    font-family: var(--sans); color: var(--ink);
-    display: none;
-  `;
-  tweaks.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-      <div style="font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);">Tweaks</div>
-      <button id="tw-close" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:2px 6px; font-size:16px; line-height:1;">×</button>
-    </div>
-
-    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Verdict font</div>
-    <select id="tw-font" style="width:100%; padding:8px 10px; border:1px solid var(--rule-2); border-radius:8px; background:var(--paper); margin-bottom:14px; font-size:13px;"></select>
-
-    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; display:flex; justify-content:space-between;">
-      <span>Size</span><span id="tw-size-val" style="font-family:var(--mono); text-transform:none; letter-spacing:0;"></span>
-    </div>
-    <input type="range" id="tw-size" min="20" max="56" step="1" style="width:100%; margin-bottom:14px; accent-color:var(--accent);">
-
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:10px; cursor:pointer;">
-      <input type="checkbox" id="tw-italic" style="accent-color:var(--accent);">
-      Italicize accent phrase
-    </label>
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:14px; cursor:pointer;">
-      <input type="checkbox" id="tw-dot" style="accent-color:var(--accent);">
-      Leading status dot
-    </label>
-
-    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Copy <span style="text-transform:none; letter-spacing:0; color:var(--faint);">— wrap accent in {em}…{/em}</span></div>
-    <textarea id="tw-copy" rows="3" style="width:100%; padding:8px 10px; border:1px solid var(--rule-2); border-radius:8px; font-family:var(--sans); font-size:12.5px; resize:vertical; background:var(--paper);"></textarea>
-  `;
-  document.body.appendChild(tweaks);
-
-  // populate font dropdown
-  const fontSel = tweaks.querySelector('#tw-font');
-  Object.keys(FONT_PRESETS).forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name; opt.textContent = name;
-    fontSel.appendChild(opt);
-  });
-
-  function syncTweakUI(){
-    fontSel.value = state.verdictFont;
-    tweaks.querySelector('#tw-size').value = state.verdictSize;
-    tweaks.querySelector('#tw-size-val').textContent = state.verdictSize + 'px';
-    tweaks.querySelector('#tw-italic').checked = !!state.verdictItalicEm;
-    tweaks.querySelector('#tw-dot').checked = !!state.verdictDot;
-    tweaks.querySelector('#tw-copy').value = state.verdictCopy;
-  }
-
-  fontSel.addEventListener('change', e => persist({ verdictFont: e.target.value }));
-  tweaks.querySelector('#tw-size').addEventListener('input', e => {
-    tweaks.querySelector('#tw-size-val').textContent = e.target.value + 'px';
-    persist({ verdictSize: parseInt(e.target.value, 10) });
-  });
-  tweaks.querySelector('#tw-italic').addEventListener('change', e => persist({ verdictItalicEm: e.target.checked }));
-  tweaks.querySelector('#tw-dot').addEventListener('change', e => persist({ verdictDot: e.target.checked }));
-  tweaks.querySelector('#tw-copy').addEventListener('input', e => persist({ verdictCopy: e.target.value }));
-  tweaks.querySelector('#tw-close').addEventListener('click', () => { tweaks.style.display = 'none'; });
-
-  // host protocol
-  window.addEventListener('message', ev => {
-    const d = ev.data || {};
-    if (d.type === '__activate_edit_mode') { syncTweakUI(); tweaks.style.display = 'block'; }
-    if (d.type === '__deactivate_edit_mode') { tweaks.style.display = 'none'; }
-  });
-  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch(e){}
-
-  // initial paint
-  applyTweaks();
+  document.getElementById('providerSel')?.addEventListener('change', refreshModelOptions);
+  refreshModelOptions();
 </script>
 </body>
 </html>

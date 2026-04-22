@@ -104,6 +104,7 @@ def count_pipeline(raw_text):
         mock_compose_result.is_valid = True
         mock_compose_result.flow_def = mock_flow_def
         mock_compose_result.blueprint_yaml = "name: placeholder"
+        mock_compose_result.dsl_code = "@flow\ndef placeholder():\n    return None\n"
         mock_compose_result.total_input_tokens = 0
         mock_compose_result.total_output_tokens = 0
         mock_compose_result.model = "test-model"
