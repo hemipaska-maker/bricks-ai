@@ -188,17 +188,24 @@ class DAG:
             return StepDefinition(name=step_name, brick=node.brick_name, params=resolved, save_as=step_name)
 
         if node.type == "for_each":
-            items_ref: str = ""
+            items_param: Any
             if isinstance(node.items, Node) and node.items.id in node_to_step_name:
-                items_ref = f"${{{node_to_step_name[node.items.id]}.result}}"
+                items_param = f"${{{node_to_step_name[node.items.id]}.result}}"
+            elif isinstance(node.items, list):
+                # Literal list (e.g. ``for_each(items=my_list, do=...)``) —
+                # pass the values through so the engine iterates over them.
+                items_param = node.items
+            else:
+                items_param = []
             do_name = node.do if isinstance(node.do, str) else str(node.do)
             return StepDefinition(
                 name=step_name,
                 brick="__for_each__",
                 params={
-                    "items": items_ref,
+                    "items": items_param,
                     "do_brick": do_name,
                     "item_kwarg": node.item_kwarg,
+                    "static_kwargs": dict(node.static_kwargs),
                     "on_error": node.on_error,
                 },
                 save_as=step_name,

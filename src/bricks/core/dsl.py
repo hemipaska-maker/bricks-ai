@@ -64,6 +64,11 @@ class Node:
         item_kwarg: Name of the keyword the lambda binds to the iteration
             item — e.g. ``"email"`` for ``for_each(do=lambda e: step.X(email=e))``.
             Defaults to ``"item"`` when the lambda cannot be introspected.
+        static_kwargs: Keyword arguments passed to the inner brick that are
+            **not** the per-item binding — e.g. ``{"rename_map": {"id": "cid"}}``
+            in ``for_each(do=lambda r: step.rename_dict_keys(input=r, rename_map={...}))``.
+            Captured by the DSL tracer and merged per-iteration by the
+            ``__for_each__`` builtin. Defaults to an empty dict.
         on_error: Error policy for ``for_each`` — ``"fail"`` (default, stop on
             first error) or ``"collect"`` (continue, gather all errors).
         condition: Condition for ``branch`` nodes (brick name string in v1).
@@ -82,6 +87,7 @@ class Node:
     items: Node | list[Any] | None = None
     do: str | Callable[..., Any] | None = None
     item_kwarg: str = "item"
+    static_kwargs: dict[str, Any] = field(default_factory=dict)
     on_error: str = "fail"
 
     # branch fields
@@ -285,12 +291,29 @@ def for_each(
     # Default to "item" for backward compatibility when the lambda doesn't
     # use the item, uses it positionally, or nests it inside an expression.
     item_kwarg: str = "item"
+    static_kwargs: dict[str, Any] = {}
     for key, value in first.params.items():
         if isinstance(value, Node) and value.id == mock.id:
             item_kwarg = key
-            break
+            continue
+        # Lambdas that close over *other* step outputs (Node refs) are not
+        # supported: the DAG is built once per compose, so there's no way to
+        # materialise a per-iteration dependency. Fail loudly at compose time.
+        if isinstance(value, Node):
+            raise ValueError(
+                f"for_each: do= lambda may not reference another step's output "
+                f"(kwarg {key!r} is a Node reference). Pass literals via closure instead."
+            )
+        static_kwargs[key] = value
 
-    node = Node(type="for_each", items=items, do=do_brick, item_kwarg=item_kwarg, on_error=on_error)
+    node = Node(
+        type="for_each",
+        items=items,
+        do=do_brick,
+        item_kwarg=item_kwarg,
+        on_error=on_error,
+        static_kwargs=static_kwargs,
+    )
     _tracer.record(node)
     return node
 

@@ -144,18 +144,24 @@ def crm_summary(raw_api_response):
     return {{"active_count": count, "total_revenue": total, "avg_revenue": average}}
 
 # Example B — for_each over extracted values + reduce_sum across multiple counts
+# NOTE: for_each over a boolean brick returns the full list including Falses
+# (e.g. [{{"result": True}}, {{"result": False}}, …]). To count only the
+# positives, filter_dict_list by ``key="result", value=True`` first, then
+# count the filtered list. Counting ``validations.output`` directly counts
+# ALL emails, not just the valid ones.
 @flow
 def ticket_urgency_report(raw_api_response):
-    parsed       = step.extract_json_from_str(text=raw_api_response)
-    tickets      = step.extract_dict_field(data=parsed.output, field="tickets")
-    emails       = step.map_values(items=tickets.output, key="customer_email")
-    validations  = for_each(items=emails.output, do=lambda e: step.is_email_valid(email=e))
-    valid_count  = step.count_dict_list(items=validations.output)
-    high         = step.filter_dict_list(items=tickets.output, key="priority", value="high")
-    critical     = step.filter_dict_list(items=tickets.output, key="priority", value="critical")
-    high_count   = step.count_dict_list(items=high.output)
-    crit_count   = step.count_dict_list(items=critical.output)
-    urgent_total = step.reduce_sum(values=[high_count, crit_count])
+    parsed        = step.extract_json_from_str(text=raw_api_response)
+    tickets       = step.extract_dict_field(data=parsed.output, field="tickets")
+    emails        = step.map_values(items=tickets.output, key="customer_email")
+    validations   = for_each(items=emails.output, do=lambda e: step.is_email_valid(email=e))
+    valid_only    = step.filter_dict_list(items=validations.output, key="result", value=True)
+    valid_count   = step.count_dict_list(items=valid_only.output)
+    high          = step.filter_dict_list(items=tickets.output, key="priority", value="high")
+    critical      = step.filter_dict_list(items=tickets.output, key="priority", value="critical")
+    high_count    = step.count_dict_list(items=high.output)
+    crit_count    = step.count_dict_list(items=critical.output)
+    urgent_total  = step.reduce_sum(values=[high_count, crit_count])
     return {{"valid_count": valid_count, "high_count": high_count,
             "critical_count": crit_count, "total_urgent": urgent_total}}
 

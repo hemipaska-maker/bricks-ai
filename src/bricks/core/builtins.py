@@ -19,6 +19,7 @@ def _for_each_impl(
     do_brick: str,
     on_error: Literal["fail", "collect"] = "fail",
     item_kwarg: str = "item",
+    static_kwargs: dict[str, Any] | None = None,
     registry: BrickRegistry | None = None,
 ) -> dict[str, Any]:
     """Execute a brick for each item in the list.
@@ -31,6 +32,11 @@ def _for_each_impl(
             DSL tracer from the for_each lambda (e.g. ``"email"`` for
             ``for_each(do=lambda e: step.is_email_valid(email=e))``).
             Defaults to ``"item"`` for blueprints written without the DSL.
+        static_kwargs: Literal keyword arguments the lambda closed over, to
+            be passed on every iteration alongside ``item_kwarg`` — e.g.
+            ``{"rename_map": {"id": "customer_id"}}`` for
+            ``for_each(do=lambda r: step.rename_dict_keys(input=r, rename_map={...}))``.
+            The per-item kwarg wins on name conflict.
         registry: Registry to look up ``do_brick``. Required.
 
     Returns:
@@ -46,12 +52,17 @@ def _for_each_impl(
         raise ValueError("__for_each__ requires a registry parameter.")
 
     callable_, _ = registry.get(do_brick)
+    static: dict[str, Any] = dict(static_kwargs or {})
     results: list[Any] = []
     errors: list[dict[str, Any]] = []
 
     for i, item in enumerate(items):
         try:
-            result = callable_(**{item_kwarg: item})
+            # Merge statics first, then overlay the per-item kwarg so it wins
+            # any name conflict (a lambda that closed over a key matching
+            # ``item_kwarg`` would otherwise shadow the iterator).
+            call_kwargs = {**static, item_kwarg: item}
+            result = callable_(**call_kwargs)
         except BrickExecutionError:
             # Already attributed (e.g. nested for_each). Preserve it.
             if on_error != "collect":
