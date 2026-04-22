@@ -7,6 +7,46 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0](https://github.com/hemipaska-maker/bricks-ai/compare/v0.4.32...v0.5.0) (2026-04-22)
+
+
+### Features
+
+* **ai:** Healer protocol, HealContext, HealerChain ([07c14ce](https://github.com/hemipaska-maker/bricks-ai/commit/07c14ceb5255094cdb96b8a12639331ce69f968c)), closes [#29](https://github.com/hemipaska-maker/bricks-ai/issues/29)
+* **ai:** LLMRetryHealer, ShapeAwareLLMHealer, FullRecomposeHealer ([0fe5c77](https://github.com/hemipaska-maker/bricks-ai/commit/0fe5c77f0561c8d42a781b2e70776c5bb0771ec2))
+* **ai:** ParamNameHealer, DictUnwrapHealer (deterministic tiers) ([c7fd3e2](https://github.com/hemipaska-maker/bricks-ai/commit/c7fd3e21010564c8de893ce8bfc8212ef9b5611b)), closes [#30](https://github.com/hemipaska-maker/bricks-ai/issues/30)
+* **ai:** wire composer to HealerChain via optional executor ([d6bb624](https://github.com/hemipaska-maker/bricks-ai/commit/d6bb624922cf5342f2bf2cbe84279632b657fe45))
+* **core:** for_each honours lambda kwarg binding + integration test coverage ([#58](https://github.com/hemipaska-maker/bricks-ai/issues/58)) ([1c203b8](https://github.com/hemipaska-maker/bricks-ai/commit/1c203b83d4b7da1335584bea6e8b3188b2c9c1a8)), closes [#35](https://github.com/hemipaska-maker/bricks-ai/issues/35) [#36](https://github.com/hemipaska-maker/bricks-ai/issues/36) [#37](https://github.com/hemipaska-maker/bricks-ai/issues/37)
+* keep README fresh via cog + CI link guards ([88f5917](https://github.com/hemipaska-maker/bricks-ai/commit/88f5917ee54e97a7605d189f788e64db61d9bcfc))
+* keep README fresh via cog + CI link guards ([#24](https://github.com/hemipaska-maker/bricks-ai/issues/24)) ([27ff841](https://github.com/hemipaska-maker/bricks-ai/commit/27ff841fc83b2a89ec43671bce840db16308dce6))
+* **llm:** prompt caching for Anthropic-family models via LiteLLM ([0ac4271](https://github.com/hemipaska-maker/bricks-ai/commit/0ac427174b9a21dccd086ec7582655de689b8eca)), closes [#32](https://github.com/hemipaska-maker/bricks-ai/issues/32)
+* **playground:** add Anthropic / OpenAI / Ollama providers + BYOK wiring ([#53](https://github.com/hemipaska-maker/bricks-ai/issues/53)) ([2a545ff](https://github.com/hemipaska-maker/bricks-ai/commit/2a545ff058a83e5a18de6f99e362afae3162a971)), closes [#44](https://github.com/hemipaska-maker/bricks-ai/issues/44)
+* **playground:** add FastAPI endpoints under /playground + wire frontend ([#52](https://github.com/hemipaska-maker/bricks-ai/issues/52)) ([7c71d4a](https://github.com/hemipaska-maker/bricks-ai/commit/7c71d4a3f303191fe44cfd7de1c8e903597fb263)), closes [#43](https://github.com/hemipaska-maker/bricks-ai/issues/43)
+* **playground:** compare toggle + CLI/compare/upload tests ([#45](https://github.com/hemipaska-maker/bricks-ai/issues/45)) ([#54](https://github.com/hemipaska-maker/bricks-ai/issues/54)) ([6654dc2](https://github.com/hemipaska-maker/bricks-ai/commit/6654dc24604dcb1e90656e0d370715b65d78a038))
+* **playground:** copy v2 mockup into web/static/index.html + strip unused fonts ([#51](https://github.com/hemipaska-maker/bricks-ai/issues/51)) ([f45ef14](https://github.com/hemipaska-maker/bricks-ai/commit/f45ef1494f60a392664c00f7407601f34e129291)), closes [#42](https://github.com/hemipaska-maker/bricks-ai/issues/42)
+* **providers:** parse --output-format json in ClaudeCodeProvider ([#47](https://github.com/hemipaska-maker/bricks-ai/issues/47)) ([d80c190](https://github.com/hemipaska-maker/bricks-ai/commit/d80c190ab098bf177cbafaa4ae18113d828a8121))
+* **providers:** parse --output-format json in ClaudeCodeProvider for real cost + tokens ([9ed2fab](https://github.com/hemipaska-maker/bricks-ai/commit/9ed2fabdf53b1304bae2d58c401a28c14c70e0f8)), closes [#47](https://github.com/hemipaska-maker/bricks-ai/issues/47)
+
+
+### Bug Fixes
+
+* **ai:** correct crm_summary example and add two worked examples ([cc8190d](https://github.com/hemipaska-maker/bricks-ai/commit/cc8190d084a982935b1bdbccad4bcf23ae620c33)), closes [#28](https://github.com/hemipaska-maker/bricks-ai/issues/28)
+* **ci:** install all optional deps so tests can run ([df6b50d](https://github.com/hemipaska-maker/bricks-ai/commit/df6b50d77c9ec31066e15bddfd8007aa535305a2))
+* **ci:** make cog cross-platform deterministic; drop lychee --exclude-mail ([098f1f4](https://github.com/hemipaska-maker/bricks-ai/commit/098f1f49c980e7dfbaf47ae719017c3b131fea23))
+* **composer:** surface raw LLM DSL on failure paths + widen for_each error ([#60](https://github.com/hemipaska-maker/bricks-ai/issues/60)) ([#65](https://github.com/hemipaska-maker/bricks-ai/issues/65)) ([02ec989](https://github.com/hemipaska-maker/bricks-ai/commit/02ec9898d7c0dfc4613262293c859e6f56fe1371))
+* **core:** [@flow](https://github.com/flow) wires params to ${inputs.X}; default registry ships builtins ([#66](https://github.com/hemipaska-maker/bricks-ai/issues/66)) ([#67](https://github.com/hemipaska-maker/bricks-ai/issues/67)) ([bf68452](https://github.com/hemipaska-maker/bricks-ai/commit/bf68452ce79c314d5580cbcc539c4726b0f00289))
+* **core:** attribute for_each / branch inner failures to the real brick ([#57](https://github.com/hemipaska-maker/bricks-ai/issues/57)) ([ecc7a76](https://github.com/hemipaska-maker/bricks-ai/commit/ecc7a76e1fe18a98b7f92cad79c310668351df90)), closes [#34](https://github.com/hemipaska-maker/bricks-ai/issues/34)
+* **dsl:** detect Node deps nested inside list/dict kwargs ([62629a9](https://github.com/hemipaska-maker/bricks-ai/commit/62629a9c6f1ef643cfbe78b40476ecc3ef3564df))
+* **dsl:** detect Node deps nested inside list/dict kwargs ([9b9eb34](https://github.com/hemipaska-maker/bricks-ai/commit/9b9eb341880ffa4848c8779e7c94f74f8c0d3450)), closes [#25](https://github.com/hemipaska-maker/bricks-ai/issues/25)
+* **playground:** real-time wiring via pluggy hooks + SSE ([#56](https://github.com/hemipaska-maker/bricks-ai/issues/56)) ([#59](https://github.com/hemipaska-maker/bricks-ai/issues/59)) ([27c9068](https://github.com/hemipaska-maker/bricks-ai/commit/27c90689f1f7f4882f3554d0b62fecf8c610700e))
+* **playground:** UI polish — real data, drill-down, flow diagram ([#56](https://github.com/hemipaska-maker/bricks-ai/issues/56) follow-up) ([#62](https://github.com/hemipaska-maker/bricks-ai/issues/62)) ([07dafe8](https://github.com/hemipaska-maker/bricks-ai/commit/07dafe837338e321a861991ed75013011d7b5744))
+
+
+### Documentation
+
+* **playground:** add v1 build spec and v2 mockup ([fd8362e](https://github.com/hemipaska-maker/bricks-ai/commit/fd8362ea9434bb0343ef824d6864b5270cbf240a))
+* **playground:** README + AGENTS + CHANGELOG for v0.5.0 acceptance ([#55](https://github.com/hemipaska-maker/bricks-ai/issues/55)) ([116972e](https://github.com/hemipaska-maker/bricks-ai/commit/116972eee5244ce9503932de14d5b94e752717d2)), closes [#46](https://github.com/hemipaska-maker/bricks-ai/issues/46)
+
 ## [Unreleased] — Playground v0.5.0 (2026-04-21)
 
 ### Added

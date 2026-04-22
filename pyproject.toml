@@ -1,6 +1,6 @@
 [project]
 name = "bricks-ai"
-version = "0.5.0-dev"
+version = "0.5.0"
 description = "Deterministic execution engine: typed Python building blocks composed into auditable pipelines."
 requires-python = ">=3.10"
 license = "MIT"
