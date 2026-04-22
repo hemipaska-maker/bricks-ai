@@ -45,6 +45,22 @@ if TYPE_CHECKING:
     from bricks.core.models import BlueprintDefinition
 
 
+@dataclass(frozen=True)
+class InputRef:
+    """Sentinel injected by :func:`flow` for each declared flow parameter.
+
+    The ``@flow`` decorator traces the user's function once at decoration
+    time with one of these per parameter slot. During DAG serialisation,
+    :func:`~bricks.core.dag._resolve_param` converts it to the
+    ``${inputs.<name>}`` reference string the engine resolves at
+    ``execute`` time. Without the sentinel, the old code left literal
+    ``None`` values in step params, so ``step.X(values=values)`` ran with
+    ``values=None`` and crashed inside the brick.
+    """
+
+    name: str
+
+
 @dataclass
 class Node:
     """A single node in the Bricks execution DAG.
@@ -386,6 +402,7 @@ class FlowDefinition:
         dag: DAG,
         fn: Callable[..., Any] | None = None,
         output_nodes: dict[str, Node] | None = None,
+        input_names: list[str] | None = None,
     ) -> None:
         """Initialise with a name, description, and pre-built DAG.
 
@@ -398,12 +415,19 @@ class FlowDefinition:
                 the ``None``-param DAG captured at decoration time.
             output_nodes: Optional mapping of output key → terminal Node for
                 multi-output flows that return ``dict[str, Node]``.
+            input_names: Declared flow parameter names (order preserved).
+                Populated by :func:`flow` so :meth:`to_blueprint` can emit
+                the matching ``blueprint.inputs`` keys — without them the
+                orchestrator's :class:`~bricks.orchestrator.input_mapper.InputMapper`
+                has no slots to bind runtime ``inputs={...}`` values into
+                and step params remain stuck on the trace-time sentinel.
         """
         self.name = name
         self.description = description
         self.dag = dag
         self._fn = fn
         self.output_nodes = output_nodes
+        self.input_names: list[str] = list(input_names or [])
 
     def to_dag(self) -> DAG:
         """Return the raw DAG.
@@ -435,6 +459,8 @@ class FlowDefinition:
                 for key, node in self.output_nodes.items()
                 if node.id in node_id_to_step
             }
+        if self.input_names:
+            bp.inputs = dict.fromkeys(self.input_names, "Any")
         return bp
 
     def to_yaml(self) -> str:
@@ -567,7 +593,11 @@ def flow(
     from bricks.core.dag_builder import DAGBuilder  # noqa: PLC0415
 
     sig = inspect.signature(func)
-    mock_args = dict.fromkeys(sig.parameters)
+    param_names = list(sig.parameters)
+    # Each parameter becomes an InputRef sentinel — the DAG serialiser
+    # turns it into a ``${inputs.<name>}`` reference, which the engine's
+    # InputMapper resolves to the runtime value passed to execute().
+    mock_args: dict[str, Any] = {name: InputRef(name) for name in param_names}
 
     _tracer.start()
     try:
@@ -595,4 +625,5 @@ def flow(
         dag=dag,
         fn=func,
         output_nodes=output_nodes,
+        input_names=param_names,
     )

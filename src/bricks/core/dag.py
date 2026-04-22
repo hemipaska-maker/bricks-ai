@@ -10,28 +10,30 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from bricks.core.dsl import Node
+from bricks.core.dsl import InputRef, Node
 
 if TYPE_CHECKING:
     from bricks.core.models import BlueprintDefinition
 
 
 def _resolve_param(value: Any, node_to_step_name: dict[str, str]) -> Any:
-    """Recursively resolve Node references in param values to ``${step.result}`` strings.
+    """Recursively resolve Node / InputRef references to engine-reference strings.
 
-    Handles direct Node values, as well as Nodes nested inside lists and dicts.
-    If a Node's id is not in the mapping (shouldn't happen in normal DAG construction),
-    the raw value is returned unchanged as a defensive fallback.
+    Handles direct Node values, :class:`~bricks.core.dsl.InputRef` sentinels,
+    and both nested inside lists and dicts. Nodes become ``${step.result}``;
+    InputRefs become ``${inputs.<name>}``. Unknown scalars pass through.
 
     Args:
-        value: A param value — may be a Node, list, dict, or scalar.
+        value: A param value — may be a Node, InputRef, list, dict, or scalar.
         node_to_step_name: Mapping of node IDs to step names.
 
     Returns:
-        The value with all resolvable Node references replaced by reference strings.
+        The value with all resolvable references replaced by reference strings.
     """
     if isinstance(value, Node) and value.id in node_to_step_name:
         return f"${{{node_to_step_name[value.id]}.result}}"
+    if isinstance(value, InputRef):
+        return f"${{inputs.{value.name}}}"
     if isinstance(value, list):
         return [_resolve_param(v, node_to_step_name) for v in value]
     if isinstance(value, dict):
@@ -191,6 +193,10 @@ class DAG:
             items_param: Any
             if isinstance(node.items, Node) and node.items.id in node_to_step_name:
                 items_param = f"${{{node_to_step_name[node.items.id]}.result}}"
+            elif isinstance(node.items, InputRef):
+                # ``@flow def f(items): for_each(items=items, ...)`` —
+                # bind the iteration list to the runtime input slot.
+                items_param = f"${{inputs.{node.items.name}}}"
             elif isinstance(node.items, list):
                 # Literal list (e.g. ``for_each(items=my_list, do=...)``) —
                 # pass the values through so the engine iterates over them.
@@ -198,6 +204,9 @@ class DAG:
             else:
                 items_param = []
             do_name = node.do if isinstance(node.do, str) else str(node.do)
+            resolved_statics = {
+                key: _resolve_param(value, node_to_step_name) for key, value in node.static_kwargs.items()
+            }
             return StepDefinition(
                 name=step_name,
                 brick="__for_each__",
@@ -205,7 +214,7 @@ class DAG:
                     "items": items_param,
                     "do_brick": do_name,
                     "item_kwarg": node.item_kwarg,
-                    "static_kwargs": dict(node.static_kwargs),
+                    "static_kwargs": resolved_statics,
                     "on_error": node.on_error,
                 },
                 save_as=step_name,

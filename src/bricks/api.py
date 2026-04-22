@@ -37,17 +37,24 @@ _DEFAULT_MODEL: str = "claude-haiku-4-5-20251001"
 def _build_default_registry() -> BrickRegistry:
     """Build the default registry by discovering installed brick packs.
 
+    Also registers DSL control-flow builtins (``__for_each__`` / ``__branch__``).
+    Without this, any composed blueprint that wraps iteration in ``for_each``
+    fails at execute() with ``BrickNotFoundError: '__for_each__'`` —
+    issue #66 bug B.
+
     Returns:
         A :class:`~bricks.core.registry.BrickRegistry` populated with all
-        bricks from every installed pack.
+        bricks from every installed pack plus DSL builtins.
 
     Raises:
         BricksConfigError: If no packs (e.g. ``bricks-stdlib``) are installed.
     """
+    from bricks.core.builtins import register_builtins  # noqa: PLC0415
     from bricks.packs import discover_and_load  # noqa: PLC0415
 
     reg = BrickRegistry()
     discover_and_load(reg)
+    register_builtins(reg)
     return reg
 
 
