@@ -85,6 +85,14 @@ class Node:
             in ``for_each(do=lambda r: step.rename_dict_keys(input=r, rename_map={...}))``.
             Captured by the DSL tracer and merged per-iteration by the
             ``__for_each__`` builtin. Defaults to an empty dict.
+        item_paths: Keyword arguments derived from subscripting or
+            attribute access on the iteration item — e.g.
+            ``{"value": [("getitem", "pattern")]}`` for
+            ``for_each(do=lambda p: step.X(value=p["pattern"]))``.
+            Each entry maps a kwarg name to a sequence of
+            ``(op, key)`` pairs (``"getitem"`` or ``"getattr"``)
+            applied to the real item per iteration by the
+            ``__for_each__`` builtin. Empty by default.
         on_error: Error policy for ``for_each`` — ``"fail"`` (default, stop on
             first error) or ``"collect"`` (continue, gather all errors).
         condition: Condition for ``branch`` nodes (brick name string in v1).
@@ -104,6 +112,7 @@ class Node:
     do: str | Callable[..., Any] | None = None
     item_kwarg: str = "item"
     static_kwargs: dict[str, Any] = field(default_factory=dict)
+    item_paths: dict[str, list[tuple[str, Any]]] = field(default_factory=dict)
     on_error: str = "fail"
 
     # branch fields
@@ -134,6 +143,64 @@ class Node:
         if self.type == "brick":
             return f"Node(brick={self.brick_name!r}, id={self.id!r})"
         return f"Node(type={self.type!r}, id={self.id!r})"
+
+
+class _ItemProxy(Node):
+    """Trace-time stand-in for the for_each iteration item.
+
+    Subclasses :class:`Node` so the existing ``isinstance(value, Node)``
+    kwarg-detection in :func:`for_each` still finds it. Adds
+    ``__getitem__`` / ``__getattr__`` that return new proxies recording
+    an access path. After tracing, the path is read off each kwarg's
+    proxy and stored on the for_each Node so ``__for_each__`` can apply
+    the same path to the real item per iteration at runtime.
+
+    All proxies in a chain share the root ``id`` so the kwarg-scan
+    identity check (``value.id == mock.id``) finds descendants
+    alongside the bare mock.
+    """
+
+    # Class-level annotation so mypy knows the real type — without it,
+    # `__getattr__` shadows the attribute and reads of `_access_path`
+    # are typed as `_ItemProxy`. The runtime value is set via
+    # ``object.__setattr__`` in ``__init__``.
+    _access_path: list[tuple[str, Any]]
+
+    def __init__(self, root_id: str, access_path: list[tuple[str, Any]] | None = None) -> None:
+        """Build a proxy that pretends to be the iteration item.
+
+        Args:
+            root_id: Shared identifier across the proxy chain — equal to
+                the original mock's id, so existing identity comparisons
+                in :func:`for_each` recognise descendants.
+            access_path: Sequence of ``(op, key)`` pairs recording how
+                this proxy was reached from the root. Empty for the
+                root mock; one entry longer per subscript / getattr.
+        """
+        super().__init__(type="brick", brick_name="__mock__", params={})
+        # Bypass the dataclass __setattr__ contract for the shared id —
+        # we want every descendant to compare equal to the root under
+        # the existing identity check.
+        object.__setattr__(self, "id", root_id)
+        object.__setattr__(self, "_access_path", list(access_path or []))
+
+    def __getitem__(self, key: Any) -> _ItemProxy:
+        """Record a subscript access and return an extended proxy."""
+        return _ItemProxy(self.id, [*self._access_path, ("getitem", key)])
+
+    def __getattr__(self, name: str) -> _ItemProxy:
+        """Record an attribute access and return an extended proxy.
+
+        Only fires when normal attribute lookup fails — Node fields
+        (``id``, ``params``, the ``output`` property, etc.) still
+        resolve via the inherited dataclass machinery. Underscore
+        names are skipped so Python internals (``__class__``,
+        ``__deepcopy__``, ``_access_path`` itself) don't accidentally
+        produce proxies.
+        """
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return _ItemProxy(self.id, [*self._access_path, ("getattr", name)])
 
 
 class ExecutionTracer:
@@ -284,7 +351,10 @@ def for_each(
     outer_tracer = _dsl_module._tracer
     _dsl_module._tracer = inner_tracer
     inner_tracer.start()
-    mock = Node(type="brick", brick_name="__mock__", params={})
+    # _ItemProxy lets the lambda subscript / attr-access the item without
+    # raising at trace time — the access path is recorded and replayed
+    # per iteration at runtime. See issue #69.
+    mock = _ItemProxy(root_id=uuid.uuid4().hex[:8])
     trace_error: Exception | None = None
     try:
         do(mock)
@@ -315,15 +385,22 @@ def for_each(
     first = inner_nodes[0]
     do_brick: str = first.brick_name or f"__{first.type}__"
 
-    # Find the kwarg the lambda binds the iteration item to — the key in
-    # the inner node's params whose value is the mock Node we injected.
-    # Default to "item" for backward compatibility when the lambda doesn't
-    # use the item, uses it positionally, or nests it inside an expression.
-    item_kwarg: str = "item"
+    # Find the kwarg(s) the lambda binds to the iteration item.
+    # _ItemProxy values with no access path → bare-item kwarg (item_kwarg).
+    # _ItemProxy values with an access path → derived kwarg, recorded in
+    # item_paths so __for_each__ can apply the same subscript / getattr
+    # chain to the real item per iteration. See issue #69.
+    # item_kwarg starts empty so a path-only lambda doesn't inject a
+    # stray ``item=`` kwarg into the inner brick call at runtime.
+    item_kwarg: str = ""
     static_kwargs: dict[str, Any] = {}
+    item_paths: dict[str, list[tuple[str, Any]]] = {}
     for key, value in first.params.items():
-        if isinstance(value, Node) and value.id == mock.id:
-            item_kwarg = key
+        if isinstance(value, _ItemProxy):
+            if value._access_path:
+                item_paths[key] = value._access_path
+            else:
+                item_kwarg = key
             continue
         # Lambdas that close over *other* step outputs (Node refs) are not
         # supported: the DAG is built once per compose, so there's no way to
@@ -342,6 +419,7 @@ def for_each(
         item_kwarg=item_kwarg,
         on_error=on_error,
         static_kwargs=static_kwargs,
+        item_paths=item_paths,
     )
     _tracer.record(node)
     return node

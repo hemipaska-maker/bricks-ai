@@ -215,6 +215,7 @@ class DAG:
                     "do_brick": do_name,
                     "item_kwarg": node.item_kwarg,
                     "static_kwargs": resolved_statics,
+                    "item_paths": {key: list(path) for key, path in node.item_paths.items()},
                     "on_error": node.on_error,
                 },
                 save_as=step_name,

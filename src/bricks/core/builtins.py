@@ -14,12 +14,44 @@ from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
 
 
+def _apply_path(path: list[Any], item: Any) -> Any:
+    """Replay a recorded subscript / getattr chain on a real item.
+
+    The DSL tracer captures ``pat["pattern"]`` etc. as a sequence of
+    ``(op, key)`` pairs (see :class:`bricks.core.dsl._ItemProxy` —
+    issue #69). At runtime ``__for_each__`` calls this helper to
+    reproduce the same access on the actual iteration item.
+
+    Args:
+        path: Ordered list of ``(op, key)`` pairs where ``op`` is
+            ``"getitem"`` or ``"getattr"``. Tuples may arrive as lists
+            after a YAML round-trip — both shapes are accepted.
+        item: The real iteration value to apply *path* to.
+
+    Returns:
+        The value reached after applying every step.
+
+    Raises:
+        ValueError: If *path* contains an unknown operation.
+    """
+    for entry in path:
+        op, key = entry[0], entry[1]
+        if op == "getitem":
+            item = item[key]
+        elif op == "getattr":
+            item = getattr(item, key)
+        else:
+            raise ValueError(f"__for_each__: unknown access op {op!r} in item_paths")
+    return item
+
+
 def _for_each_impl(
     items: list[Any],
     do_brick: str,
     on_error: Literal["fail", "collect"] = "fail",
     item_kwarg: str = "item",
     static_kwargs: dict[str, Any] | None = None,
+    item_paths: dict[str, list[Any]] | None = None,
     registry: BrickRegistry | None = None,
 ) -> dict[str, Any]:
     """Execute a brick for each item in the list.
@@ -31,12 +63,21 @@ def _for_each_impl(
         item_kwarg: Keyword name to pass each item under. Extracted by the
             DSL tracer from the for_each lambda (e.g. ``"email"`` for
             ``for_each(do=lambda e: step.is_email_valid(email=e))``).
+            Empty string means the lambda never bound the bare item to
+            a kwarg (e.g. ``do=lambda p: step.X(value=p["k"])`` — uses
+            only ``item_paths``); in that case the item is not injected.
             Defaults to ``"item"`` for blueprints written without the DSL.
         static_kwargs: Literal keyword arguments the lambda closed over, to
             be passed on every iteration alongside ``item_kwarg`` — e.g.
             ``{"rename_map": {"id": "customer_id"}}`` for
             ``for_each(do=lambda r: step.rename_dict_keys(input=r, rename_map={...}))``.
             The per-item kwarg wins on name conflict.
+        item_paths: Subscript / attribute access chains the DSL tracer
+            captured for kwargs that derive from the iteration item —
+            e.g. ``{"value": [("getitem", "pattern")]}`` for
+            ``for_each(do=lambda p: step.X(value=p["pattern"]))``.
+            Each chain is applied to the real item per iteration. See
+            issue #69.
         registry: Registry to look up ``do_brick``. Required.
 
     Returns:
@@ -53,15 +94,21 @@ def _for_each_impl(
 
     callable_, _ = registry.get(do_brick)
     static: dict[str, Any] = dict(static_kwargs or {})
+    paths: dict[str, list[Any]] = dict(item_paths or {})
     results: list[Any] = []
     errors: list[dict[str, Any]] = []
 
     for i, item in enumerate(items):
         try:
-            # Merge statics first, then overlay the per-item kwarg so it wins
-            # any name conflict (a lambda that closed over a key matching
-            # ``item_kwarg`` would otherwise shadow the iterator).
-            call_kwargs = {**static, item_kwarg: item}
+            # Order: static < path-derived < whole-item kwarg. The
+            # whole-item kwarg wins on name conflict (matches the
+            # docstring); path-derived overrides statics with the same
+            # key (which would itself be unusual). Empty item_kwarg
+            # means the lambda never bound the bare item — skip it.
+            derived = {name: _apply_path(path, item) for name, path in paths.items()}
+            call_kwargs: dict[str, Any] = {**static, **derived}
+            if item_kwarg:
+                call_kwargs[item_kwarg] = item
             result = callable_(**call_kwargs)
         except BrickExecutionError:
             # Already attributed (e.g. nested for_each). Preserve it.
