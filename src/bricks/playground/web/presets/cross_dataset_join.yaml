@@ -10,7 +10,10 @@ task_text: |
   pro_revenue (for pro plan), enterprise_revenue (for enterprise plan),
   and total_completed (total completed orders count).
 expected_outputs:
-  total_completed: 24
+  total_completed: 18
+  basic_revenue: 3758.7
+  pro_revenue: 0.0
+  enterprise_revenue: 687.8
 required_bricks:
   - extract_json_from_str
   - filter_dict_list

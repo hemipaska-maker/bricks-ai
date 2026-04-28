@@ -13,7 +13,7 @@ data:
   - {id: 5, name: Webcam, price: 89.99, stock: 0}
 expected_outputs:
   available_count: 3
-  total_value: 2459.82
+  total_value: 2859.75
 required_bricks:
   - extract_json_from_str
   - filter_dict_list

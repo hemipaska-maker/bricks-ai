@@ -44,11 +44,18 @@ class ClaudeCodeProvider(LLMProvider):
         response = provider.complete("Say hello", system="You are helpful.")
     """
 
-    def __init__(self, timeout: int = 120, model: str | None = None) -> None:
+    def __init__(self, timeout: int = 300, model: str | None = None) -> None:
         """Initialise provider.
 
         Args:
             timeout: Maximum seconds to wait for a ``claude -p`` response.
+                Defaults to 300s — the post-#66 expanded brick catalog
+                pushes first-compose latency on a cold prompt cache into
+                the 90-150s range, and the prior 120s default sat
+                squarely in the failure-rate band (issue #74). 300s
+                covers ~99% of observed compose latencies in the
+                bench-runs sweep without making developer-loop failures
+                hang painfully.
             model: Optional model alias to pass as ``--model`` (e.g.
                 ``"sonnet"``, ``"opus"``, ``"haiku"``). ``None`` lets
                 Claude Code pick its default.
