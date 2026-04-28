@@ -570,7 +570,11 @@ def playground(
             raise typer.Exit(code=1) from exc
 
     url = f"http://{'localhost' if host == '127.0.0.1' else host}:{bound_port}"
-    typer.echo(f"\u2713 Bricks Playground running \u2192 {url}")
+    # Plain ASCII so the banner renders on every platform \u2014 Python's
+    # default Windows console codepage (cp1252) can't encode the
+    # check-mark / arrow glyphs we used to ship and would crash here
+    # before uvicorn even started.
+    typer.echo(f"OK  Bricks Playground running -> {url}")
 
     if not no_browser:
         threading.Timer(0.3, lambda: webbrowser.open(url)).start()
