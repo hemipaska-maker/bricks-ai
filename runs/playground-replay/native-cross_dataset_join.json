@@ -1,0 +1,48 @@
+{
+  "preset": "cross_dataset_join",
+  "scenario": {
+    "name": "Orders Customer Join",
+    "task_text": "Parse the JSON data containing two tables: \"orders\" (order_id, customer_id,\namount, status, order_date) and \"customers\" (id, name, email, plan).\nJoin orders to customers on customer_id = id. Filter to completed orders only.\nCalculate total completed order amount per customer plan tier:\nbasic_revenue (sum of completed order amounts for basic plan customers),\npro_revenue (for pro plan), enterprise_revenue (for enterprise plan),\nand total_completed (total completed orders count).\n",
+    "expected_outputs": {
+      "total_completed": 18,
+      "basic_revenue": 3758.7,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8
+    },
+    "model": "claudecode"
+  },
+  "bricks": {
+    "outputs": {
+      "basic_revenue": 3758.7000000000003,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8,
+      "total_completed": 18
+    },
+    "tokens_in": 3,
+    "tokens_out": 2860,
+    "duration_seconds": 33.78099999995902,
+    "model": "",
+    "raw_response": "name: plan_revenue_summary\ndescription: DSL-generated pipeline with 14 steps\ninputs:\n  raw_api_response: Any\nsteps:\n- name: step_1_extract_json_from_str\n  brick: extract_json_from_str\n  params:\n    text: ${inputs.raw_api_response}\n  save_as: step_1_extract_json_from_str\n- name: step_2_extract_dict_field\n  brick: extract_dict_field\n  params:\n    data: ${step_1_extract_json_from_str.result}\n    field: customers\n  save_as: step_2_extract_dict_field\n- name: step_3_for_each\n  brick: __for_each__\n  params:\n    items: ${step_2_extract_dict_field.result}\n    do_brick: rename_dict_keys\n    item_kwarg: data\n    static_kwargs:\n      rename_map:\n        id: customer_id\n    item_paths: {}\n    on_error: fail\n  save_as: step_3_for_each\n- name: step_4_map_values\n  brick: map_values\n  params:\n    items: ${step_3_for_each.result}\n    key: result\n  save_as: step_4_map_values\n- name: step_5_extract_dict_field\n  brick: extract_dict_field\n  params:\n    data: ${step_1_extract_json_from_str.result}\n    field: orders\n  save_as: step_5_extract_dict_field\n- name: step_6_join_lists_on_key\n  brick: join_lists_on_key\n  params:\n    left: ${step_5_extract_dict_field.result}\n    right: ${step_4_map_values.result}\n    key: customer_id\n  save_as: step_6_join_lists_on_key\n- name: step_7_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_6_join_lists_on_key.result}\n    key: status\n    value: completed\n  save_as: step_7_filter_dict_list\n- name: step_8_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_7_filter_dict_list.result}\n    key: plan\n    value: pro\n  save_as: step_8_filter_dict_list\n- name: step_9_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_7_filter_dict_list.result}\n  save_as: step_9_count_dict_list\n- name: step_10_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_8_filter_dict_list.result}\n    field: amount\n    operation: sum\n  save_as: step_10_calculate_aggregates\n- name: step_11_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_7_filter_dict_list.result}\n    key: plan\n    value: basic\n  save_as: step_11_filter_dict_list\n- name: step_12_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_11_filter_dict_list.result}\n    field: amount\n    operation: sum\n  save_as: step_12_calculate_aggregates\n- name: step_13_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_7_filter_dict_list.result}\n    key: plan\n    value: enterprise\n  save_as: step_13_filter_dict_list\n- name: step_14_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_13_filter_dict_list.result}\n    field: amount\n    operation: sum\n  save_as: step_14_calculate_aggregates\noutputs_map:\n  basic_revenue: ${step_12_calculate_aggregates.result}\n  pro_revenue: ${step_10_calculate_aggregates.result}\n  enterprise_revenue: ${step_14_calculate_aggregates.result}\n  total_completed: ${step_9_count_dict_list.result}\n",
+    "dsl_code": "@flow\ndef plan_revenue_summary(raw_api_response):\n    parsed             = step.extract_json_from_str(text=raw_api_response)\n    orders             = step.extract_dict_field(data=parsed.output, field=\"orders\")\n    customers          = step.extract_dict_field(data=parsed.output, field=\"customers\")\n\n    renamed_raw        = for_each(items=customers.output, do=lambda item: step.rename_dict_keys(data=item, rename_map={\"id\": \"customer_id\"}))\n    renamed_customers  = step.map_values(items=renamed_raw.output, key=\"result\")\n\n    joined             = step.join_lists_on_key(left=orders.output, right=renamed_customers.output, key=\"customer_id\")\n    completed          = step.filter_dict_list(items=joined.output, key=\"status\", value=\"completed\")\n\n    total_completed    = step.count_dict_list(items=completed.output)\n\n    basic              = step.filter_dict_list(items=completed.output, key=\"plan\", value=\"basic\")\n    pro                = step.filter_dict_list(items=completed.output, key=\"plan\", value=\"pro\")\n    enterprise         = step.filter_dict_list(items=completed.output, key=\"plan\", value=\"enterprise\")\n\n    basic_revenue      = step.calculate_aggregates(items=basic.output, field=\"amount\", operation=\"sum\")\n    pro_revenue        = step.calculate_aggregates(items=pro.output, field=\"amount\", operation=\"sum\")\n    enterprise_revenue = step.calculate_aggregates(items=enterprise.output, field=\"amount\", operation=\"sum\")\n\n    return {\n        \"basic_revenue\":      basic_revenue,\n        \"pro_revenue\":        pro_revenue,\n        \"enterprise_revenue\": enterprise_revenue,\n        \"total_completed\":    total_completed,\n    }",
+    "error": "",
+    "flow_def": "<bricks.core.dsl.FlowDefinition object at 0x0000017C6F56BAC0>",
+    "_driver_duration_ms": 33780
+  },
+  "raw_llm": {
+    "outputs": {
+      "basic_revenue": 3758.7,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8,
+      "total_completed": 18
+    },
+    "tokens_in": 3,
+    "tokens_out": 2297,
+    "duration_seconds": 29.35999999998603,
+    "model": "claude-sonnet-4-6",
+    "raw_response": "{\"basic_revenue\": 3758.7, \"pro_revenue\": 0.0, \"enterprise_revenue\": 687.8, \"total_completed\": 18}",
+    "dsl_code": "",
+    "error": "",
+    "flow_def": null,
+    "_driver_duration_ms": 29359
+  }
+}

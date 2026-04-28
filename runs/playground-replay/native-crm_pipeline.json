@@ -1,0 +1,45 @@
+{
+  "preset": "crm_pipeline",
+  "scenario": {
+    "name": "CRM Pipeline",
+    "task_text": "Parse the JSON customer data. Filter to only active customers (status = \"active\").\nCalculate: total number of active customers (active_count), sum of their monthly_revenue\n(total_active_revenue), and average revenue per active customer (avg_active_revenue).\n",
+    "expected_outputs": {
+      "active_count": 9,
+      "total_active_revenue": 1524.0,
+      "avg_active_revenue": 169.33
+    },
+    "model": "claudecode"
+  },
+  "bricks": {
+    "outputs": {
+      "active_count": 9,
+      "total_active_revenue": 1524.0,
+      "avg_active_revenue": 169.33333333333334
+    },
+    "tokens_in": 6,
+    "tokens_out": 585,
+    "duration_seconds": 24.391000000061467,
+    "model": "",
+    "raw_response": "name: active_customer_summary\ndescription: DSL-generated pipeline with 5 steps\ninputs:\n  raw_api_response: Any\nsteps:\n- name: step_1_extract_json_from_str\n  brick: extract_json_from_str\n  params:\n    text: ${inputs.raw_api_response}\n  save_as: step_1_extract_json_from_str\n- name: step_2_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_1_extract_json_from_str.result}\n    key: status\n    value: active\n  save_as: step_2_filter_dict_list\n- name: step_3_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_2_filter_dict_list.result}\n    field: monthly_revenue\n    operation: sum\n  save_as: step_3_calculate_aggregates\n- name: step_4_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_2_filter_dict_list.result}\n    field: monthly_revenue\n    operation: avg\n  save_as: step_4_calculate_aggregates\n- name: step_5_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_2_filter_dict_list.result}\n  save_as: step_5_count_dict_list\noutputs_map:\n  active_count: ${step_5_count_dict_list.result}\n  total_active_revenue: ${step_3_calculate_aggregates.result}\n  avg_active_revenue: ${step_4_calculate_aggregates.result}\n",
+    "dsl_code": "@flow\ndef active_customer_summary(raw_api_response):\n    parsed    = step.extract_json_from_str(text=raw_api_response)\n    actives   = step.filter_dict_list(items=parsed.output, key=\"status\", value=\"active\")\n    count     = step.count_dict_list(items=actives.output)\n    total     = step.calculate_aggregates(items=actives.output, field=\"monthly_revenue\", operation=\"sum\")\n    average   = step.calculate_aggregates(items=actives.output, field=\"monthly_revenue\", operation=\"avg\")\n    return {\"active_count\": count, \"total_active_revenue\": total, \"avg_active_revenue\": average}",
+    "error": "",
+    "flow_def": "<bricks.core.dsl.FlowDefinition object at 0x0000017C6F390490>",
+    "_driver_duration_ms": 24391
+  },
+  "raw_llm": {
+    "outputs": {
+      "active_count": 9,
+      "total_active_revenue": 1023.5,
+      "avg_active_revenue": 113.72222222222223
+    },
+    "tokens_in": 3,
+    "tokens_out": 40,
+    "duration_seconds": 7.062999999965541,
+    "model": "claude-sonnet-4-6",
+    "raw_response": "{\"active_count\": 9, \"total_active_revenue\": 1023.5, \"avg_active_revenue\": 113.72222222222223}",
+    "dsl_code": "",
+    "error": "",
+    "flow_def": null,
+    "_driver_duration_ms": 7062
+  }
+}

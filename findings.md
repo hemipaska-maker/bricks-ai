@@ -237,3 +237,66 @@ This is the one to highlight in the article: **even when the LLM "shows its work
 ### Run records
 
 15 runs in `runs/track-1-exploration_*.json`, timestamped 2026-04-28. Manifest line per run in `manifest/track-1.jsonl`.
+
+## 2026-04-29 — Playground replay post-#75 (Bug C fix + spec fix + 300s timeout)
+
+After #69/#70 (Bug C: for_each lambda subscripting), #74 (preset expected_outputs match data; ClaudeCode timeout 300s), and the playground refactor (#76-#79), re-ran all 4 web-playground scenarios via [`runs/playground-replay/replay_native.py`](runs/playground-replay/replay_native.py) using `ClaudeCodeProvider` directly (the new `bricks playground run` CLI hardcodes LiteLLM, which costs API rates).
+
+### Headline shift
+
+The user's original "Bricks loses on all scenarios" report is now objectively wrong on this sha:
+
+| Scenario | Bricks | Raw LLM | Verdict |
+|---|---|---|---|
+| crm_pipeline | **3/3 ✓** | 1/3 ✗ | **Bricks wins** (raw miscounted revenue by $500) |
+| ticket_pipeline | **4/4 ✓** | 2/4 ✗ | **Bricks wins** (raw off by 1 on two keys) |
+| cross_dataset_join | **4/4 ✓** | 4/4 ✓ | **Both pass** — #74 fixed the bad expected_output |
+| custom_example | 1/2 ✗ | 1/2 ✗ | Both fail; new bug (below) |
+
+So at sha `020ae4c`: Bricks wins or ties on **3 of 4 demo scenarios**. The post-#75 playground actually demonstrates the article's thesis honestly.
+
+### custom_example — composer picked wrong primitive
+
+The lone Bricks regression. Task: compute `total_value = Σ(price × stock)` over products in stock. The composer emitted:
+
+```python
+@flow
+def process_product_inventory(raw_api_response):
+    parsed          = step.extract_json_from_str(text=raw_api_response)
+    out_of_stock    = step.filter_dict_list(items=parsed.output, key="stock", value=0)
+    available       = step.difference_lists(a=parsed.output, b=out_of_stock.output)
+    available_count = step.count_dict_list(items=available.output)
+    prices          = step.map_values(items=available.output, key="price")
+    stocks          = step.map_values(items=available.output, key="stock")
+    zipped          = step.zip_lists(a=prices.output, b=stocks.output)
+    per_product     = for_each(items=zipped.output, do=lambda item: step.reduce_sum(values=item))  # bug
+    total_value     = step.calculate_aggregates(items=per_product.output, field="result", operation="sum")
+    return {"available_count": available_count, "total_value": total_value}
+```
+
+`step.reduce_sum(values=item)` over a `(price, stock)` pair computes `price + stock`, not `price × stock`. So `total_value` ended up at $454.97 vs expected $2,859.75.
+
+Three things wrong-in-an-illustrative-way:
+1. **Catalog gap.** There is no `reduce_product` brick. The composer reached for `reduce_sum` because it was the closest-named primitive.
+2. **Composer didn't use the obvious workaround** — `for_each(items=available, do=lambda p: step.multiply(a=p["price"], b=p["stock"]))` then sum. This is now legal post-Bug-C but the composer didn't reach for it.
+3. **Raw LLM failed differently and less badly** — got $2,459.27 (off by $400, ~14%). Probably truncated reasoning. Bricks's $454.97 is structurally wrong (off by a factor of ~6).
+
+Article material: this is a **catalog gap masquerading as a composer mistake**. In compiler terms — when an instruction is missing from the ISA, the front-end emits a workaround that looks right but isn't. Adds a fourth failure class to the taxonomy.
+
+### Status of filed issues at this sha
+
+- Bug C fixed (#69/#70) — for_each lambda supports `item["key"]`.
+- Preset `expected_outputs` corrected to match data; ClaudeCode default timeout raised to 300s (#73/#74).
+- Playground refactor merged (#76-#79) — showcase deleted, presets/datasets/loader promoted out of `web/`, headless CLI added.
+- Open: token display dropping cache fields (flagged, not formally filed).
+- Open: composer "missing-primitive fallback" on no-`reduce_product`-style cases — would be Phase 2 of the brick-selector roadmap (miss-fallback + interactive refinement).
+
+### Side-effect: new playground CLI dropped ClaudeCodeProvider support
+
+`bricks playground run` (added in #79) hardcodes `LiteLLMProvider`, requiring an `ANTHROPIC_API_KEY` and billing at API rates. The web playground still supports `provider="claude_code"` so we stayed on the Pro account by replaying via [`runs/playground-replay/replay_native.py`](runs/playground-replay/replay_native.py) — direct import of `BricksEngine` + `RawLLMEngine` + `ClaudeCodeProvider`. Worth flagging as a small follow-up: `bricks playground run --provider claudecode` for parity with the web UI.
+
+### What this means for the article
+
+- Both empirical pillars hold: Bricks wins on correctness at scale (cost-curve sweep), Bricks wins or ties on real demo scenarios (3 of 4 here).
+- The "honest counter-case" section now has a **better example than email-rewrite**: `custom_example` is a structured-data task where Bricks fails on a catalog gap. Engineers will recognise this as the kind of friction they'd hit in practice. Worth swapping the article's counter-case to use this.
+- The "stop the LLM doing arithmetic" wedge is reinforced: even on a 5-row dataset, raw LLM miscounted revenue ($1,023.50 vs $1,524.00) and ticket categories. At small N. With a clear task. The model still drifts.

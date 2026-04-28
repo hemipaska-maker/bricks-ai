@@ -1,0 +1,48 @@
+{
+  "preset": "ticket_pipeline",
+  "scenario": {
+    "name": "Support Ticket Pipeline",
+    "task_text": "Parse the JSON ticket data. Filter to tickets with priority=\"high\" AND status=\"open\".\nCount the total (open_high_count), then count by category:\nbilling (billing_count), technical (technical_count), general (general_count).\n",
+    "expected_outputs": {
+      "open_high_count": 9,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 3
+    },
+    "model": "claudecode"
+  },
+  "bricks": {
+    "outputs": {
+      "open_high_count": 9,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 3
+    },
+    "tokens_in": 6,
+    "tokens_out": 877,
+    "duration_seconds": 20.656000000075437,
+    "model": "",
+    "raw_response": "name: filter_and_count_tickets\ndescription: DSL-generated pipeline with 10 steps\ninputs:\n  raw_api_response: Any\nsteps:\n- name: step_1_extract_json_from_str\n  brick: extract_json_from_str\n  params:\n    text: ${inputs.raw_api_response}\n  save_as: step_1_extract_json_from_str\n- name: step_2_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_1_extract_json_from_str.result}\n    key: priority\n    value: high\n  save_as: step_2_filter_dict_list\n- name: step_3_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_2_filter_dict_list.result}\n    key: status\n    value: open\n  save_as: step_3_filter_dict_list\n- name: step_4_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_3_filter_dict_list.result}\n    key: category\n    value: billing\n  save_as: step_4_filter_dict_list\n- name: step_5_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_4_filter_dict_list.result}\n  save_as: step_5_count_dict_list\n- name: step_6_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_3_filter_dict_list.result}\n    key: category\n    value: general\n  save_as: step_6_filter_dict_list\n- name: step_7_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_3_filter_dict_list.result}\n    key: category\n    value: technical\n  save_as: step_7_filter_dict_list\n- name: step_8_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_3_filter_dict_list.result}\n  save_as: step_8_count_dict_list\n- name: step_9_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_7_filter_dict_list.result}\n  save_as: step_9_count_dict_list\n- name: step_10_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_6_filter_dict_list.result}\n  save_as: step_10_count_dict_list\noutputs_map:\n  open_high_count: ${step_8_count_dict_list.result}\n  billing_count: ${step_5_count_dict_list.result}\n  technical_count: ${step_9_count_dict_list.result}\n  general_count: ${step_10_count_dict_list.result}\n",
+    "dsl_code": "@flow\ndef filter_and_count_tickets(raw_api_response):\n    parsed       = step.extract_json_from_str(text=raw_api_response)\n    high         = step.filter_dict_list(items=parsed.output, key=\"priority\", value=\"high\")\n    open_high    = step.filter_dict_list(items=high.output, key=\"status\", value=\"open\")\n    total_count  = step.count_dict_list(items=open_high.output)\n    billing      = step.filter_dict_list(items=open_high.output, key=\"category\", value=\"billing\")\n    technical    = step.filter_dict_list(items=open_high.output, key=\"category\", value=\"technical\")\n    general      = step.filter_dict_list(items=open_high.output, key=\"category\", value=\"general\")\n    bill_count   = step.count_dict_list(items=billing.output)\n    tech_count   = step.count_dict_list(items=technical.output)\n    gen_count    = step.count_dict_list(items=general.output)\n    return {\"open_high_count\": total_count, \"billing_count\": bill_count,\n            \"technical_count\": tech_count, \"general_count\": gen_count}",
+    "error": "",
+    "flow_def": "<bricks.core.dsl.FlowDefinition object at 0x0000017C6CFCD1E0>",
+    "_driver_duration_ms": 20656
+  },
+  "raw_llm": {
+    "outputs": {
+      "open_high_count": 10,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 4
+    },
+    "tokens_in": 3,
+    "tokens_out": 37,
+    "duration_seconds": 7.672000000020489,
+    "model": "claude-sonnet-4-6",
+    "raw_response": "{\"open_high_count\": 10, \"billing_count\": 4, \"technical_count\": 2, \"general_count\": 4}",
+    "dsl_code": "",
+    "error": "",
+    "flow_def": null,
+    "_driver_duration_ms": 7672
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "preset": "custom_example",
+  "scenario": {
+    "name": "Custom Inline Example",
+    "task_text": "Parse the JSON product data. Filter to products with stock > 0.\nCount the number of available products (available_count) and\ncalculate the total value of available inventory (total_value =\nsum of price * stock for each available product).\n",
+    "expected_outputs": {
+      "available_count": 3,
+      "total_value": 2859.75
+    },
+    "model": "claudecode"
+  },
+  "bricks": {
+    "outputs": {
+      "available_count": 3,
+      "total_value": 454.97
+    },
+    "tokens_in": 6,
+    "tokens_out": 14222,
+    "duration_seconds": 228.0470000000205,
+    "model": "",
+    "raw_response": "name: process_product_inventory\ndescription: DSL-generated pipeline with 9 steps\ninputs:\n  raw_api_response: Any\nsteps:\n- name: step_1_extract_json_from_str\n  brick: extract_json_from_str\n  params:\n    text: ${inputs.raw_api_response}\n  save_as: step_1_extract_json_from_str\n- name: step_2_filter_dict_list\n  brick: filter_dict_list\n  params:\n    items: ${step_1_extract_json_from_str.result}\n    key: stock\n    value: 0\n  save_as: step_2_filter_dict_list\n- name: step_3_difference_lists\n  brick: difference_lists\n  params:\n    a: ${step_1_extract_json_from_str.result}\n    b: ${step_2_filter_dict_list.result}\n  save_as: step_3_difference_lists\n- name: step_4_map_values\n  brick: map_values\n  params:\n    items: ${step_3_difference_lists.result}\n    key: stock\n  save_as: step_4_map_values\n- name: step_5_count_dict_list\n  brick: count_dict_list\n  params:\n    items: ${step_3_difference_lists.result}\n  save_as: step_5_count_dict_list\n- name: step_6_map_values\n  brick: map_values\n  params:\n    items: ${step_3_difference_lists.result}\n    key: price\n  save_as: step_6_map_values\n- name: step_7_zip_lists\n  brick: zip_lists\n  params:\n    a: ${step_6_map_values.result}\n    b: ${step_4_map_values.result}\n  save_as: step_7_zip_lists\n- name: step_8_for_each\n  brick: __for_each__\n  params:\n    items: ${step_7_zip_lists.result}\n    do_brick: reduce_sum\n    item_kwarg: values\n    static_kwargs: {}\n    item_paths: {}\n    on_error: fail\n  save_as: step_8_for_each\n- name: step_9_calculate_aggregates\n  brick: calculate_aggregates\n  params:\n    items: ${step_8_for_each.result}\n    field: result\n    operation: sum\n  save_as: step_9_calculate_aggregates\noutputs_map:\n  available_count: ${step_5_count_dict_list.result}\n  total_value: ${step_9_calculate_aggregates.result}\n",
+    "dsl_code": "@flow\ndef process_product_inventory(raw_api_response):\n    parsed          = step.extract_json_from_str(text=raw_api_response)\n    out_of_stock    = step.filter_dict_list(items=parsed.output, key=\"stock\", value=0)\n    available       = step.difference_lists(a=parsed.output, b=out_of_stock.output)\n    available_count = step.count_dict_list(items=available.output)\n    prices          = step.map_values(items=available.output, key=\"price\")\n    stocks          = step.map_values(items=available.output, key=\"stock\")\n    zipped          = step.zip_lists(a=prices.output, b=stocks.output)\n    per_product     = for_each(items=zipped.output, do=lambda item: step.reduce_sum(values=item))\n    total_value     = step.calculate_aggregates(items=per_product.output, field=\"result\", operation=\"sum\")\n    return {\"available_count\": available_count, \"total_value\": total_value}",
+    "error": "",
+    "flow_def": "<bricks.core.dsl.FlowDefinition object at 0x0000017C6F3903A0>",
+    "_driver_duration_ms": 228047
+  },
+  "raw_llm": {
+    "outputs": {
+      "available_count": 3,
+      "total_value": 2459.27
+    },
+    "tokens_in": 3,
+    "tokens_out": 22,
+    "duration_seconds": 6.905999999959022,
+    "model": "claude-sonnet-4-6",
+    "raw_response": "{\"available_count\": 3, \"total_value\": 2459.27}",
+    "dsl_code": "",
+    "error": "",
+    "flow_def": null,
+    "_driver_duration_ms": 6905
+  }
+}

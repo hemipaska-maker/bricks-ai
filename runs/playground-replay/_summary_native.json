@@ -1,0 +1,101 @@
+[
+  {
+    "preset": "crm_pipeline",
+    "expected": {
+      "active_count": 9,
+      "total_active_revenue": 1524.0,
+      "avg_active_revenue": 169.33
+    },
+    "bricks_outputs": {
+      "active_count": 9,
+      "total_active_revenue": 1524.0,
+      "avg_active_revenue": 169.33333333333334
+    },
+    "bricks_error": "",
+    "bricks_tokens_in": 6,
+    "bricks_tokens_out": 585,
+    "raw_outputs": {
+      "active_count": 9,
+      "total_active_revenue": 1023.5,
+      "avg_active_revenue": 113.72222222222223
+    },
+    "raw_error": "",
+    "raw_tokens_in": 3,
+    "raw_tokens_out": 40
+  },
+  {
+    "preset": "ticket_pipeline",
+    "expected": {
+      "open_high_count": 9,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 3
+    },
+    "bricks_outputs": {
+      "open_high_count": 9,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 3
+    },
+    "bricks_error": "",
+    "bricks_tokens_in": 6,
+    "bricks_tokens_out": 877,
+    "raw_outputs": {
+      "open_high_count": 10,
+      "billing_count": 4,
+      "technical_count": 2,
+      "general_count": 4
+    },
+    "raw_error": "",
+    "raw_tokens_in": 3,
+    "raw_tokens_out": 37
+  },
+  {
+    "preset": "cross_dataset_join",
+    "expected": {
+      "total_completed": 18,
+      "basic_revenue": 3758.7,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8
+    },
+    "bricks_outputs": {
+      "basic_revenue": 3758.7000000000003,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8,
+      "total_completed": 18
+    },
+    "bricks_error": "",
+    "bricks_tokens_in": 3,
+    "bricks_tokens_out": 2860,
+    "raw_outputs": {
+      "basic_revenue": 3758.7,
+      "pro_revenue": 0.0,
+      "enterprise_revenue": 687.8,
+      "total_completed": 18
+    },
+    "raw_error": "",
+    "raw_tokens_in": 3,
+    "raw_tokens_out": 2297
+  },
+  {
+    "preset": "custom_example",
+    "expected": {
+      "available_count": 3,
+      "total_value": 2859.75
+    },
+    "bricks_outputs": {
+      "available_count": 3,
+      "total_value": 454.97
+    },
+    "bricks_error": "",
+    "bricks_tokens_in": 6,
+    "bricks_tokens_out": 14222,
+    "raw_outputs": {
+      "available_count": 3,
+      "total_value": 2459.27
+    },
+    "raw_error": "",
+    "raw_tokens_in": 3,
+    "raw_tokens_out": 22
+  }
+]
