@@ -110,3 +110,93 @@ def test_run_unknown_preset_exits_1_with_helpful_message() -> None:
     # user sees what's available without re-reading docs.
     assert "no_such_preset_42" in r.output
     assert "crm_pipeline" in r.output
+
+
+def test_run_uses_inferred_provider_for_claudecode_preset() -> None:
+    """All bundled presets declare ``model: claudecode`` — the CLI must
+    infer ``claude_code`` (not LiteLLM) so the run actually works."""
+    captured: dict[str, str] = {}
+
+    def fake_build(*, provider: str, model: str, api_key: str) -> object:
+        captured["provider"] = provider
+        captured["model"] = model
+        captured["api_key"] = api_key
+        return SimpleNamespace()
+
+    with (
+        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch(
+            "bricks.playground.engine.BricksEngine.solve",
+            return_value=_stub_engine_result({"x": 1}),
+        ),
+    ):
+        r = _runner.invoke(app, ["playground", "run", "crm_pipeline"])
+
+    assert r.exit_code == 0, r.output
+    assert captured["provider"] == "claude_code"
+    # API key resolution skips claude_code (no key needed).
+    assert captured["api_key"] == ""
+
+
+def test_run_explicit_provider_flag_overrides_inference() -> None:
+    """``--provider`` wins over the inference rules."""
+    captured: dict[str, str] = {}
+
+    def fake_build(*, provider: str, model: str, api_key: str) -> object:
+        captured["provider"] = provider
+        captured["model"] = model
+        return SimpleNamespace()
+
+    with (
+        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch(
+            "bricks.playground.engine.BricksEngine.solve",
+            return_value=_stub_engine_result({"x": 1}),
+        ),
+    ):
+        r = _runner.invoke(
+            app,
+            ["playground", "run", "crm_pipeline", "--provider", "anthropic", "--api-key", "k"],
+        )
+
+    assert r.exit_code == 0, r.output
+    assert captured["provider"] == "anthropic"
+
+
+def test_run_model_flag_overrides_scenario_model() -> None:
+    """``--model`` lets the user swap the model without editing the YAML."""
+    captured: dict[str, str] = {}
+
+    def fake_build(*, provider: str, model: str, api_key: str) -> object:
+        captured["model"] = model
+        return SimpleNamespace()
+
+    with (
+        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch(
+            "bricks.playground.engine.BricksEngine.solve",
+            return_value=_stub_engine_result({"x": 1}),
+        ),
+    ):
+        r = _runner.invoke(
+            app,
+            ["playground", "run", "crm_pipeline", "--model", "gpt-4o-mini", "--api-key", "k"],
+        )
+
+    assert r.exit_code == 0, r.output
+    assert captured["model"] == "gpt-4o-mini"
+
+
+def test_run_anthropic_without_key_exits_1() -> None:
+    """BYOK rule: anthropic without an API key (flag or env) fails fast."""
+    with patch.dict("os.environ", {"BRICKS_API_KEY": "", "ANTHROPIC_API_KEY": ""}, clear=False):
+        # Make sure no umbrella key bleeds in from the host shell.
+        import os
+
+        os.environ.pop("BRICKS_API_KEY", None)
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        r = _runner.invoke(app, ["playground", "run", "crm_pipeline", "--provider", "anthropic"])
+
+    assert r.exit_code == 1
+    assert "anthropic" in r.output
+    assert "API_KEY" in r.output
