@@ -606,27 +606,42 @@ def _playground_root(
 @playground_app.command("run")
 def playground_run(
     target: str = typer.Argument(..., help="Preset stem (e.g. 'crm_pipeline') or path to a scenario YAML."),
-    compare_raw: bool = typer.Option(
-        False, "--compare-raw", help="Also run the raw-LLM engine for side-by-side comparison."
+    provider: str = typer.Option(
+        "",
+        "--provider",
+        help="LLM provider: claude_code | anthropic | openai | ollama. "
+        "Inferred from the scenario's model alias when empty.",
+    ),
+    model: str = typer.Option(
+        "",
+        "--model",
+        help="Override the scenario's model (e.g. 'gpt-4o-mini'). Empty = use scenario.model.",
     ),
     api_key: str = typer.Option(
         "",
         "--api-key",
-        help="API key for the LLM provider (BYOK). Reads BRICKS_API_KEY / ANTHROPIC_API_KEY env if empty.",
+        help="BYOK key. Resolution: this flag → BRICKS_API_KEY env → "
+        "ANTHROPIC_API_KEY / OPENAI_API_KEY env. Ignored for claude_code / ollama.",
+    ),
+    compare_raw: bool = typer.Option(
+        False, "--compare-raw", help="Also run the raw-LLM engine for side-by-side comparison."
     ),
 ) -> None:
     """Run a playground scenario headlessly and print input data, blueprint, outputs.
 
     Resolves *target* to a YAML path (preset stem under
-    ``bricks/playground/presets/`` or a literal file path), runs the
-    BricksEngine on the bundled data, and (with ``--compare-raw``) the
-    RawLLMEngine alongside it.
+    ``bricks/playground/presets/`` or a literal file path), constructs an
+    LLM provider via :mod:`bricks.playground.provider_factory` (same
+    factory the web UI uses), runs BricksEngine, and — with
+    ``--compare-raw`` — RawLLMEngine alongside it.
     """
-    import os  # noqa: PLC0415
-
     try:
-        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
         from bricks.playground.engine import BricksEngine, RawLLMEngine  # noqa: PLC0415
+        from bricks.playground.provider_factory import (  # noqa: PLC0415
+            build_provider,
+            infer_provider,
+            resolve_api_key,
+        )
         from bricks.playground.scenario_loader import load_scenario, resolve_preset  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: Playground features require the 'playground' extra.", err=True)
@@ -646,10 +661,22 @@ def playground_run(
     typer.echo(_pretty_truncate(raw_data, max_chars=2000))
     typer.echo("")
 
-    resolved_key = api_key or os.environ.get("BRICKS_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
-    provider = LiteLLMProvider(model=scenario.model, api_key=resolved_key)
+    effective_model = model or scenario.model
+    if not provider:
+        try:
+            provider = infer_provider(effective_model)
+        except ValueError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
 
-    bricks_engine = BricksEngine(provider=provider)
+    resolved_key = resolve_api_key(provider, explicit=api_key)
+    try:
+        llm_provider = build_provider(provider=provider, model=effective_model, api_key=resolved_key)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    bricks_engine = BricksEngine(provider=llm_provider)
     bricks_result = bricks_engine.solve(scenario.task_text, raw_data)
 
     typer.echo("=== COMPOSED BLUEPRINT (bricks) ===")
@@ -664,7 +691,7 @@ def playground_run(
     typer.echo("")
 
     if compare_raw:
-        raw_engine = RawLLMEngine(provider=provider)
+        raw_engine = RawLLMEngine(provider=llm_provider)
         raw_result = raw_engine.solve(scenario.task_text, raw_data)
         typer.echo("=== OUTPUTS (raw_llm) ===")
         if raw_result.error:

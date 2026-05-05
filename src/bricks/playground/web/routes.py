@@ -22,6 +22,7 @@ from fastapi.responses import StreamingResponse
 from bricks import __version__ as _bricks_version
 from bricks.core.hooks import hookimpl as _hookimpl
 from bricks.llm.base import LLMProvider
+from bricks.playground.provider_factory import build_provider
 from bricks.playground.scenario_loader import _PRESETS_DIR, resolve_preset
 from bricks.playground.web.schemas import (
     EngineResult,
@@ -40,53 +41,18 @@ _UPLOAD_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 def _build_provider(provider: str, model: str, api_key: str | None) -> LLMProvider:
-    """Return an LLMProvider for the given ``provider`` / ``model`` pair.
+    """Thin web wrapper over :func:`bricks.playground.provider_factory.build_provider`.
 
-    All four providers from design.md §7 are implemented here. API keys
-    live only in the request body (BYOK) and are never read from the
-    environment.
-
-    Args:
-        provider: One of ``anthropic`` / ``openai`` / ``claude_code`` / ``ollama``.
-        model: Provider-specific model identifier.
-        api_key: BYOK key (required for anthropic / openai, ignored for
-            ``claude_code`` and ``ollama``).
-
-    Returns:
-        An ``LLMProvider`` instance.
-
-    Raises:
-        HTTPException: 400 if BYOK is required but missing.
+    Translates the shared factory's ``ValueError`` (unknown provider,
+    missing BYOK) into the ``HTTPException(400)`` the route handlers
+    expect. Lives here so the route's signature stays unchanged for
+    existing callers while the actual construction logic is shared
+    with the ``bricks playground run`` CLI.
     """
-    if provider == "claude_code":
-        from bricks.providers.claudecode import ClaudeCodeProvider
-
-        return ClaudeCodeProvider(model=model or None)
-
-    if provider == "ollama":
-        from bricks.providers.ollama import OllamaProvider
-
-        return OllamaProvider(model=model)
-
-    if provider in {"anthropic", "openai"} and not api_key:
-        raise HTTPException(status_code=400, detail=f"{provider} requires an api_key in the request body (BYOK)")
-
-    if provider == "anthropic":
-        from bricks.providers.anthropic import AnthropicProvider
-
-        assert api_key is not None  # narrowed by the BYOK check above
-        return AnthropicProvider(model=model, api_key=api_key)
-
-    if provider == "openai":
-        from bricks.providers.openai import OpenAIProvider
-
-        assert api_key is not None
-        return OpenAIProvider(model=model, api_key=api_key)
-
-    raise HTTPException(
-        status_code=400,
-        detail=f"Unknown provider {provider!r}",
-    )
+    try:
+        return build_provider(provider=provider, model=model, api_key=api_key or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _load_preset_dict(path: Path) -> dict[str, Any]:
