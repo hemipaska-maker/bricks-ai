@@ -6,7 +6,7 @@
 
 **LLMs guess. Bricks computes.**
 
-Bricks is a deterministic execution engine for AI agents. Your LLM writes a YAML blueprint from pre-tested building blocks. Bricks validates it, then executes it — same input, same output, every time. No hallucinated math. No format failures. No token burn on repeat runs.
+Bricks is a deterministic execution engine for AI agents. Your LLM writes a Python DSL pipeline from pre-tested building blocks. Bricks validates it (AST whitelist), then executes it — same input, same output, every time. No hallucinated math. No format failures. No token burn on repeat runs.
 
 ---
 
@@ -26,9 +26,10 @@ The Playground is a local web UI that runs your task through Bricks against embe
 ```bash
 git clone https://github.com/hemipaska-maker/bricks-ai.git
 cd bricks
-pip install -e ".[stdlib,ai,playground]"
-export ANTHROPIC_API_KEY=sk-ant-...       # or any supported LLM — see below
+pip install -e ".[ai,playground]"
 bricks playground                          # open the web UI at http://localhost:8080
+                                           # claude_code is the default — no API key needed
+                                           # for anthropic / openai keys, see "Bring Your Own LLM" below
 ```
 
 Here's what you'll see — real results tested across three Claude models:
@@ -212,10 +213,11 @@ The MCP server exposes:
 # From source (recommended for now)
 git clone https://github.com/hemipaska-maker/bricks-ai.git
 cd bricks
-pip install -e ".[stdlib,ai]"
+pip install -e ".[ai,playground]"
 
-# stdlib: 100 pre-tested bricks (data, string, math, validation, encoding)
-# ai: LiteLLM for multi-provider LLM composition
+# 100 stdlib bricks (data, string, math, validation, encoding) ship by default.
+# ai: LiteLLM + direct provider SDKs (anthropic, openai, ollama).
+# playground: FastAPI web UI + the `bricks playground run` CLI.
 ```
 
 ---
@@ -423,11 +425,11 @@ bricks playground run path/to/your_scenario.yaml     # your own scenario, same s
 
 Each preset runs BricksEngine on the bundled data, prints the composed blueprint, and (optionally) compares against a raw LLM call.
 
-| Scenario | What it proves | Bricks | Raw LLM |
-|----------|---------------|--------|---------|
-| **CRM-pipeline** | Determinism beats reasoning | ✅ Correct | ❌ Wrong (hallucination or format failure) |
-| **CRM-hallucination** | Consistency at scale (10 runs) | 10/10 (100%) | 6/10 (60%) |
-| **CRM-reuse** | Zero cost after first run (20 runs) | 20/20, 3,327 tokens | 12/20, 75,880 tokens |
-| **TICKET-pipeline** | Generalizes to new domains | ✅ Correct | ❌ Struggles with PII + filtering |
+| Preset | What it proves | Bricks | Raw LLM |
+|---|---|---|---|
+| **`crm_pipeline`** | Determinism beats reasoning | ✅ Correct | ❌ Wrong (hallucination or format failure) |
+| **`cross_dataset_join`** | Multi-table join + grouped aggregation | ✅ `total_completed: 18, basic_revenue: 3758.70, …` | ❌ Often misses the join shape |
+| **`ticket_pipeline`** | Generalises to a different domain (support tickets) | ✅ Correct | ❌ Struggles with PII + filtering |
+| **`custom_example`** | Inline / BYO data — no dataset file required | ✅ `available_count: 3, total_value: 2859.75` | ✅ Trivial enough that raw usually gets it |
 
 Tested with ClaudeCode, Claude Haiku, and Claude Sonnet.
