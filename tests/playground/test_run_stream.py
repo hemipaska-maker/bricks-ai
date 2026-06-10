@@ -16,9 +16,9 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-import bricks.playground.web.routes as routes_module
-from bricks.llm.base import CompletionResult, LLMProvider
-from bricks.playground.web.app import app
+import bricks_ai.playground.web.routes as routes_module
+from bricks_ai.llm.base import CompletionResult, LLMProvider
+from bricks_ai.playground.web.app import app
 
 _FIXTURE_DIR = Path(__file__).parent.parent / "integration" / "fixtures"
 _CRM_RAW = json.dumps(

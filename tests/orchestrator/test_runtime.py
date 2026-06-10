@@ -1,4 +1,4 @@
-"""Tests for bricks.orchestrator.runtime — RuntimeOrchestrator."""
+"""Tests for bricks_ai.orchestrator — RuntimeOrchestrator."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bricks.ai.composer import ComposeResult
 from bricks.boot.config import SystemConfig
 from bricks.core.config import StoreConfig
 from bricks.core.exceptions import OrchestratorError
 from bricks.core.models import ExecutionResult, Verbosity
 from bricks.core.registry import BrickRegistry
 from bricks.core.selector import AllBricksSelector
-from bricks.llm.base import CompletionResult, LLMProvider
-from bricks.orchestrator.runtime import RuntimeOrchestrator
 from bricks.selector.selector import TieredBrickSelector
+from bricks_ai.composer import ComposeResult
+from bricks_ai.llm.base import CompletionResult, LLMProvider
+from bricks_ai.orchestrator import RuntimeOrchestrator
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 

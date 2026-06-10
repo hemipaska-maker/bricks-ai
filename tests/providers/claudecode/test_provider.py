@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from bricks.providers.claudecode import ClaudeCodeProvider
+from bricks_ai.providers.claudecode import ClaudeCodeProvider
 
 _CLAUDE_AVAILABLE = shutil.which("claude") is not None
 
@@ -58,7 +58,7 @@ def test_json_output_populates_all_fields() -> None:
     """JSON response maps to real tokens, cost, cache counters."""
     provider = ClaudeCodeProvider()
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run(json.dumps(_SAMPLE_JSON)),
     ):
         response = provider.complete("hi")
@@ -79,7 +79,7 @@ def test_is_error_true_raises_runtime_error() -> None:
     provider = ClaudeCodeProvider()
     with (
         patch(
-            "bricks.providers.claudecode.provider.subprocess.run",
+            "bricks_ai.providers.claudecode.provider.subprocess.run",
             return_value=_mock_run(json.dumps(payload)),
         ),
         pytest.raises(RuntimeError, match="boom"),
@@ -91,7 +91,7 @@ def test_malformed_json_falls_back_to_estimate() -> None:
     """Non-JSON output falls back to tiktoken/char estimation."""
     provider = ClaudeCodeProvider()
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run("not-json"),
     ):
         response = provider.complete("hello world")
@@ -108,7 +108,7 @@ def test_malformed_json_fallback_preserves_model_alias() -> None:
     """Fallback uses the configured model alias when set."""
     provider = ClaudeCodeProvider(model="opus")
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run("not-json"),
     ):
         response = provider.complete("hi")
@@ -121,7 +121,7 @@ def test_model_param_appears_in_command() -> None:
     """`model=` adds `--model <alias>` to the subprocess argv."""
     provider = ClaudeCodeProvider(model="opus")
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run(json.dumps(_SAMPLE_JSON)),
     ) as mock_run:
         provider.complete("hi")
@@ -134,7 +134,7 @@ def test_model_param_absent_when_not_set() -> None:
     """Default provider does not pass `--model`."""
     provider = ClaudeCodeProvider()
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run(json.dumps(_SAMPLE_JSON)),
     ) as mock_run:
         provider.complete("hi")
@@ -156,7 +156,7 @@ def test_per_model_variants(model_key: str) -> None:
     }
     provider = ClaudeCodeProvider()
     with patch(
-        "bricks.providers.claudecode.provider.subprocess.run",
+        "bricks_ai.providers.claudecode.provider.subprocess.run",
         return_value=_mock_run(json.dumps(payload)),
     ):
         response = provider.complete("hi")
@@ -175,7 +175,7 @@ def test_nonzero_returncode_raises() -> None:
     )
     with (
         patch(
-            "bricks.providers.claudecode.provider.subprocess.run",
+            "bricks_ai.providers.claudecode.provider.subprocess.run",
             return_value=failed,
         ),
         pytest.raises(RuntimeError, match="cli crashed"),

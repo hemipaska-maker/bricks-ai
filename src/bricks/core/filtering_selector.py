@@ -1,6 +1,6 @@
 """FilteringSelector — wraps another selector and excludes named bricks.
 
-Used by the tier-40 :class:`~bricks.ai.healing.FullRecomposeHealer` when
+Used by the tier-40 :class:`~bricks_ai.healing.FullRecomposeHealer` when
 prior healing attempts identified specific bricks that the LLM keeps
 misusing. By dropping those bricks from the pool before the next compose,
 the LLM is forced to pick an alternative.

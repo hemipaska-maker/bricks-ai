@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from bricks.ai.composer import BlueprintComposer
 from bricks.core.builtins import register_builtins
 from bricks.core.dsl import FlowDefinition, flow, for_each, step
 from bricks.core.engine import BlueprintEngine, DAGExecutionEngine
 from bricks.core.loader import BlueprintLoader
 from bricks.core.models import BrickMeta, ExecutionResult
 from bricks.core.registry import BrickRegistry
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.composer import BlueprintComposer
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -93,7 +93,7 @@ def test_full_pipeline_compose_and_execute() -> None:
 
 def test_mcp_execute_returns_dsl_code_when_verbose() -> None:
     """Orchestrator verbose result includes dsl_code field."""
-    from bricks.orchestrator.runtime import RuntimeOrchestrator
+    from bricks_ai.orchestrator import RuntimeOrchestrator
 
     reg = _make_math_registry()
     composer = _make_composer(reg)
@@ -212,7 +212,7 @@ def test_flow_to_yaml_round_trips() -> None:
 
 def test_verbose_output_has_dsl_and_yaml() -> None:
     """Both dsl_code and blueprint_yaml present in verbose orchestrator response."""
-    from bricks.orchestrator.runtime import RuntimeOrchestrator
+    from bricks_ai.orchestrator import RuntimeOrchestrator
 
     reg = _make_math_registry()
     composer = _make_composer(reg)

@@ -496,7 +496,7 @@ class FlowDefinition:
             input_names: Declared flow parameter names (order preserved).
                 Populated by :func:`flow` so :meth:`to_blueprint` can emit
                 the matching ``blueprint.inputs`` keys — without them the
-                orchestrator's :class:`~bricks.orchestrator.input_mapper.InputMapper`
+                orchestrator's :class:`~bricks.core.input_mapper.InputMapper`
                 has no slots to bind runtime ``inputs={...}`` values into
                 and step params remain stuck on the trace-time sentinel.
         """

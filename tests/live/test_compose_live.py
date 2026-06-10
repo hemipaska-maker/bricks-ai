@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import pytest
 
-from bricks.ai.composer import BlueprintComposer
 from bricks.core.registry import BrickRegistry
-from bricks.llm.base import LLMProvider
 from bricks.stdlib import register as _register_stdlib
+from bricks_ai.composer import BlueprintComposer
+from bricks_ai.llm.base import LLMProvider
 
 
 @pytest.mark.live

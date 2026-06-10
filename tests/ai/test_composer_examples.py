@@ -13,8 +13,8 @@ import ast
 
 import pytest
 
-from bricks.ai.composer import DSL_PROMPT_TEMPLATE
 from bricks.core.validator_dsl import validate_dsl
+from bricks_ai.composer import DSL_PROMPT_TEMPLATE
 
 
 def _extract_examples(template: str) -> list[str]:

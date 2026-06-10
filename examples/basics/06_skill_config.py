@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from bricks import Bricks
+from bricks_ai import Bricks
 
 _CONFIG_DIR = Path(__file__).parent.parent / "config"
 _AGENT_YAML = _CONFIG_DIR / "agent.yaml"

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from bricks.api import Bricks
-from bricks.llm.base import LLMProvider
+from bricks_ai.api import Bricks
+from bricks_ai.llm.base import LLMProvider
 
 
 @pytest.mark.live
@@ -36,8 +36,8 @@ def test_reuse_hits_cache(llm_provider: LLMProvider) -> None:
     from bricks.boot.config import SystemConfig
     from bricks.core.config import StoreConfig
     from bricks.core.registry import BrickRegistry
-    from bricks.orchestrator.runtime import RuntimeOrchestrator
     from bricks.stdlib import register as _reg_stdlib
+    from bricks_ai.orchestrator import RuntimeOrchestrator
 
     registry = BrickRegistry()
     _reg_stdlib(registry)

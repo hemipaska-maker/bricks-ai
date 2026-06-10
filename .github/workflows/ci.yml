@@ -17,7 +17,8 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pip install -e ".[dev,ai,mcp,playground]"
-      - run: mypy src/bricks
+      - run: mypy src/bricks src/bricks_ai
+      - run: lint-imports
       - run: cog --check README.md
 
   links:
@@ -41,3 +42,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev,ai,mcp,playground]"
       - run: pytest
+
+  # Proves the deterministic engine works in an environment where no LLM SDK
+  # (litellm / anthropic / openai) is even installed — base install only.
+  engine-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pytest
+      - run: python -c "import bricks; print('engine import OK,', bricks.__version__)"
+      - run: python -c "import sys, bricks; leaked = [m for m in sys.modules if m.startswith('bricks_ai') or m in ('litellm', 'anthropic', 'openai')]; assert not leaked, leaked"
+      - run: bricks --help
+      - run: pytest tests/core tests/stdlib tests/store tests/selector tests/boot

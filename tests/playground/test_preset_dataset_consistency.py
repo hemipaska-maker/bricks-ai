@@ -24,8 +24,8 @@ from typing import Any
 import pytest
 import yaml
 
-from bricks.playground.dataset_loader import _DATASETS_DIR
-from bricks.playground.scenario_loader import _PRESETS_DIR
+from bricks_ai.playground.dataset_loader import _DATASETS_DIR
+from bricks_ai.playground.scenario_loader import _PRESETS_DIR
 
 # Inline-data presets carry their data inside the YAML; dataset-id
 # presets reference one of the bundled JSON files. The dataset_id

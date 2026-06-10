@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bricks.ai.composer import (
+from bricks.core.registry import BrickRegistry
+from bricks_ai.composer import (
     BlueprintComposer,
     ComposeResult,
     CompositionError,
 )
-from bricks.core.registry import BrickRegistry
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 # ---------------------------------------------------------------------------
 # DSL fixtures

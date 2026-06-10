@@ -1,6 +1,6 @@
 """Tests for issue #66 bug B — public ``Bricks`` default registry must ship builtins.
 
-``Bricks.default()`` → ``_build_default_registry()`` previously called
+``Bricks.default()`` → ``build_default_registry()`` previously called
 ``discover_and_load`` for stdlib packs but never registered the DSL
 control-flow builtins (``__for_each__`` / ``__branch__``). Any composed
 blueprint that wrapped iteration crashed on the first ``registry.get``
@@ -12,16 +12,17 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from bricks.api import Bricks, _build_default_registry
+from bricks.api import build_default_registry
 from bricks.core.engine import BlueprintEngine
 from bricks.core.models import BlueprintDefinition, StepDefinition
+from bricks_ai.api import Bricks
 
 
-def test_build_default_registry_includes_control_flow_builtins() -> None:
+def testbuild_default_registry_includes_control_flow_builtins() -> None:
     """The registry backing ``Bricks.default()`` must have both DSL
     builtins so composed blueprints never crash with
     ``BrickNotFoundError: '__for_each__'``."""
-    reg = _build_default_registry()
+    reg = build_default_registry()
     assert reg.has("__for_each__"), "__for_each__ missing — for_each blueprints would fail"
     assert reg.has("__branch__"), "__branch__ missing — conditional blueprints would fail"
 

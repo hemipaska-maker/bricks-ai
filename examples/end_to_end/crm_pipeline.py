@@ -49,7 +49,7 @@ outputs_map:
   active_count: "${active_count.result}"
 """
 
-# Fallback inline data (5 records) used when bricks.playground is not installed
+# Fallback inline data (5 records) used when bricks_ai.playground is not installed
 _FALLBACK_DATA = json.dumps(
     {
         "customers": [
@@ -73,11 +73,11 @@ def _load_data() -> tuple[str, int]:
 
 def run_demo(raw_data: str, expected_active: int) -> None:
     """Demo mode: pre-composed blueprint, no API key needed."""
-    from bricks.api import _build_default_registry
+    from bricks.api import build_default_registry
     from bricks.core.engine import BlueprintEngine
     from bricks.core.loader import BlueprintLoader
 
-    registry = _build_default_registry()
+    registry = build_default_registry()
     blueprint = BlueprintLoader().load_string(_DEMO_YAML)
     outputs = BlueprintEngine(registry=registry).run(blueprint, inputs={"raw_data": raw_data}).outputs
 
@@ -90,8 +90,8 @@ def run_demo(raw_data: str, expected_active: int) -> None:
 
 def run_live(raw_data: str) -> None:
     """Live mode: AI composes and executes the pipeline."""
-    from bricks import Bricks
-    from bricks.llm.litellm_provider import LiteLLMProvider
+    from bricks_ai import Bricks
+    from bricks_ai.llm.litellm_provider import LiteLLMProvider
 
     model = os.getenv("BRICKS_MODEL", "claude-haiku-4-5")
     provider = LiteLLMProvider(model=model)

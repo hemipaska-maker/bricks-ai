@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from bricks.llm.base import LLMProvider
+from bricks_ai.llm.base import LLMProvider
 
 # Minimal valid blueprint YAML for filtering active customers
 _ACTIVE_FILTER_YAML = """\
@@ -59,7 +59,7 @@ def test_demo_flow_mocked(llm_provider: LLMProvider) -> None:
 @pytest.mark.live
 def test_demo_flow_live(llm_provider: LLMProvider) -> None:
     """Live smoke test: compose + execute with real LLM (--live flag required)."""
-    from bricks.api import Bricks
+    from bricks_ai.api import Bricks
 
     engine = Bricks.default(provider=llm_provider)
     result: dict[str, Any] = engine.execute(

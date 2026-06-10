@@ -1,4 +1,4 @@
-"""Tests for bricks.mcp — execute_task tool and MCP server handlers."""
+"""Tests for bricks_ai.mcp — execute_task tool and MCP server handlers."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bricks.mcp.tool import EXECUTE_TASK_SCHEMA, execute_task
+from bricks_ai.mcp.tool import EXECUTE_TASK_SCHEMA, execute_task
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -25,7 +25,7 @@ def _mock_orchestrator(
     output_tokens: int = 20,
 ) -> MagicMock:
     """Return a mock RuntimeOrchestrator with a configured execute() return value."""
-    from bricks.orchestrator.runtime import RuntimeOrchestrator
+    from bricks_ai.orchestrator import RuntimeOrchestrator
 
     mock = MagicMock(spec=RuntimeOrchestrator)
     mock.execute.return_value = {
@@ -41,7 +41,7 @@ def _mock_orchestrator(
 
 def _mock_orchestrator_verbose() -> MagicMock:
     """Return a mock orchestrator with a verbose execute() return value."""
-    from bricks.orchestrator.runtime import RuntimeOrchestrator
+    from bricks_ai.orchestrator import RuntimeOrchestrator
 
     mock = MagicMock(spec=RuntimeOrchestrator)
     mock.execute.return_value = {
@@ -141,7 +141,7 @@ def _capture_handlers(engine: MagicMock) -> dict:
     """Run run_mcp_server with a fake server and return all captured handlers."""
     import asyncio
 
-    from bricks.mcp.server import run_mcp_server
+    from bricks_ai.mcp.server import run_mcp_server
 
     captured: dict = {}
 
@@ -431,6 +431,6 @@ class TestLogging:
 
         engine = _make_bricks_engine()
         handlers = _capture_handlers(engine)
-        with patch.object(logging.getLogger("bricks.mcp"), "info") as mock_log:
+        with patch.object(logging.getLogger("bricks_ai.mcp"), "info") as mock_log:
             asyncio.run(handlers["call_tool"]("execute_task", {"task": "hello"}))
             assert mock_log.call_count >= 1

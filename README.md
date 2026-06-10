@@ -25,7 +25,7 @@ The Playground is a local web UI that runs your task through Bricks against embe
 
 ```bash
 git clone https://github.com/hemipaska-maker/bricks-ai.git
-cd bricks
+cd bricks-ai
 pip install -e ".[ai,playground]"
 bricks playground                          # open the web UI at http://localhost:8080
                                            # claude_code is the default — no API key needed
@@ -86,6 +86,22 @@ The LLM is used once, for planning. Execution is pure Python — no LLM in the l
 
 ---
 
+## Architecture: Engine vs AI Layer
+
+The codebase is split into two packages with a strict one-way dependency:
+
+| Package | What it is | LLM involvement | Dependencies |
+|---|---|---|---|
+| **`bricks`** | The deterministic engine: brick registry, blueprint validation, DAG execution, 100 stdlib bricks, blueprint store | **None** — pure Python | pydantic, typer, ruamel.yaml, rich |
+| **`bricks_ai`** | The AI layer: LLM composer, healing, provider adapters, task orchestrator, playground, MCP server | All of it | `bricks` + optional LLM SDKs |
+
+`bricks_ai` imports `bricks`; the engine never imports the AI layer. The boundary
+is enforced in CI by import-linter and an `engine-only` job that installs the base
+package — with no LLM SDK present — and runs the engine test suites. A plain
+`pip install bricks-ai` gives you the deterministic engine; the AI extras opt you in.
+
+---
+
 ## Why Bricks?
 
 **Correctness.** 100% across every model tested. Raw LLMs hallucinate numbers, ignore format instructions, and drift across runs. Bricks doesn't — every brick is typed and tested.
@@ -100,8 +116,10 @@ The LLM is used once, for planning. Execution is pure Python — no LLM in the l
 
 ## Quick Start — Python API
 
+Natural-language task execution lives in the AI layer (`bricks_ai`):
+
 ```python
-from bricks.api import Bricks
+from bricks_ai import Bricks
 
 # One line setup — auto-discovers all installed brick packs
 engine = Bricks.default()  # reads API key from environment
@@ -115,6 +133,16 @@ result = engine.execute(
 print(result["outputs"])      # {"active_customers": [...], "count": 42}
 print(result["cache_hit"])    # True on second call — zero tokens!
 print(result["tokens_used"])  # 0 on cache hit
+```
+
+Already have a blueprint? The deterministic engine runs it with zero LLM
+involvement (and zero LLM packages installed):
+
+```python
+from bricks import run_blueprint
+
+result = run_blueprint("blueprints/revenue.yaml", inputs={"values": [1, 2, 3]})
+print(result.outputs)
 ```
 
 **Verified output** (a deterministic stdlib brick, regenerated on every commit):
@@ -212,12 +240,14 @@ The MCP server exposes:
 ```bash
 # From source (recommended for now)
 git clone https://github.com/hemipaska-maker/bricks-ai.git
-cd bricks
+cd bricks-ai
 pip install -e ".[ai,playground]"
 
-# 100 stdlib bricks (data, string, math, validation, encoding) ship by default.
-# ai: LiteLLM + direct provider SDKs (anthropic, openai, ollama).
-# playground: FastAPI web UI + the `bricks playground run` CLI.
+# Base install = the deterministic engine only (no LLM SDKs):
+#   100 stdlib bricks (data, string, math, validation, encoding),
+#   blueprint validation/execution, the store, and the engine CLI commands.
+# ai: LiteLLM — enables `bricks_ai` composition (compose/demo/serve).
+# playground: FastAPI web UI + provider SDKs + the `bricks playground run` CLI.
 ```
 
 ---

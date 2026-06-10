@@ -408,12 +408,22 @@ def compose(
     intent: str = typer.Argument(..., help="Natural language description."),
 ) -> None:
     """AI-compose a blueprint from a natural language description."""
+    import importlib.util  # noqa: PLC0415
+
+    # litellm itself is imported lazily inside LiteLLMProvider.complete(), so
+    # importing the provider module succeeds even without the [ai] extra —
+    # check availability explicitly to fail fast before prompting for a key.
+    if importlib.util.find_spec("litellm") is None:
+        typer.echo("Error: AI features require the 'litellm' package.", err=True)
+        typer.echo('Install with: pip install "bricks-ai[ai]"', err=True)
+        raise typer.Exit(code=1)
+
     try:
-        from bricks.ai.composer import BlueprintComposer  # noqa: PLC0415
-        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
+        from bricks_ai.composer import BlueprintComposer  # noqa: PLC0415
+        from bricks_ai.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: AI features require the 'litellm' package.", err=True)
-        typer.echo("Install with: pip install bricks[ai]", err=True)
+        typer.echo('Install with: pip install "bricks-ai[ai]"', err=True)
         raise typer.Exit(code=1) from exc
 
     api_key = os.environ.get("ANTHROPIC_API_KEY") or typer.prompt("Anthropic API key", hide_input=True)
@@ -421,7 +431,7 @@ def compose(
     composer = BlueprintComposer(provider=LiteLLMProvider(api_key=api_key))
 
     try:
-        from bricks.ai.composer import ComposerError  # noqa: PLC0415
+        from bricks_ai.composer import ComposerError  # noqa: PLC0415
 
         result = composer.compose(intent, registry)
         typer.echo(f"Valid: {result.is_valid}")
@@ -442,14 +452,19 @@ def demo(
     provider_name: str = typer.Option("", "--provider", help="Provider override: 'claudecode' (no API key needed)."),
 ) -> None:
     """Interactive 3-act demo: simplicity -> correctness -> savings."""
-    from bricks.demo.runner import DemoRunner  # noqa: PLC0415
-    from bricks.llm.base import LLMProvider  # noqa: PLC0415
+    try:
+        from bricks_ai.demo.runner import DemoRunner  # noqa: PLC0415
+        from bricks_ai.llm.base import LLMProvider  # noqa: PLC0415
+    except ImportError as exc:
+        typer.echo("Error: the demo requires the AI layer.", err=True)
+        typer.echo('Install with: pip install "bricks-ai[ai]"', err=True)
+        raise typer.Exit(code=1) from exc
 
     resolved_provider: LLMProvider | None = None
 
     if provider_name == "claudecode":
         try:
-            from bricks.providers.claudecode.provider import (  # noqa: PLC0415
+            from bricks_ai.providers.claudecode.provider import (  # noqa: PLC0415
                 ClaudeCodeProvider,
             )
 
@@ -461,7 +476,12 @@ def demo(
             )
             raise typer.Exit(code=1) from None
     elif os.getenv("BRICKS_MODEL") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
-        from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
+        try:
+            from bricks_ai.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
+        except ImportError as exc:
+            typer.echo("Error: live demo mode requires the 'litellm' package.", err=True)
+            typer.echo('Install with: pip install "bricks-ai[ai]"', err=True)
+            raise typer.Exit(code=1) from exc
 
         resolved_model = os.getenv("BRICKS_MODEL", model)
         resolved_provider = LiteLLMProvider(model=resolved_model)
@@ -489,11 +509,11 @@ def serve(
     import asyncio  # noqa: PLC0415
 
     try:
-        from bricks import Bricks  # noqa: PLC0415
-        from bricks.mcp.server import run_mcp_server  # noqa: PLC0415
+        from bricks_ai import Bricks  # noqa: PLC0415
+        from bricks_ai.mcp.server import run_mcp_server  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: MCP features require the 'mcp' package.", err=True)
-        typer.echo("Install with: pip install bricks[mcp]", err=True)
+        typer.echo('Install with: pip install "bricks-ai[mcp,ai]"', err=True)
         raise typer.Exit(code=1) from exc
 
     typer.echo("Starting Bricks MCP server (stdio)...", err=True)
@@ -569,10 +589,10 @@ def _playground_root(
     try:
         import uvicorn  # noqa: PLC0415
 
-        from bricks.playground.web.app import app as web_app  # noqa: PLC0415
+        from bricks_ai.playground.web.app import app as web_app  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: Playground features require the 'playground' extra.", err=True)
-        typer.echo("Install with: pip install bricks[playground]", err=True)
+        typer.echo('Install with: pip install "bricks-ai[playground]"', err=True)
         raise typer.Exit(code=1) from exc
 
     if force_port:
@@ -631,21 +651,21 @@ def playground_run(
 
     Resolves *target* to a YAML path (preset stem under
     ``bricks/playground/presets/`` or a literal file path), constructs an
-    LLM provider via :mod:`bricks.playground.provider_factory` (same
+    LLM provider via :mod:`bricks_ai.llm.factory` (same
     factory the web UI uses), runs BricksEngine, and — with
     ``--compare-raw`` — RawLLMEngine alongside it.
     """
     try:
-        from bricks.playground.engine import BricksEngine, RawLLMEngine  # noqa: PLC0415
-        from bricks.playground.provider_factory import (  # noqa: PLC0415
+        from bricks_ai.llm.factory import (  # noqa: PLC0415
             build_provider,
             infer_provider,
             resolve_api_key,
         )
-        from bricks.playground.scenario_loader import load_scenario, resolve_preset  # noqa: PLC0415
+        from bricks_ai.playground.engine import BricksEngine, RawLLMEngine  # noqa: PLC0415
+        from bricks_ai.playground.scenario_loader import load_scenario, resolve_preset  # noqa: PLC0415
     except ImportError as exc:
         typer.echo("Error: Playground features require the 'playground' extra.", err=True)
-        typer.echo("Install with: pip install bricks[playground,ai]", err=True)
+        typer.echo('Install with: pip install "bricks-ai[playground,ai]"', err=True)
         raise typer.Exit(code=1) from exc
 
     try:
@@ -704,7 +724,7 @@ def _resolve_scenario_raw_data(scenario: Any, *, base_dir: Path) -> str:
     """Resolve a ScenarioDefinition's data source to a JSON string for the engines."""
     import json  # noqa: PLC0415
 
-    from bricks.playground.dataset_loader import DatasetLoader  # noqa: PLC0415
+    from bricks_ai.playground.dataset_loader import DatasetLoader  # noqa: PLC0415
 
     if scenario.data is not None:
         return json.dumps(scenario.data)
