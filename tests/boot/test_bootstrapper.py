@@ -1,15 +1,13 @@
-"""Tests for bricks.boot — SystemBootstrapper and SystemConfig."""
+"""Tests for bricks.boot — SystemBootstrapper and SystemConfig (YAML only, no LLM)."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from bricks.boot.bootstrapper import SystemBootstrapper
 from bricks.boot.config import SystemConfig
-from bricks.llm.base import CompletionResult, LLMProvider
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -80,13 +78,6 @@ store:
         assert cfg.max_selector_results == 10
         assert cfg.store.enabled is True
 
-    def test_yaml_no_llm_call(self, tmp_path: Path) -> None:
-        """YAML config does not make any LLM calls."""
-        p = _write(tmp_path, "agent.yaml", "name: silent\n")
-        mock_prov = MagicMock(spec=LLMProvider)
-        SystemBootstrapper(provider=mock_prov).bootstrap(p)
-        mock_prov.complete.assert_not_called()
-
     def test_yml_extension_supported(self, tmp_path: Path) -> None:
         """Bootstrap works with .yml extension as well as .yaml."""
         p = _write(tmp_path, "config.yml", "name: yml_test\n")
@@ -98,53 +89,6 @@ store:
         p = _write(tmp_path, "my_agent.yaml", "description: no name here\n")
         cfg = SystemBootstrapper().bootstrap(p)
         assert cfg.name == "my_agent"
-
-
-# ── TestBootstrapperMarkdown ────────────────────────────────────────────────
-
-
-class TestBootstrapperMarkdown:
-    """Tests for Markdown config bootstrapping (one LLM call)."""
-
-    def _mock_provider(self, json_text: str) -> MagicMock:
-        """Return a mock LLMProvider that returns json_text."""
-        mock_prov = MagicMock(spec=LLMProvider)
-        mock_prov.complete.return_value = CompletionResult(text=json_text)
-        return mock_prov
-
-    def test_md_extracts_categories_and_tags(self, tmp_path: Path) -> None:
-        """Bootstrap from .md makes one LLM call and extracts categories/tags."""
-        p = _write(
-            tmp_path,
-            "skill.md",
-            "# CRM Processor\nFilters and aggregates CRM customer data.\n",
-        )
-        mock_prov = self._mock_provider('{"categories": ["data_transformation"], "tags": ["filtering"]}')
-        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
-        assert cfg.brick_categories == ["data_transformation"]
-        assert cfg.tags == ["filtering"]
-
-    def test_md_extracts_title_as_name(self, tmp_path: Path) -> None:
-        """The H1 heading in the .md file becomes the config name."""
-        p = _write(tmp_path, "skill.md", "# My Agent\nDoes things.\n")
-        mock_prov = self._mock_provider('{"categories": [], "tags": []}')
-        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
-        assert cfg.name == "My Agent"
-
-    def test_md_llm_parse_failure_falls_back(self, tmp_path: Path) -> None:
-        """Malformed JSON from LLM → empty categories/tags, no crash."""
-        p = _write(tmp_path, "skill.md", "# Agent\nSome description.\n")
-        mock_prov = self._mock_provider("not valid json at all")
-        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
-        assert cfg.brick_categories == []
-        assert cfg.tags == []
-
-    def test_md_no_title_uses_stem(self, tmp_path: Path) -> None:
-        """No H1 heading → file stem used as name."""
-        p = _write(tmp_path, "my_skill.md", "No heading here.\n")
-        mock_prov = self._mock_provider('{"categories": [], "tags": []}')
-        cfg = SystemBootstrapper(provider=mock_prov).bootstrap(p)
-        assert cfg.name == "my_skill"
 
 
 # ── TestBootstrapperErrors ──────────────────────────────────────────────────
@@ -162,4 +106,10 @@ class TestBootstrapperErrors:
         """Unsupported file extension raises ValueError."""
         p = _write(tmp_path, "config.toml", "name = 'test'\n")
         with pytest.raises(ValueError, match="Unsupported config format"):
+            SystemBootstrapper().bootstrap(p)
+
+    def test_markdown_points_to_ai_layer(self, tmp_path: Path) -> None:
+        """Markdown skill configs are an AI-layer feature; the engine says so."""
+        p = _write(tmp_path, "skill.md", "# Agent\nDoes things.\n")
+        with pytest.raises(ValueError, match=r"bricks_ai\.skill_boot"):
             SystemBootstrapper().bootstrap(p)

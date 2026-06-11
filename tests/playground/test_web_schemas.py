@@ -1,10 +1,10 @@
-"""Tests for bricks.playground.web.schemas."""
+"""Tests for bricks_ai.playground.web.schemas."""
 
 from __future__ import annotations
 
 import pytest
 
-from bricks.playground.web.schemas import BenchmarkRequest, BenchmarkResponse, EngineResultResponse
+from bricks_ai.playground.web.schemas import BenchmarkRequest, BenchmarkResponse, EngineResultResponse
 
 
 class TestBenchmarkRequest:

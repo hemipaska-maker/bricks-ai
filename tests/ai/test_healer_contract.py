@@ -28,7 +28,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bricks.ai.healing import (
+from bricks.core.exceptions import BrickExecutionError
+from bricks_ai.healing import (
     DictUnwrapHealer,
     FullRecomposeHealer,
     HealContext,
@@ -38,8 +39,7 @@ from bricks.ai.healing import (
     ParamNameHealer,
     ShapeAwareLLMHealer,
 )
-from bricks.core.exceptions import BrickExecutionError
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 # --- test doubles -----------------------------------------------------------
 

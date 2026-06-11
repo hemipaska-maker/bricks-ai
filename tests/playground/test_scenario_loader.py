@@ -1,4 +1,4 @@
-"""Tests for bricks.playground.scenario_loader — load_scenario, export_scenario, round-trip."""
+"""Tests for bricks_ai.playground.scenario_loader — load_scenario, export_scenario, round-trip."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from typing import Any
 import pytest
 import yaml
 
-from bricks.playground.scenario_format import ScenarioDefinition
-from bricks.playground.scenario_loader import (
+from bricks_ai.playground.scenario_format import ScenarioDefinition
+from bricks_ai.playground.scenario_loader import (
     export_scenario,
     load_scenario,
     scenario_to_benchmark_request,

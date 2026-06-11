@@ -7,7 +7,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from bricks.playground.web.app import app
+from bricks_ai.playground.web.app import app
 
 
 @pytest.fixture(name="client")

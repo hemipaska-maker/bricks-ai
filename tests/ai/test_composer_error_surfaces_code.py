@@ -12,14 +12,14 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from bricks.ai.composer import (
+from bricks.core.selector import AllBricksSelector
+from bricks_ai.composer import (
     BlueprintComposer,
     CallDetail,
     ComposeResult,
     CompositionError,
 )
-from bricks.core.selector import AllBricksSelector
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 
 def _make_composer(response_text: str) -> BlueprintComposer:

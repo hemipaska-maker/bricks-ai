@@ -1,7 +1,7 @@
-"""Smoke tests for the relocated bricks.playground.engine module.
+"""Smoke tests for the relocated bricks_ai.playground.engine module.
 
 After PR 2 of the playground redesign (#76) the engine moved from
-``bricks.playground.showcase.engine`` to ``bricks.playground.engine``.
+``bricks_ai.playground.showcase.engine`` to ``bricks_ai.playground.engine``.
 This file confirms the public ``BricksEngine`` and ``RawLLMEngine``
 classes still expose the same shape that web routes + CLI rely on.
 Heavyweight behavior is exercised by the existing integration tests
@@ -11,7 +11,7 @@ the import path and result shape.
 
 from __future__ import annotations
 
-from bricks.playground.engine import BricksEngine, EngineResult, RawLLMEngine
+from bricks_ai.playground.engine import BricksEngine, EngineResult, RawLLMEngine
 
 
 def test_imports_resolve() -> None:

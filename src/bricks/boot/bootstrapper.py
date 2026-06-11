@@ -1,12 +1,13 @@
-"""SystemBootstrapper: reads agent.yaml or skill.md, returns SystemConfig.
+"""SystemBootstrapper: reads agent.yaml, returns SystemConfig.
 
 ``agent.yaml`` → parse directly, zero LLM calls.
-``skill.md``   → one LLM call to extract categories and tags, then build config.
+
+Free-text ``skill.md`` bootstrapping needs an LLM to extract categories and
+tags, so it lives in the AI layer — see ``bricks_ai.skill_boot``.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -15,51 +16,34 @@ from ruamel.yaml.error import YAMLError
 
 from bricks.boot.config import SystemConfig
 from bricks.core.config import StoreConfig
-from bricks.llm.base import LLMProvider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
-_EXTRACT_SYSTEM = """\
-You are a configuration extractor. Given an agent description, extract the domain categories and tags.
-Return ONLY valid JSON with no explanation:
-{"categories": ["category1", "category2"], "tags": ["tag1", "tag2"]}
-
-Categories should be snake_case domain areas (e.g. data_transformation, string_processing, math, date_time).
-Tags should be concise descriptive labels (e.g. aggregation, filtering, formatting).
-"""
-
 
 class SystemBootstrapper:
-    """Reads a config file and returns a fully resolved ``SystemConfig``.
+    """Reads an ``agent.yaml`` config file and returns a resolved ``SystemConfig``.
 
-    Supports two config formats:
-
-    - ``agent.yaml``: structured YAML, parsed directly without any LLM call.
-    - ``skill.md``: free-text markdown description; one LLM call extracts
-      ``brick_categories`` and ``tags`` from the description.
-
-    If the LLM call fails or returns unparseable JSON, the bootstrapper falls
-    back to empty ``categories`` and ``tags`` — it never raises on LLM errors.
+    The structured YAML is parsed directly without any LLM call. Markdown
+    skill descriptions (``skill.md``) are not supported here — they require
+    an LLM extraction call and are handled by
+    ``bricks_ai.skill_boot.bootstrap_from_skill``.
     """
 
     def __init__(
         self,
         api_key: str = "",
         model: str = _DEFAULT_MODEL,
-        provider: LLMProvider | None = None,
     ) -> None:
         """Initialise the bootstrapper.
 
         Args:
-            api_key: API key for the default LiteLLM provider. Required only for ``.md`` files
-                when no explicit ``provider`` is given.
-            model: Model ID used for the extraction call (default LiteLLM provider only).
-            provider: Optional custom LLM provider. When given, ``api_key`` and ``model``
-                are ignored for LLM calls.
+            api_key: Default API key recorded in the resolved config when the
+                YAML does not specify one. The engine never uses it; it is
+                inert configuration consumed by the AI layer.
+            model: Default model ID recorded in the resolved config.
         """
         self._api_key = api_key
         self._model = model
-        self._provider = provider
         self._yaml = YAML()
         self._yaml.preserve_quotes = True
 
@@ -67,14 +51,15 @@ class SystemBootstrapper:
         """Read a config file and return a resolved ``SystemConfig``.
 
         Args:
-            config_path: Path to ``agent.yaml`` or ``skill.md``.
+            config_path: Path to ``agent.yaml``.
 
         Returns:
             A populated ``SystemConfig``.
 
         Raises:
             FileNotFoundError: If ``config_path`` does not exist.
-            ValueError: If the file extension is not ``.yaml`` or ``.md``.
+            ValueError: If the file extension is not ``.yaml``/``.yml``.
+                Markdown files get a pointer to ``bricks_ai.skill_boot``.
         """
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -82,8 +67,12 @@ class SystemBootstrapper:
         if suffix in {".yaml", ".yml"}:
             return self._from_yaml(config_path)
         if suffix == ".md":
-            return self._from_markdown(config_path)
-        raise ValueError(f"Unsupported config format {suffix!r}. Use '.yaml' or '.md'.")
+            raise ValueError(
+                "Markdown skill configs require the AI layer: use "
+                "bricks_ai.skill_boot.bootstrap_from_skill() "
+                '(pip install "bricks-ai[ai]").'
+            )
+        raise ValueError(f"Unsupported config format {suffix!r}. Use '.yaml'.")
 
     # ── private helpers ────────────────────────────────────────────────────
 
@@ -120,62 +109,3 @@ class SystemBootstrapper:
             store=store_cfg,
             max_selector_results=data.get("max_selector_results", 20),
         )
-
-    def _from_markdown(self, path: Path) -> SystemConfig:
-        """Parse a ``skill.md`` file, making one LLM call to extract config.
-
-        Args:
-            path: Path to the markdown file.
-
-        Returns:
-            A ``SystemConfig`` with ``brick_categories`` and ``tags`` extracted
-            by the LLM. Falls back to empty lists on any LLM or parse error.
-        """
-        content = path.read_text(encoding="utf-8")
-        name = _extract_md_title(content) or path.stem
-        categories, tags = self._extract_from_llm(content)
-        return SystemConfig(
-            name=name,
-            description=content[:500],
-            brick_categories=categories,
-            tags=tags,
-            model=self._model,
-            api_key=self._api_key,
-        )
-
-    def _extract_from_llm(self, description: str) -> tuple[list[str], list[str]]:
-        """Call the LLM to extract categories and tags from a description.
-
-        Args:
-            description: Agent description text.
-
-        Returns:
-            A tuple of ``(categories, tags)`` lists. Falls back to ``([], [])``
-            on any error so the bootstrapper never raises on LLM failures.
-        """
-        try:
-            from bricks.llm.litellm_provider import LiteLLMProvider  # noqa: PLC0415
-
-            provider = self._provider or LiteLLMProvider(model=self._model, api_key=self._api_key)
-            text = provider.complete(prompt=description, system=_EXTRACT_SYSTEM).text.strip()
-            parsed = json.loads(text)
-            categories = [str(c) for c in parsed.get("categories", [])]
-            tags = [str(t) for t in parsed.get("tags", [])]
-            return categories, tags
-        except Exception:
-            return [], []
-
-
-def _extract_md_title(content: str) -> str:
-    """Extract the first H1 heading from markdown content.
-
-    Args:
-        content: Markdown text.
-
-    Returns:
-        The heading text without the leading ``#``, or empty string if not found.
-    """
-    for line in content.splitlines():
-        if line.startswith("# "):
-            return line[2:].strip()
-    return ""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_INDEX = Path(__file__).resolve().parents[2] / "src" / "bricks" / "playground" / "web" / "static" / "index.html"
+_INDEX = Path(__file__).resolve().parents[2] / "src" / "bricks_ai" / "playground" / "web" / "static" / "index.html"
 
 
 def test_index_html_exists() -> None:

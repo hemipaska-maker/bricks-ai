@@ -1,4 +1,4 @@
-"""Tests for bricks.llm — LLMProvider ABC and LiteLLMProvider."""
+"""Tests for bricks_ai.llm — LLMProvider ABC and LiteLLMProvider."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from bricks.errors import BricksComposeError, BricksConfigError
-from bricks.llm.base import LLMProvider
-from bricks.llm.litellm_provider import LiteLLMProvider
+from bricks_ai.llm.base import LLMProvider
+from bricks_ai.llm.litellm_provider import LiteLLMProvider
 
 
 class TestLLMProviderABC:

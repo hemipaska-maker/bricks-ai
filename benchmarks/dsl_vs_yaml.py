@@ -24,10 +24,10 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "core" / "src"))
 
 import bricks
-from bricks.ai.composer import BlueprintComposer
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.composer import BlueprintComposer
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 # ---------------------------------------------------------------------------
 # Pre-canned DSL responses for each benchmark task

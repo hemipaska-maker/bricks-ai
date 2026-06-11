@@ -22,8 +22,8 @@ from typing import Any
 
 import pytest
 
-from bricks.llm.base import CompletionResult, LLMProvider
-from bricks.playground.engine import BricksEngine
+from bricks_ai.llm.base import CompletionResult, LLMProvider
+from bricks_ai.playground.engine import BricksEngine
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures"
 

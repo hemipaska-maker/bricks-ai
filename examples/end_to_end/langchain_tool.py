@@ -23,8 +23,8 @@ _live = bool(os.getenv("BRICKS_MODEL") or os.getenv("ANTHROPIC_API_KEY") or os.g
 
 def _build_engine() -> object:
     """Return a Bricks engine configured from environment."""
-    from bricks import Bricks
-    from bricks.llm.litellm_provider import LiteLLMProvider
+    from bricks_ai import Bricks
+    from bricks_ai.llm.litellm_provider import LiteLLMProvider
 
     model = os.getenv("BRICKS_MODEL", "claude-haiku-4-5")
     return Bricks.default(provider=LiteLLMProvider(model=model))
@@ -39,7 +39,7 @@ def make_bricks_tool(engine: object) -> object:
     Returns:
         A plain callable that accepts a JSON string input.
     """
-    from bricks import Bricks as _Bricks
+    from bricks_ai import Bricks as _Bricks
 
     assert isinstance(engine, _Bricks)  # noqa: S101
 

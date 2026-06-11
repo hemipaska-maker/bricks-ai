@@ -11,7 +11,7 @@ import pytest
 from bricks.core.brick import BrickFunction, brick
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
-from bricks.llm.base import LLMProvider
+from bricks_ai.llm.base import LLMProvider
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -39,7 +39,7 @@ def llm_provider(request: pytest.FixtureRequest) -> LLMProvider:
     """Return mock provider by default; ClaudeCodeProvider with --live flag."""
     if request.config.getoption("--live"):
         try:
-            from bricks.providers.claudecode import ClaudeCodeProvider
+            from bricks_ai.providers.claudecode import ClaudeCodeProvider
 
             return ClaudeCodeProvider()  # type: ignore[return-value]
         except ImportError:

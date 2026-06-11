@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from bricks.core.input_mapper import InputMapper
 from bricks.errors import BricksInputError
-from bricks.orchestrator.input_mapper import InputMapper
 
 
 class TestInputMapper:

@@ -15,9 +15,9 @@ from unittest.mock import patch
 
 import pytest
 
-from bricks.providers.anthropic import AnthropicProvider
-from bricks.providers.ollama import OllamaProvider
-from bricks.providers.openai import OpenAIProvider
+from bricks_ai.providers.anthropic import AnthropicProvider
+from bricks_ai.providers.ollama import OllamaProvider
+from bricks_ai.providers.openai import OpenAIProvider
 
 # ── Anthropic ────────────────────────────────────────────────────────────────
 
@@ -221,13 +221,13 @@ def test_ollama_connect_error_is_helpful() -> None:
             provider.complete("hi")
 
 
-# ── Claude Code adapter (reuses bricks.providers.claudecode from #47) ────────
+# ── Claude Code adapter (reuses bricks_ai.providers.claudecode from #47) ────────
 
 
 def test_claudecode_via_build_provider() -> None:
     """routes._build_provider('claude_code', ...) returns the existing provider."""
-    from bricks.playground.web.routes import _build_provider
-    from bricks.providers.claudecode import ClaudeCodeProvider
+    from bricks_ai.playground.web.routes import _build_provider
+    from bricks_ai.providers.claudecode import ClaudeCodeProvider
 
     p = _build_provider("claude_code", "haiku", None)
     assert isinstance(p, ClaudeCodeProvider)
@@ -238,7 +238,7 @@ def test_claudecode_subprocess_mocked() -> None:
     """Smoke: the underlying #47 provider still parses JSON output via subprocess."""
     import json as jsonlib
 
-    from bricks.providers.claudecode import ClaudeCodeProvider
+    from bricks_ai.providers.claudecode import ClaudeCodeProvider
 
     sample = {
         "is_error": False,
@@ -253,7 +253,7 @@ def test_claudecode_subprocess_mocked() -> None:
         "modelUsage": {"claude-haiku-4-5": {}},
     }
     fake = subprocess.CompletedProcess(args=["claude"], returncode=0, stdout=jsonlib.dumps(sample), stderr="")
-    with patch("bricks.providers.claudecode.provider.subprocess.run", return_value=fake):
+    with patch("bricks_ai.providers.claudecode.provider.subprocess.run", return_value=fake):
         provider = ClaudeCodeProvider()
         result = provider.complete("hi")
     assert result.text == "hello"

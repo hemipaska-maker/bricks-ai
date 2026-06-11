@@ -1,17 +1,17 @@
-"""Tests for the bricks.demo module (demo mode — no LLM required)."""
+"""Tests for the bricks_ai.demo module (demo mode — no LLM required)."""
 
 from __future__ import annotations
 
 import pytest
 
-from bricks.demo.data import (
+from bricks_ai.demo.data import (
     EXPECTED_ACTIVE_REVENUE,
     SAMPLE_CRM,
     SIMULATED_LLM_RESPONSES,
     DemoMetrics,
     generate_variants,
 )
-from bricks.demo.runner import DemoRunner
+from bricks_ai.demo.runner import DemoRunner
 
 # ---------------------------------------------------------------------------
 # data.py tests

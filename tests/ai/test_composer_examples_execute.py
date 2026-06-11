@@ -22,12 +22,12 @@ from typing import Any
 
 import pytest
 
-from bricks.ai.composer import DSL_PROMPT_TEMPLATE
 from bricks.core.builtins import register_builtins
 from bricks.core.dsl import FlowDefinition, branch, flow, for_each, step
 from bricks.core.engine import BlueprintEngine
 from bricks.core.models import BrickMeta
 from bricks.core.registry import BrickRegistry
+from bricks_ai.composer import DSL_PROMPT_TEMPLATE
 from tests.ai.test_composer_examples import _extract_examples
 
 

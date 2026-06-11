@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from bricks.api import Bricks
 from bricks.core.exceptions import OrchestratorError
-from bricks.llm.base import LLMProvider
+from bricks_ai.api import Bricks
+from bricks_ai.llm.base import LLMProvider
 
 
 @pytest.mark.live

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import yaml
+from ruamel.yaml import YAML
 
 from bricks.core.dag import DAG
 from bricks.core.dsl import FlowDefinition, Node, _tracer, branch, flow, for_each, step
@@ -91,7 +91,7 @@ class TestFlowDecorator:
             return step.clean(text="x")
 
         result = pipe.to_yaml()
-        parsed = yaml.safe_load(result)
+        parsed = YAML(typ="safe").load(result)
         assert isinstance(parsed, dict)
 
 

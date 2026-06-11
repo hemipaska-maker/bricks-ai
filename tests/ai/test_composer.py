@@ -1,4 +1,4 @@
-"""Tests for bricks.ai.composer."""
+"""Tests for bricks_ai.composer."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bricks.ai.composer import (
+from bricks.core.registry import BrickRegistry
+from bricks_ai.composer import (
     _RETRY_PROMPT,
     BlueprintComposer,
     ComposerError,
     ComposeResult,
 )
-from bricks.core.registry import BrickRegistry
-from bricks.llm.base import CompletionResult
+from bricks_ai.llm.base import CompletionResult
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ def bad_flow():
 
 def _make_composer(registry: BrickRegistry) -> BlueprintComposer:
     """Create a BlueprintComposer with a mocked LLMProvider."""
-    from bricks.llm.base import LLMProvider
+    from bricks_ai.llm.base import LLMProvider
 
     composer = BlueprintComposer.__new__(BlueprintComposer)
     mock_provider = MagicMock(spec=LLMProvider)
@@ -198,7 +198,7 @@ class TestComposerInit:
 
     def test_accepts_llm_provider(self) -> None:
         """BlueprintComposer accepts an LLMProvider instance."""
-        from bricks.llm.base import LLMProvider
+        from bricks_ai.llm.base import LLMProvider
 
         mock_provider = MagicMock(spec=LLMProvider)
         composer = BlueprintComposer(provider=mock_provider)
@@ -341,7 +341,7 @@ class TestDSLPromptTemplate:
 
     def test_prompt_contains_data_flow_contract(self) -> None:
         """DSL_PROMPT_TEMPLATE includes the data flow contract block."""
-        from bricks.ai.composer import DSL_PROMPT_TEMPLATE
+        from bricks_ai.composer import DSL_PROMPT_TEMPLATE
 
         prompt = DSL_PROMPT_TEMPLATE.format(
             brick_signatures="add(a: float, b: float) → dict",
@@ -352,7 +352,7 @@ class TestDSLPromptTemplate:
 
     def test_prompt_contains_worked_examples(self) -> None:
         """DSL_PROMPT_TEMPLATE includes worked @flow examples A/B/C."""
-        from bricks.ai.composer import DSL_PROMPT_TEMPLATE
+        from bricks_ai.composer import DSL_PROMPT_TEMPLATE
 
         prompt = DSL_PROMPT_TEMPLATE.format(
             brick_signatures="add(a: float, b: float) → dict",

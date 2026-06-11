@@ -64,6 +64,7 @@ dev = [
     "ruff>=0.3",
     "build",
     "cogapp>=3.4",
+    "import-linter>=2.0",
 ]
 
 [project.scripts]
@@ -86,8 +87,25 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"bricks.playground" = ["presets/*.yaml", "datasets/*.json"]
-"bricks.playground.web" = ["static/*", "static/**/*"]
+"bricks" = ["py.typed"]
+"bricks_ai" = ["py.typed"]
+"bricks_ai.playground" = ["presets/*.yaml", "datasets/*.json"]
+"bricks_ai.playground.web" = ["static/*", "static/**/*"]
+
+[tool.importlinter]
+root_packages = ["bricks", "bricks_ai"]
+
+[[tool.importlinter.contracts]]
+name = "Engine must not import the AI layer"
+type = "forbidden"
+source_modules = ["bricks"]
+forbidden_modules = ["bricks_ai"]
+ignore_imports = [
+    # CLI AI commands (compose/demo/serve/playground) import bricks_ai
+    # lazily inside the command body, behind try/except ImportError gates.
+    "bricks.cli.main -> bricks_ai",
+    "bricks.cli.main -> bricks_ai.**",
+]
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -121,11 +139,11 @@ ignore_missing_imports = true
 
 
 [[tool.mypy.overrides]]
-module = ["bricks.mcp.server", "bricks.cli.check_env"]
+module = ["bricks_ai.mcp.server", "bricks.cli.check_env"]
 warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
-module = ["bricks.playground.*", "bricks.stdlib.*", "bricks.providers.*"]
+module = ["bricks_ai.playground.*", "bricks.stdlib.*", "bricks_ai.providers.*"]
 ignore_errors = true
 
 [tool.ruff]
@@ -152,5 +170,5 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "PLC0415"]
-"src/bricks/playground/**/*.py" = ["S101", "PLC0415"]
+"src/bricks_ai/playground/**/*.py" = ["S101", "PLC0415"]
 "examples/**/*.py" = ["PLC0415"]

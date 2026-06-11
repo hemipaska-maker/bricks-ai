@@ -15,16 +15,37 @@ pre-commit install
 Test all:        pytest
 Test one:        pytest tests/path/to/test_x.py::test_name
 Lint:            ruff check . && ruff format --check .
-Typecheck:       mypy src/bricks
+Typecheck:       mypy src/bricks src/bricks_ai
+Import boundary: lint-imports
 Run CLI:         bricks --help
 Run Playground:  bricks playground  (local web UI at http://localhost:8080)
 
 ## Architecture
-- `src/bricks/core/` — engine, context, DSL pipeline
-- `src/bricks/stdlib/` — standard bricks (text, data, logic)
-- `src/bricks/playground/` — web GUI + FastAPI backend, scenario runner (preset/custom YAML), `bricks playground run` CLI
-- `src/bricks/providers/` — LLM provider adapters (claudecode, anthropic, openai, ollama)
-See docs/architecture.md for detail.
+Two top-level packages with a one-way dependency: `bricks_ai` imports `bricks`, never the reverse.
+
+**`src/bricks/` — the deterministic engine (zero LLM code or deps):**
+- `bricks/core/` — engine, registry, DSL pipeline, validators, context
+- `bricks/stdlib/` — standard bricks (text, data, logic)
+- `bricks/store/` — blueprint cache (file/memory)
+- `bricks/selector/` — keyword/embedding brick selection tiers
+- `bricks/boot/` — `agent.yaml` bootstrapping (YAML only)
+- `bricks/cli/` — CLI; AI commands lazily import `bricks_ai` behind friendly gates
+
+**`src/bricks_ai/` — the AI layer (everything that talks to an LLM):**
+- `composer.py` / `healing.py` — LLM blueprint composition + self-heal
+- `orchestrator.py` — natural-language task executor (compose → execute)
+- `api.py` — the `Bricks` facade (`from bricks_ai import Bricks`)
+- `skill_boot.py` — `skill.md` bootstrapping (one LLM extraction call)
+- `llm/` — `LLMProvider` ABC, LiteLLM provider, shared provider factory
+- `providers/` — adapters (claudecode, anthropic, openai, ollama)
+- `playground/` — web GUI + FastAPI backend, scenario runner, `bricks playground run`
+- `mcp/`, `demo/` — MCP server, interactive demo
+
+The boundary is enforced by import-linter (`[tool.importlinter]` in pyproject.toml),
+a guard test (`tests/core/test_no_ai_imports.py`), and the `engine-only` CI job
+which installs the base package (no LLM SDKs) and runs the engine test suites.
+See docs/ENGINE_AI_SPLIT_PLAN.md for the split rationale; the `pre-decoupling`
+git tag marks the last coupled state.
 
 ## Conventions
 - Python 3.10+, type hints everywhere, docstrings on public APIs

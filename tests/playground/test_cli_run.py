@@ -23,7 +23,7 @@ _runner = CliRunner()
 
 
 def _stub_engine_result(outputs: dict[str, object], *, dsl_code: str = "@flow\ndef f(): pass\n") -> SimpleNamespace:
-    """Mimic ``bricks.playground.engine.EngineResult`` shape used by ``run``."""
+    """Mimic ``bricks_ai.playground.engine.EngineResult`` shape used by ``run``."""
     return SimpleNamespace(
         outputs=outputs,
         dsl_code=dsl_code,
@@ -42,9 +42,9 @@ def test_run_resolves_preset_name_and_prints_three_sections() -> None:
     """A bare preset name resolves to the bundled YAML and the three
     labeled sections appear in the output."""
     with (
-        patch("bricks.llm.litellm_provider.LiteLLMProvider"),
+        patch("bricks_ai.llm.litellm_provider.LiteLLMProvider"),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"active_count": 9, "total_active_revenue": 1524.0}),
         ),
     ):
@@ -69,9 +69,9 @@ def test_run_resolves_yaml_path(tmp_path: Path) -> None:
     )
 
     with (
-        patch("bricks.llm.litellm_provider.LiteLLMProvider"),
+        patch("bricks_ai.llm.litellm_provider.LiteLLMProvider"),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"count": 2}),
         ),
     ):
@@ -85,13 +85,13 @@ def test_run_resolves_yaml_path(tmp_path: Path) -> None:
 def test_run_compare_raw_runs_raw_llm_engine_too() -> None:
     """``--compare-raw`` adds the raw_llm output block."""
     with (
-        patch("bricks.llm.litellm_provider.LiteLLMProvider"),
+        patch("bricks_ai.llm.litellm_provider.LiteLLMProvider"),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"x": 1}),
         ),
         patch(
-            "bricks.playground.engine.RawLLMEngine.solve",
+            "bricks_ai.playground.engine.RawLLMEngine.solve",
             return_value=_stub_engine_result({"x": 1}, dsl_code=""),
         ),
     ):
@@ -124,9 +124,9 @@ def test_run_uses_inferred_provider_for_claudecode_preset() -> None:
         return SimpleNamespace()
 
     with (
-        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch("bricks_ai.llm.factory.build_provider", new=fake_build),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"x": 1}),
         ),
     ):
@@ -148,9 +148,9 @@ def test_run_explicit_provider_flag_overrides_inference() -> None:
         return SimpleNamespace()
 
     with (
-        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch("bricks_ai.llm.factory.build_provider", new=fake_build),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"x": 1}),
         ),
     ):
@@ -172,9 +172,9 @@ def test_run_model_flag_overrides_scenario_model() -> None:
         return SimpleNamespace()
 
     with (
-        patch("bricks.playground.provider_factory.build_provider", new=fake_build),
+        patch("bricks_ai.llm.factory.build_provider", new=fake_build),
         patch(
-            "bricks.playground.engine.BricksEngine.solve",
+            "bricks_ai.playground.engine.BricksEngine.solve",
             return_value=_stub_engine_result({"x": 1}),
         ),
     ):

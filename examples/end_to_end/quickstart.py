@@ -61,19 +61,19 @@ _live = bool(os.getenv("BRICKS_MODEL") or os.getenv("ANTHROPIC_API_KEY") or os.g
 
 def run_demo() -> dict[str, object]:
     """Run in demo mode using the pre-composed blueprint."""
-    from bricks.api import _build_default_registry
+    from bricks.api import build_default_registry
     from bricks.core.engine import BlueprintEngine
     from bricks.core.loader import BlueprintLoader
 
-    registry = _build_default_registry()
+    registry = build_default_registry()
     blueprint = BlueprintLoader().load_string(_DEMO_YAML)
     return BlueprintEngine(registry=registry).run(blueprint, inputs={"raw_data": _RAW_DATA}).outputs
 
 
 def run_live() -> dict[str, object]:
     """Run in live mode — composes the blueprint via LLM, then executes."""
-    from bricks import Bricks
-    from bricks.llm.litellm_provider import LiteLLMProvider
+    from bricks_ai import Bricks
+    from bricks_ai.llm.litellm_provider import LiteLLMProvider
 
     model = os.getenv("BRICKS_MODEL", "claude-haiku-4-5")
     provider = LiteLLMProvider(model=model)

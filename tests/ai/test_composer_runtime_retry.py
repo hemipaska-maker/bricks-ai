@@ -11,12 +11,12 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from bricks.ai.composer import BlueprintComposer
-from bricks.ai.healing import HealAttempt, HealResult
 from bricks.core.brick import BrickMeta
 from bricks.core.exceptions import BrickExecutionError
 from bricks.core.registry import BrickRegistry
-from bricks.llm.base import CompletionResult, LLMProvider
+from bricks_ai.composer import BlueprintComposer
+from bricks_ai.healing import HealAttempt, HealResult
+from bricks_ai.llm.base import CompletionResult, LLMProvider
 
 # A DSL snippet the validate_dsl pass accepts and that executes to a simple
 # dict when run through the composer's _parse_dsl_response + a fake executor.

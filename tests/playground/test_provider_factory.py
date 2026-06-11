@@ -1,4 +1,4 @@
-"""Tests for ``bricks.playground.provider_factory``.
+"""Tests for ``bricks_ai.llm.factory``.
 
 The factory is the single source of truth that both the FastAPI web
 routes and the ``bricks playground run`` CLI use to construct an
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from bricks.playground.provider_factory import (
+from bricks_ai.llm.factory import (
     SUPPORTED_PROVIDERS,
     build_provider,
     infer_provider,

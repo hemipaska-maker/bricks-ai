@@ -541,7 +541,7 @@ class TestComposeCommand:
 
         monkeypatch.chdir(tmp_path)
         # Patch the import to raise ImportError
-        with mock.patch.dict(sys.modules, {"bricks.ai.composer": None}):  # type: ignore[dict-item]
+        with mock.patch.dict(sys.modules, {"bricks_ai.composer": None}):  # type: ignore[dict-item]
             result = runner.invoke(app, ["compose", "do something"])
         # If anthropic IS installed, we'd get a prompt; either way, test
         # that the command doesn't just crash with an unhandled exception.
@@ -551,14 +551,14 @@ class TestComposeCommand:
         """compose that raises ComposerError should exit 1 with a message."""
         import unittest.mock as mock
 
-        from bricks.ai.composer import ComposerError
+        from bricks_ai.composer import ComposerError
 
         monkeypatch.chdir(tmp_path)
         mock_composer_instance = mock.MagicMock()
         mock_composer_instance.compose.side_effect = ComposerError("API call failed: test")
         mock_composer_cls = mock.MagicMock(return_value=mock_composer_instance)
 
-        with mock.patch("bricks.ai.composer.BlueprintComposer", mock_composer_cls):
+        with mock.patch("bricks_ai.composer.BlueprintComposer", mock_composer_cls):
             result = runner.invoke(app, ["compose", "do something"], input="fake_key\n")
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}"
         assert "Composition failed" in result.output, "Expected 'Composition failed' in output"

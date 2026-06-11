@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bricks.llm.litellm_provider import LiteLLMProvider, _is_anthropic_family
+from bricks_ai.llm.litellm_provider import LiteLLMProvider, _is_anthropic_family
 
 
 @pytest.mark.parametrize(
