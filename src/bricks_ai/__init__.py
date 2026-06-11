@@ -13,7 +13,7 @@ from bricks_ai.orchestrator import RuntimeOrchestrator
 # Deprecated alias — will be removed in v1.0.0
 SequenceComposer = BlueprintComposer
 
-__version__ = "0.5.0-dev"
+__version__ = "1.0.0"
 
 __all__ = [
     "BlueprintComposer",
